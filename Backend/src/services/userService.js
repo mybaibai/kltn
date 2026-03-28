@@ -1,29 +1,22 @@
-import User from '../models/userModel.js'; 
-// ⚠️ LƯU Ý QUAN TRỌNG: Trong Node.js, import file nội bộ BẮT BUỘC phải có đuôi .js
+import User from '../models/userModel.js';
 
-// 1. Tạo User
-export const createUser = async (userData) => {
-  const newUser = await User.create(userData);
-  return newUser;
-};
+export const getAllUsers = (filter = {}) =>
+  User.find(filter).select('-password_hash');
 
-// 2. Lấy tất cả User
-export const getAllUsers = async () => {
-  return await User.find();
-};
+export const getUserById = (id) =>
+  User.findById(id).select('-password_hash');
 
-// 3. Lấy 1 User theo ID
-export const getUserById = async (userId) => {
-  return await User.findById(userId);
-};
+export const getUserByPhone = (phone) =>
+  User.findOne({ phone });
 
-// 4. Cập nhật User
-export const updateUser = async (userId, updateData) => {
-  // { new: true } để trả về dữ liệu mới sau khi update
-  return await User.findByIdAndUpdate(userId, updateData, { new: true });
-};
+export const createUser = (data) =>
+  User.create(data);
 
-// 5. Xóa User
-export const deleteUser = async (userId) => {
-  return await User.findByIdAndDelete(userId);
-};
+export const updateUser = (id, data) =>
+  User.findByIdAndUpdate(id, data, { new: true }).select('-password_hash');
+
+export const toggleUserActive = (id, is_active) =>
+  User.findByIdAndUpdate(id, { is_active }, { new: true });
+
+export const deleteUser = (id) =>
+  User.findByIdAndDelete(id);

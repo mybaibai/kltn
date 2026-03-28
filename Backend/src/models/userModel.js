@@ -1,23 +1,12 @@
 import mongoose from 'mongoose';
 
 const userSchema = new mongoose.Schema({
-  name: { 
-    type: String, 
-    required: true // Bắt buộc phải có
-  },
-  email: { 
-    type: String, 
-    required: true, 
-    unique: true // Không được trùng email
-  },
-  age: { 
-    type: Number, 
-    default: 18 
-  }
-}, {
-  timestamps: true // Tự động thêm createdAt và updatedAt
-});
+  phone:         { type: String, required: true, unique: true, trim: true },
+  name:          { type: String, default: '' },
+  role:          { type: String, enum: ['requester','responder','admin'], default: 'requester' },
+  password_hash: { type: String, default: null },
+  is_active:     { type: Boolean, default: true },
+  avatar_url:    { type: String, default: '' },
+}, { timestamps: true });
 
-const User = mongoose.model('User', userSchema);
-
-export default User;
+export default mongoose.model('User', userSchema);

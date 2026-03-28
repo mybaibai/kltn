@@ -1,25 +1,25 @@
-import express from 'express';
-import dotenv from 'dotenv';
-import connectDB from './config/db.js'; // Nhớ đuôi .js
-import userRoutes from './routes/userRoutes.js'; // Nhớ đuôi .js
+import express  from 'express';
+import dotenv   from 'dotenv';
+import cors     from 'cors';
+import connectDB from './config/db.js';
+import userRoutes from './routes/userRoutes.js';
+import teamRoutes from './routes/teamRoutes.js';
+import sosRoutes  from './routes/sosRoutes.js';
 
-// Load biến môi trường
 dotenv.config();
 
 const app = express();
 
-// Middleware quan trọng: Giúp Express hiểu được dữ liệu JSON
-// Nếu thiếu dòng này, req.body sẽ bị undefined
+app.use(cors());
 app.use(express.json());
 
-// Kết nối Database
 connectDB();
 
-// Route gốc
-// Mọi request bắt đầu bằng /api/users sẽ đi vào userRoutes
 app.use('/api/users', userRoutes);
+app.use('/api/teams', teamRoutes);
+app.use('/api/sos',   sosRoutes);
+
+app.get('/', (_, res) => res.json({ message: '✅ SOS API đang chạy' }));
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`🚀 Server đang chạy tại http://localhost:${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 Server: http://localhost:${PORT}`));
