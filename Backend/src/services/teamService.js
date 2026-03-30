@@ -1,35 +1,42 @@
-import Team from '../models/teamModel.js';
+//Backend/src/services/teamService.js
+import User from '../models/userModel.js';
+import UserLocation from '../models/userLocationModel.js';
 
 export const getAllTeams = () =>
-  Team.find().populate('leader_id', 'name phone');
+  User.find({ role: 'RESCUE' }).select('full_name phone role status profile created_at updated_at');
 
 export const getTeamById = (id) =>
-  Team.findById(id).populate('leader_id', 'name phone');
+  User.findOne({ _id: id, role: 'RESCUE' }).select('full_name phone role status profile created_at updated_at');
 
 export const createTeam = (data) =>
-  Team.create(data);
+  User.create({ ...data, role: 'RESCUE' });
 
 export const updateTeam = (id, data) =>
-  Team.findByIdAndUpdate(id, data, { new: true });
+  User.findOneAndUpdate({ _id: id, role: 'RESCUE' }, data, { new: true });
 
 export const updateTeamLocation = (teamId, lat, lng) =>
-  Team.findByIdAndUpdate(
-    teamId,
-    { location: { type: 'Point', coordinates: [lng, lat] } },
-    { new: true }
-  );
+  UserLocation.findOneAndUpdate(
+    { user_id: teamId },
+    { location: { type: 'Point', coordinates: [Number(lng), Number(lat)] }, updated_at: new Date() },
+    { new: true, upsert: true }
+  ).populate('user_id', 'full_name phone role status');
 
-export const findNearestTeam = (lat, lng, maxDistance = 10000) =>
-  Team.find({
-    status: 'available',
-    is_active: true,
+export const findNearestTeam = async (lat, lng, maxDistance = 10000) => {
+  const locations = await UserLocation.find({
     location: {
       $near: {
-        $geometry: { type: 'Point', coordinates: [lng, lat] },
+        $geometry: { type: 'Point', coordinates: [Number(lng), Number(lat)] },
         $maxDistance: maxDistance,
       },
     },
-  }).limit(5);
+  })
+    .limit(5)
+    .populate('user_id', 'full_name phone role status');
+
+  return locations
+    .map((x) => x.user_id)
+    .filter((u) => u && u.role === 'RESCUE' && u.status === 'ACTIVE');
+};
 
 export const deleteTeam = (id) =>
-  Team.findByIdAndDelete(id);
+  User.findOneAndDelete({ _id: id, role: 'RESCUE' });

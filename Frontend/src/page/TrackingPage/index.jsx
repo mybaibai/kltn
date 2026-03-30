@@ -4,11 +4,11 @@ import MapView from '@/components/Map';
 import { getSosDetail } from '@/services/api/apiSos';
 
 const STATUS_LABEL = {
-  pending:     { text: 'Đang chờ xử lý',      color: 'text-yellow-600 bg-yellow-50' },
-  assigned:    { text: 'Đã phân công đội',     color: 'text-blue-600 bg-blue-50' },
-  in_progress: { text: 'Đội đang trên đường',  color: 'text-orange-600 bg-orange-50' },
-  resolved:    { text: 'Đã hoàn thành',        color: 'text-green-600 bg-green-50' },
-  cancelled:   { text: 'Đã huỷ',              color: 'text-gray-600 bg-gray-50' },
+  PENDING:      { text: 'Đang chờ xử lý',       color: 'text-yellow-600 bg-yellow-50' },
+  ASSIGNED:     { text: 'Đã phân công cứu trợ', color: 'text-blue-600 bg-blue-50' },
+  IN_PROGRESS:  { text: 'Cứu trợ đang di chuyển', color: 'text-orange-600 bg-orange-50' },
+  RESOLVED:     { text: 'Đã hoàn thành',         color: 'text-green-600 bg-green-50' },
+  CANCELLED:    { text: 'Đã huỷ',               color: 'text-gray-600 bg-gray-50' },
 };
 
 export default function TrackingPage() {
@@ -39,14 +39,14 @@ export default function TrackingPage() {
   if (!sos)    return <p className="p-4 text-center text-red-500">Không tìm thấy yêu cầu</p>;
 
   const statusInfo = STATUS_LABEL[sos.status] || { text: sos.status, color: '' };
-  const userPos = { lat: sos.latitude, lng: sos.longitude, label: '📍 Vị trí sự cố' };
-  const teamPos = sos.assigned_team_id?.location?.coordinates
-    ? {
-        lat: sos.assigned_team_id.location.coordinates[1],
-        lng: sos.assigned_team_id.location.coordinates[0],
-        label: `🚑 ${sos.assigned_team_id.name}`,
-      }
+
+  const coords = sos.location?.coordinates;
+  const userPos = coords?.length === 2
+    ? { lat: coords[1], lng: coords[0], label: '📍 Vị trí sự cố' }
     : null;
+
+  // Backend mới populate vào assigned_rescue_id (User)
+  const teamPos = null;
 
   return (
     <div className="max-w-xl mx-auto p-4 space-y-4">
@@ -58,11 +58,11 @@ export default function TrackingPage() {
 
       <MapView userPosition={userPos} teamPosition={teamPos} height="380px" />
 
-      {sos.assigned_team_id && (
+      {sos.assigned_rescue_id && (
         <div className="bg-blue-50 rounded-lg p-3 text-sm space-y-1">
-          <p className="font-medium text-blue-700">🚑 Đội đang hỗ trợ bạn</p>
-          <p className="text-blue-600">{sos.assigned_team_id.name}</p>
-          <p className="text-blue-500">📞 {sos.assigned_team_id.phone_contact}</p>
+          <p className="font-medium text-blue-700">🚑 Người/đội đang hỗ trợ bạn</p>
+          <p className="text-blue-600">{sos.assigned_rescue_id.full_name}</p>
+          <p className="text-blue-500">📞 {sos.assigned_rescue_id.phone}</p>
         </div>
       )}
 

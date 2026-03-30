@@ -1,3 +1,4 @@
+//Backend/src/controllers/teamController.js
 import * as teamService from '../services/teamService.js';
 
 export const getAll = async (req, res) => {

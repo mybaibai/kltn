@@ -7,7 +7,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<SosPage />} />
-        <Route path="/tracking" element={<TrackingPage />} />
+        <Route path="/tracking/:sosId" element={<TrackingPage />} />
       </Routes>
     </BrowserRouter>
   );
