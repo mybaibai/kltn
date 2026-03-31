@@ -7,6 +7,7 @@ import L from 'leaflet';
 import markerIconUrl from 'leaflet/dist/images/marker-icon.png';
 import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png';
 import { sendSos } from '@/services/api/apiSos';
+import SOSForm from './SOSform';
 
 // ── Fix Leaflet icon ──────────────────────────────────────────────────────────
 delete L.Icon.Default.prototype._getIconUrl;
@@ -27,80 +28,6 @@ function RecenterMap({ lat, lng }) {
   return null;
 }
 
-// ── Modal xác nhận gửi SOS ───────────────────────────────────────────────────
-function SosModal({ position, onConfirm, onCancel, sending }) {
-  const [description, setDescription] = useState('');
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)',
-      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-      padding: '0 0 80px 0',
-    }}>
-      <div style={{
-        background: '#fff', borderRadius: '20px 20px 0 0',
-        width: '100%', maxWidth: 480, padding: '24px 20px 20px',
-        boxShadow: '0 -8px 40px rgba(0,0,0,0.3)',
-        animation: 'slideUp 0.3s ease',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: '50%',
-            background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 20,
-          }}>🚨</div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16, color: '#111' }}>Xác nhận gửi SOS</div>
-            <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
-              📌 {position?.address?.slice(0, 60)}...
-            </div>
-          </div>
-        </div>
-
-        <textarea
-          value={description}
-          onChange={e => setDescription(e.target.value)}
-          placeholder="Mô tả tình huống (tuỳ chọn)..."
-          rows={3}
-          style={{
-            width: '100%', border: '1.5px solid #e5e7eb', borderRadius: 10,
-            padding: '10px 12px', fontSize: 14, resize: 'none', outline: 'none',
-            fontFamily: 'inherit', color: '#111', boxSizing: 'border-box',
-          }}
-        />
-
-        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-          <button
-            onClick={onCancel}
-            style={{
-              flex: 1, padding: '13px 0', borderRadius: 12, border: '1.5px solid #e5e7eb',
-              background: '#f9fafb', color: '#374151', fontSize: 15, fontWeight: 600, cursor: 'pointer',
-            }}
-          >
-            Huỷ
-          </button>
-          <button
-            onClick={() => onConfirm(description)}
-            disabled={sending}
-            style={{
-              flex: 2, padding: '13px 0', borderRadius: 12, border: 'none',
-              background: sending ? '#fca5a5' : '#dc2626',
-              color: '#fff', fontSize: 15, fontWeight: 700, cursor: sending ? 'not-allowed' : 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            }}
-          >
-            {sending ? (
-              <>
-                <span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
-                Đang gửi...
-              </>
-            ) : '🆘 GỬI SOS NGAY'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function SosPage() {
@@ -176,8 +103,8 @@ export default function SosPage() {
 
   return (
     <>
-      <style>{`
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+      {/* <style>{`
+        // * { margin: 0; padding: 0; box-sizing: border-box; }
         body { overflow: hidden; }
         @keyframes slideUp {
           from { transform: translateY(100%); opacity: 0; }
@@ -198,7 +125,7 @@ export default function SosPage() {
         .leaflet-container { font-family: inherit; }
         .top-btn { transition: all 0.15s ease; }
         .top-btn:active { transform: scale(0.95); }
-      `}</style>
+      `}</style> */}
 
       {/* ── Bản đồ full màn hình ─────────────────────────────────────────── */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0 }}>
@@ -214,15 +141,15 @@ export default function SosPage() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           {position && <RecenterMap lat={position.lat} lng={position.lng} />}
-          {position && (
-            <Marker position={[position.lat, position.lng]} icon={redIcon}>
-              <Popup>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>📍 Vị trí của bạn</div>
-                <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>{position.address}</div>
-              </Popup>
-            </Marker>
-          )}
         </MapContainer>
+          {showModal && (
+              <SOSForm
+                position={position}
+                onConfirm={handleConfirmSos}
+                onCancel={() => setShowModal(false)}
+                sending={sending}
+              />
+            )}
       </div>
 
       {/* ── Header nổi ───────────────────────────────────────────────────── */}
@@ -379,7 +306,7 @@ export default function SosPage() {
 
       {/* ── Modal xác nhận SOS ───────────────────────────────────────────── */}
       {showModal && (
-        <SosModal
+        <SOSForm
           position={position}
           onConfirm={handleConfirmSos}
           onCancel={() => setShowModal(false)}
