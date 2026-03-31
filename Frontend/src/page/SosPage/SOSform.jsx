@@ -50,10 +50,10 @@ export default function SOSForm({ position, onConfirm, onCancel, sending }) {
   const [description, setDescription] = useState('');
   const [selectedType, setSelectedType] = useState(null);
 
-  const handleSubmit = () => {
-    onConfirm?.({ type: selectedType, description });
-  };
-
+//   const handleSubmit = () => {
+//     onConfirm?.({ type: selectedType, description });
+//   };
+  
   return (
     <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
       <div
@@ -187,7 +187,7 @@ export default function SOSForm({ position, onConfirm, onCancel, sending }) {
         <div className="px-6 pb-5">
           <div className="flex items-center gap-3">
             <button
-              onClick={handleSubmit}
+              onClick={() => onConfirm(description)}
               disabled={sending}
               className={`flex-1 py-3.5 rounded-xl text-white font-bold text-base flex items-center justify-center gap-2 transition-all
                 ${sending ? 'bg-red-400' : 'bg-red-600 hover:bg-red-700 active:scale-[0.98]'}

@@ -7,6 +7,7 @@ import L from 'leaflet';
 import markerIconUrl from 'leaflet/dist/images/marker-icon.png';
 import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png';
 import { sendSos } from '@/services/api/apiSos';
+import LoginRequester from './LoginRequester';
 import SOSForm from './SOSform';
 
 // ── Fix Leaflet icon ──────────────────────────────────────────────────────────
@@ -31,6 +32,7 @@ function RecenterMap({ lat, lng }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function SosPage() {
+  const [showLogin, setShowLogin] = useState(true);
   const navigate = useNavigate();
   const [position, setPosition] = useState(null);
   const [loadingGPS, setLoadingGPS] = useState(false);
@@ -78,6 +80,11 @@ export default function SosPage() {
   // Mở modal xác nhận
   const handleSosClick = () => {
     if (!position) { showToast('⚠️ Vui lòng lấy vị trí của bạn trước', 'warning'); return; }
+    if (!user) {
+      // setLoginNotice('Vui lòng đăng nhập để tiếp tục');
+      // setShowLogin(true);
+      return;
+    }
     setShowModal(true);
   };
 
@@ -103,30 +110,6 @@ export default function SosPage() {
 
   return (
     <>
-      {/* <style>{`
-        // * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { overflow: hidden; }
-        @keyframes slideUp {
-          from { transform: translateY(100%); opacity: 0; }
-          to   { transform: translateY(0);    opacity: 1; }
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        @keyframes pulse-ring {
-          0%   { transform: scale(1);    opacity: 1; }
-          100% { transform: scale(1.8);  opacity: 0; }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-8px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        .sos-btn:active { transform: scale(0.92) !important; }
-        .leaflet-container { font-family: inherit; }
-        .top-btn { transition: all 0.15s ease; }
-        .top-btn:active { transform: scale(0.95); }
-      `}</style> */}
-
       {/* ── Bản đồ full màn hình ─────────────────────────────────────────── */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0 }}>
         <MapContainer
@@ -141,15 +124,35 @@ export default function SosPage() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           {position && <RecenterMap lat={position.lat} lng={position.lng} />}
+          {position && (
+            <Marker position={[position.lat, position.lng]}
+              icon={redIcon}>
+              <Popup>📍 Vị trí của bạn</Popup>
+            </Marker>
+          )}
         </MapContainer>
-          {showModal && (
-              <SOSForm
-                position={position}
-                onConfirm={handleConfirmSos}
-                onCancel={() => setShowModal(false)}
-                sending={sending}
-              />
-            )}
+      {/* ── Modal xác nhận SOS ───────────────────────────────────────────── */}
+        {showModal && (
+            <SOSForm
+              position={position}
+              onConfirm={handleConfirmSos}
+              onCancel={() => setShowModal(false)}
+              sending={sending}
+            />
+          )}
+        {/* {showLogin && (
+        <LoginRequester
+          notice={loginNotice}
+          onConfirm={handleLoginSuccess}
+          onCancel={() => { setShowLogin(false); setLoginNotice(''); }}
+        />
+      )} */}
+      
+      {showLogin && (
+        <LoginRequester 
+          onClose={() => setShowLogin(false)} 
+        />
+      )}
       </div>
 
       {/* ── Header nổi ───────────────────────────────────────────────────── */}
@@ -304,15 +307,6 @@ export default function SosPage() {
         </div>
       )}
 
-      {/* ── Modal xác nhận SOS ───────────────────────────────────────────── */}
-      {showModal && (
-        <SOSForm
-          position={position}
-          onConfirm={handleConfirmSos}
-          onCancel={() => setShowModal(false)}
-          sending={sending}
-        />
-      )}
     </>
   );
 }
