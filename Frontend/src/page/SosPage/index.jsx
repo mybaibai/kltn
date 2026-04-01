@@ -1,12 +1,13 @@
 // Frontend/src/page/SosPage/index.jsx
 import { useNavigate } from 'react-router-dom';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import markerIconUrl from 'leaflet/dist/images/marker-icon.png';
 import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png';
 import { sendSos } from '@/services/api/apiSos';
+import LoginRequester from './LoginRequester';
 import SOSForm from './SOSform';
 import { subscribeAuthState, logout } from '@/services/auth/session';
 
@@ -32,7 +33,21 @@ function RecenterMap({ lat, lng }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function SosPage() {
-  const [showLogin, setShowLogin] = useState(true);
+  const [user, setUser] = useState(() => {
+    try {
+      const raw = localStorage.getItem('auth_user');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [showLogin, setShowLogin] = useState(() => {
+    try {
+      return !localStorage.getItem('auth_user');
+    } catch {
+      return true;
+    }
+  });
   const navigate = useNavigate();
   const [position, setPosition] = useState(null);
   const [loadingGPS, setLoadingGPS] = useState(false);
@@ -122,8 +137,8 @@ export default function SosPage() {
   const handleSosClick = () => {
     if (!position) { showToast('⚠️ Vui lòng lấy vị trí của bạn trước', 'warning'); return; }
     if (!user) {
-      // setLoginNotice('Vui lòng đăng nhập để tiếp tục');
-      // setShowLogin(true);
+      setShowLogin(true);
+      showToast('Vui lòng đăng nhập để tiếp tục', 'warning');
       return;
     }
     setShowModal(true);
@@ -161,8 +176,8 @@ export default function SosPage() {
   const handleConfirmSos = async (description) => {
     setSending(true);
     try {
-      const res = await sendSos({
-        requester_id: '69c50f260f50433bbf71a943', // TODO: thay bằng ID từ auth
+        const res = await sendSos({
+        requester_id: user?._id,
         latitude: position.lat,
         longitude: position.lng,
         address: position.address,
@@ -217,6 +232,11 @@ export default function SosPage() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           {position && <RecenterMap lat={position.lat} lng={position.lng} />}
+          {position && (
+            <Marker position={[position.lat, position.lng]} icon={redIcon}>
+              <Popup>📍 Vị trí của bạn</Popup>
+            </Marker>
+          )}
         </MapContainer>
       {/* ── Modal xác nhận SOS ───────────────────────────────────────────── */}
         {showModal && (
@@ -236,8 +256,9 @@ export default function SosPage() {
       )} */}
       
       {showLogin && (
-        <LoginRequester 
-          onClose={() => setShowLogin(false)} 
+        <LoginRequester
+          onConfirm={handleLoginSuccess}
+          onCancel={() => setShowLogin(false)}
         />
       )}
       </div>
