@@ -1,15 +1,32 @@
 import { useState, useRef, useEffect } from 'react';
+import { sendOtp, confirmOtp, resetOtpSession } from '@/services/auth/phoneAuth';
+import api from '@/services/api';
 
 function PhoneStep({ onNext }) {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleConfirm = async () => {
-    if (!phone.trim()) return;
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 800));
-    setLoading(false);
-    onNext(phone);
+    setError('');
+    const raw = phone.trim();
+    if (!raw) return;
+    const normalized = raw.replace(/\D/g, '');
+    if (normalized.length < 9) {
+      setError('Số điện thoại không hợp lệ.');
+      return;
+    }
+    try {
+      setLoading(true);
+      const phoneE164 = `+84${normalized.replace(/^0/, '')}`;
+      await sendOtp(phoneE164);
+      onNext({ phoneRaw: normalized, phoneE164 });
+    } catch (e) {
+      console.error(e);
+      setError('Không gửi được OTP. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -40,6 +57,9 @@ function PhoneStep({ onNext }) {
             className="flex-1 bg-transparent px-4 py-3.5 text-sm text-gray-700 placeholder-gray-400 outline-none"
           />
         </div>
+        {error && (
+          <p className="mt-1 text-xs text-red-500">{error}</p>
+        )}
       </div>
 
       <button
@@ -116,23 +136,39 @@ function OtpStep({ phone, onBack, onConfirm }) {
     e.preventDefault();
   };
 
-  const handleResend = () => {
-    setCountdown(60); setOtp(Array(OTP_LENGTH).fill('')); setError('');
-    refs.current[0]?.focus();
+  const handleResend = async () => {
+    try {
+      setError('');
+      resetOtpSession();
+      setOtp(Array(OTP_LENGTH).fill(''));
+      setCountdown(60);
+      await sendOtp(phone.phoneE164);
+      refs.current[0]?.focus();
+    } catch (e) {
+      console.error(e);
+      setError('Không gửi lại được OTP. Vui lòng thử lại sau.');
+    }
   };
 
   const handleSubmit = async () => {
     const code = otp.join('');
     if (code.length < OTP_LENGTH) return;
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 800));
-    setLoading(false);
-    if (code === '000000') { setError('Mã OTP không đúng. Vui lòng thử lại.'); return; }
-    onConfirm?.(`+84${phone.replace(/^0/, '')}`, code);
+    try {
+      setLoading(true);
+      const { idToken } = await confirmOtp(code);
+      // gửi token sang backend để xác thực / tạo user
+      const res = await api.post('/auth/firebase', { idToken });
+      onConfirm?.({ phone: phone.phoneE164, backendUser: res.data });
+    } catch (e) {
+      console.error(e);
+      setError('Mã OTP không đúng hoặc đã hết hạn. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filled = otp.join('').length === OTP_LENGTH;
-  const displayPhone = `+84 ${phone.replace(/^0/, '')}`;
+  const displayPhone = phone.phoneE164.replace("+84", "+84 ");
 
   return (
     <div className="px-8 pt-2 pb-7 flex flex-col items-center">
@@ -232,7 +268,7 @@ function OtpStep({ phone, onBack, onConfirm }) {
 
 export default function LoginPopup({ onConfirm, onCancel }) {
   const [step, setStep] = useState('phone');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(null);
   const modalRef = useRef(null);
 
   const handleOverlayClick = (e) => {
@@ -247,6 +283,7 @@ export default function LoginPopup({ onConfirm, onCancel }) {
       onMouseDown={handleOverlayClick}
     >
       <div ref={modalRef} className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden" style={{ fontFamily: "'Segoe UI', sans-serif" }}>
+        <div id="recaptcha-container" />
         <div className="flex justify-end px-5 pt-4">
           <button onClick={onCancel} className="text-gray-300 hover:text-gray-500 transition-colors">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
@@ -257,7 +294,7 @@ export default function LoginPopup({ onConfirm, onCancel }) {
 
         {step === 'phone'
           ? <PhoneStep onNext={(p) => { setPhone(p); setStep('otp'); }} />
-          : <OtpStep phone={phone} onBack={() => setStep('phone')} onConfirm={onConfirm} />
+          : <OtpStep phone={phone} onBack={() => { setStep('phone'); setPhone(null); }} onConfirm={onConfirm} />
         }
       </div>
     </div>
