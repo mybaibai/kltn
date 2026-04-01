@@ -80,11 +80,11 @@ export default function SosPage() {
   // Mở modal xác nhận
   const handleSosClick = () => {
     if (!position) { showToast('⚠️ Vui lòng lấy vị trí của bạn trước', 'warning'); return; }
-    if (!user) {
+    // if (!user) {
       // setLoginNotice('Vui lòng đăng nhập để tiếp tục');
       // setShowLogin(true);
-      return;
-    }
+    //   return;
+    // }
     setShowModal(true);
   };
 
@@ -131,6 +131,7 @@ export default function SosPage() {
             </Marker>
           )}
         </MapContainer>
+      </div>
       {/* ── Modal xác nhận SOS ───────────────────────────────────────────── */}
         {showModal && (
             <SOSForm
@@ -151,9 +152,9 @@ export default function SosPage() {
       {showLogin && (
         <LoginRequester 
           onClose={() => setShowLogin(false)} 
+          onCancel={() => { setShowLogin(false); setLoginNotice(''); }}
         />
       )}
-      </div>
 
       {/* ── Header nổi ───────────────────────────────────────────────────── */}
       <div style={{
