@@ -131,6 +131,14 @@ export default function SosPage() {
             </Marker>
           )}
         </MapContainer>
+          {showModal && (
+              <SOSForm
+                position={position}
+                onConfirm={handleConfirmSos}
+                onCancel={() => setShowModal(false)}
+                sending={sending}
+              />
+            )}
       </div>
       {/* ── Modal xác nhận SOS ───────────────────────────────────────────── */}
         {showModal && (
