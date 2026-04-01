@@ -5,6 +5,7 @@ import connectDB from "./config/db.js";
 import userRoutes from "./routes/userRoutes.js";
 import teamRoutes from "./routes/teamRoutes.js";
 import sosRoutes from "./routes/sosRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
 
 dotenv.config();
 
@@ -19,6 +20,7 @@ connectDB();
 app.use("/api/users", userRoutes);
 app.use("/api/teams", teamRoutes);
 app.use("/api/sos", sosRoutes);
+app.use("/api/auth", authRoutes);
 
 app.get("/", (_, res) => res.json({ message: "✅ SOS API đang chạy" }));
 

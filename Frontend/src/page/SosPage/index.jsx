@@ -8,6 +8,7 @@ import markerIconUrl from 'leaflet/dist/images/marker-icon.png';
 import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png';
 import { sendSos } from '@/services/api/apiSos';
 import SOSForm from './SOSform';
+import { subscribeAuthState, logout } from '@/services/auth/session';
 
 // ── Fix Leaflet icon ──────────────────────────────────────────────────────────
 delete L.Icon.Default.prototype._getIconUrl;
@@ -31,6 +32,7 @@ function RecenterMap({ lat, lng }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function SosPage() {
+  const [showLogin, setShowLogin] = useState(true);
   const navigate = useNavigate();
   const [position, setPosition] = useState(null);
   const [loadingGPS, setLoadingGPS] = useState(false);
@@ -38,13 +40,54 @@ export default function SosPage() {
   const [showModal, setShowModal] = useState(false);
   const [sending, setSending] = useState(false);
   const [toast, setToast] = useState(null);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const DEFAULT_CENTER = [16.0544, 108.2022];
+
+  // Auto-login: if Firebase session exists, verify with backend and close popup
+  useEffect(() => {
+    const unsub = subscribeAuthState(async ({ user: fbUser, idToken }) => {
+      if (!fbUser || !idToken) return;
+      try {
+        const res = await fetch(
+          `${(import.meta.env.VITE_API_URL || 'http://localhost:3001/api').replace(/\/$/, '')}/auth/firebase`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken }),
+          }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const nextUser = {
+          phone: data.phoneNumber,
+          ...(data.user || {}),
+        };
+        setUser(nextUser);
+        try { localStorage.setItem('auth_user', JSON.stringify(nextUser)); } catch {}
+        setShowLogin(false);
+      } catch {
+        // ignore
+      }
+    });
+    return () => unsub?.();
+  }, []);
 
   // Toast helper
   const showToast = (msg, type = 'error') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 4000);
   };
+
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (!showUserMenu) return;
+      // close when clicking outside the menu button/menu panel
+      if (e.target?.closest?.('[data-user-menu]')) return;
+      setShowUserMenu(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [showUserMenu]);
 
   // Lấy GPS
   const handleGetLocation = () => {
@@ -78,7 +121,40 @@ export default function SosPage() {
   // Mở modal xác nhận
   const handleSosClick = () => {
     if (!position) { showToast('⚠️ Vui lòng lấy vị trí của bạn trước', 'warning'); return; }
+    if (!user) {
+      // setLoginNotice('Vui lòng đăng nhập để tiếp tục');
+      // setShowLogin(true);
+      return;
+    }
     setShowModal(true);
+  };
+
+  const handleLoginSuccess = ({ phone, backendUser }) => {
+    const nextUser = {
+      phone,
+      ...(backendUser?.user || backendUser || {}),
+    };
+    setUser(nextUser);
+    try {
+      localStorage.setItem('auth_user', JSON.stringify(nextUser));
+    } catch { /* ignore */ }
+    setShowLogin(false);
+    showToast('Xác nhận người dùng thành công', 'warning');
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      // ignore
+    }
+    try {
+      localStorage.removeItem('auth_user');
+    } catch { /* ignore */ }
+    setUser(null);
+    setShowUserMenu(false);
+    setShowLogin(true);
+    showToast('Đã đăng xuất', 'warning');
   };
 
   // Gửi SOS
@@ -142,14 +218,28 @@ export default function SosPage() {
           />
           {position && <RecenterMap lat={position.lat} lng={position.lng} />}
         </MapContainer>
-          {showModal && (
-              <SOSForm
-                position={position}
-                onConfirm={handleConfirmSos}
-                onCancel={() => setShowModal(false)}
-                sending={sending}
-              />
-            )}
+      {/* ── Modal xác nhận SOS ───────────────────────────────────────────── */}
+        {showModal && (
+            <SOSForm
+              position={position}
+              onConfirm={handleConfirmSos}
+              onCancel={() => setShowModal(false)}
+              sending={sending}
+            />
+          )}
+        {/* {showLogin && (
+        <LoginRequester
+          notice={loginNotice}
+          onConfirm={handleLoginSuccess}
+          onCancel={() => { setShowLogin(false); setLoginNotice(''); }}
+        />
+      )} */}
+      
+      {showLogin && (
+        <LoginRequester 
+          onClose={() => setShowLogin(false)} 
+        />
+      )}
       </div>
 
       {/* ── Header nổi ───────────────────────────────────────────────────── */}
@@ -162,8 +252,103 @@ export default function SosPage() {
         <div style={{ color: '#fff', fontWeight: 800, fontSize: 18, letterSpacing: '-0.3px', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
           🚨 Hỗ trợ khẩn cấp
         </div>
-        <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-          👤
+        <div data-user-menu style={{ position: 'relative' }}>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setShowUserMenu((v) => !v)}
+            onKeyDown={(e) => e.key === 'Enter' && setShowUserMenu((v) => !v)}
+            title={user ? 'Tài khoản' : 'Đăng nhập'}
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.2)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              userSelect: 'none',
+              outline: 'none',
+            }}
+          >
+            👤
+          </div>
+
+          {showUserMenu && (
+            <div
+              style={{
+                position: 'absolute',
+                right: 0,
+                top: 46,
+                width: 260,
+                background: 'rgba(255,255,255,0.97)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(0,0,0,0.06)',
+                borderRadius: 14,
+                boxShadow: '0 12px 30px rgba(0,0,0,0.18)',
+                padding: 12,
+                zIndex: 9999,
+              }}
+            >
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#6b7280', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 8 }}>
+                Tài khoản
+              </div>
+
+              {user ? (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px', borderRadius: 12, background: '#fff', border: '1px solid rgba(0,0,0,0.06)' }}>
+                    <div style={{ fontSize: 12, color: '#111827', fontWeight: 800 }}>
+                      {user.full_name?.trim() ? user.full_name : 'Người dùng'}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#374151' }}>
+                      {user.phone || user.phoneNumber || '—'}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#6b7280' }}>
+                      Vai trò: <span style={{ fontWeight: 800, color: '#111827' }}>{user.role || 'VICTIM'}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleLogout}
+                    style={{
+                      marginTop: 10,
+                      width: '100%',
+                      border: 'none',
+                      borderRadius: 12,
+                      padding: '10px 12px',
+                      cursor: 'pointer',
+                      background: '#fee2e2',
+                      color: '#991b1b',
+                      fontWeight: 800,
+                      fontSize: 13,
+                    }}
+                  >
+                    Đăng xuất
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => { setShowLogin(true); setShowUserMenu(false); }}
+                  style={{
+                    width: '100%',
+                    border: 'none',
+                    borderRadius: 12,
+                    padding: '10px 12px',
+                    cursor: 'pointer',
+                    background: '#dc2626',
+                    color: '#fff',
+                    fontWeight: 800,
+                    fontSize: 13,
+                  }}
+                >
+                  Đăng nhập
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
