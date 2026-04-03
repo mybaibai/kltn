@@ -10,6 +10,10 @@ const __dirname = path.dirname(__filename);
 
 export default defineConfig({
   plugins: [react(), tailwindcss(),svgr()],
+  server: {
+    port: 3000,
+    strictPort: true,
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

@@ -5,20 +5,24 @@ import connectDB from "./config/db.js";
 import userRoutes from "./routes/userRoutes.js";
 import teamRoutes from "./routes/teamRoutes.js";
 import sosRoutes from "./routes/sosRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
+import cookieParser from "cookie-parser";
 
 dotenv.config();
 
-const app = express();
-
-app.use(cors());
-//Backend/src/server.js
-app.use(express.json());
+app.use(cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+  }));
+  app.use(express.json());
+  app.use(cookieParser()); 
 
 connectDB();
 
 app.use("/api/users", userRoutes);
 app.use("/api/teams", teamRoutes);
 app.use("/api/sos", sosRoutes);
+app.use("/api/auth", authRoutes);
 
 app.get("/", (_, res) => res.json({ message: "✅ SOS API đang chạy" }));
 
