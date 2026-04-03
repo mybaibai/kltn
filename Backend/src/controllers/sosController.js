@@ -5,7 +5,7 @@ import * as teamService from '../services/teamService.js';
 // POST /api/sos  — Requester gửi SOS
 export const create = async (req, res) => {
   try {
-    const { requester_id, victim_id, latitude, longitude, lng, lat, address, description, incident_type_id, incident_type } = req.body;
+    const { requester_id, victim_id, latitude, longitude, lng, lat, address, description } = req.body;
 
     // Validate tối thiểu
     const resolvedVictimId = victim_id || requester_id;
@@ -16,12 +16,18 @@ export const create = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Thiếu victim_id/requester_id hoặc lat/lng' });
     }
 
+    let desc = typeof description === 'string' ? description : (description?.description || '');
+    if (address) {
+      desc = [desc, `[Địa chỉ: ${address}]`].filter(Boolean).join('\n').trim();
+    }
+
     const sos = await sosService.createSos({
       victim_id: resolvedVictimId,
-      description: typeof description === 'string' ? description : (description?.description || ''),
-      address: address || '',
-      incident_type: incident_type || incident_type_id || null,
-      location: { type: 'Point', coordinates: [Number(resolvedLng), Number(resolvedLat)] },
+      description: desc,
+      location: {
+        latitude: Number(resolvedLat),
+        longitude: Number(resolvedLng),
+      },
     });
 
     // Tự động tìm đội gần nhất và gán
