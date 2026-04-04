@@ -4,6 +4,8 @@ import TrackingPage from '@/page/TrackingPage';
 import AdminLayout from '@/layouts/AdminLayout';
 import IncidentManagement from '@/page/AdminPage/IncidentManagement';
 import AdminPlaceholder from '@/page/AdminPage/AdminPlaceholder';
+import StaffLoginPage from '@/page/StaffLoginPage';
+import StaffHomePage from '@/page/StaffHomePage';
 
 export default function App() {
   return (
@@ -19,6 +21,8 @@ export default function App() {
           <Route path="history" element={<AdminPlaceholder title="Lịch sử" />} />
           <Route path="settings" element={<AdminPlaceholder title="Cài đặt" />} />
         </Route>
+        <Route path="/staff-login" element={<StaffLoginPage />} />
+        <Route path="/staff" element={<StaffHomePage />} />
       </Routes>
     </BrowserRouter>
   );

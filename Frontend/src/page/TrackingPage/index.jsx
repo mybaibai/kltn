@@ -4,11 +4,17 @@ import MapView from '@/components/Map';
 import { getSosDetail } from '@/services/api/apiSos';
 
 const STATUS_LABEL = {
-  PENDING:      { text: 'Đang chờ xử lý',       color: 'text-yellow-600 bg-yellow-50' },
-  ASSIGNED:     { text: 'Đã phân công cứu trợ', color: 'text-blue-600 bg-blue-50' },
-  IN_PROGRESS:  { text: 'Cứu trợ đang di chuyển', color: 'text-orange-600 bg-orange-50' },
-  RESOLVED:     { text: 'Đã hoàn thành',         color: 'text-green-600 bg-green-50' },
-  CANCELLED:    { text: 'Đã huỷ',               color: 'text-gray-600 bg-gray-50' },
+  Pending: { text: 'Đang chờ xử lý', color: 'text-yellow-600 bg-yellow-50' },
+  Assigned: { text: 'Đã phân công cứu trợ', color: 'text-blue-600 bg-blue-50' },
+  InProgress: { text: 'Cứu trợ đang di chuyển', color: 'text-orange-600 bg-orange-50' },
+  Resolved: { text: 'Đã hoàn thành', color: 'text-green-600 bg-green-50' },
+  Cancelled: { text: 'Đã huỷ', color: 'text-gray-600 bg-gray-50' },
+  // Dữ liệu cũ (trước khi đổi schema)
+  PENDING: { text: 'Đang chờ xử lý', color: 'text-yellow-600 bg-yellow-50' },
+  ASSIGNED: { text: 'Đã phân công cứu trợ', color: 'text-blue-600 bg-blue-50' },
+  IN_PROGRESS: { text: 'Cứu trợ đang di chuyển', color: 'text-orange-600 bg-orange-50' },
+  RESOLVED: { text: 'Đã hoàn thành', color: 'text-green-600 bg-green-50' },
+  CANCELLED: { text: 'Đã huỷ', color: 'text-gray-600 bg-gray-50' },
 };
 
 export default function TrackingPage() {
@@ -40,10 +46,14 @@ export default function TrackingPage() {
 
   const statusInfo = STATUS_LABEL[sos.status] || { text: sos.status, color: '' };
 
-  const coords = sos.location?.coordinates;
-  const userPos = coords?.length === 2
-    ? { lat: coords[1], lng: coords[0], label: '📍 Vị trí sự cố' }
-    : null;
+  const loc = sos.location;
+  let userPos = null;
+  if (loc && typeof loc.latitude === 'number' && typeof loc.longitude === 'number') {
+    userPos = { lat: loc.latitude, lng: loc.longitude, label: '📍 Vị trí sự cố' };
+  } else if (Array.isArray(loc?.coordinates) && loc.coordinates.length === 2) {
+    const [lng, lat] = loc.coordinates;
+    userPos = { lat, lng, label: '📍 Vị trí sự cố' };
+  }
 
   // Backend mới populate vào assigned_rescue_id (User)
   const teamPos = null;

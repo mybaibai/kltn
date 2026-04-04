@@ -1,0 +1,71 @@
+================================================================================
+THÊM ADMIN / RESCUE VÀO MONGODB (collection: users)
+================================================================================
+
+CÁCH 1 — NÊN DÙNG (đã hash bcrypt đúng chuẩn backend):
+  Trong thư mục Backend:
+  npm run seed:roles -- <email_admin> <mat_khau_admin> <email_rescue> <mat_khau_rescue>
+
+  Ví dụ:
+  npm run seed:roles -- admin@ctkltn.local Admin@2026! rescue@ctkltn.local Rescue@2026!
+
+  Script sẽ upsert theo auth.email (không cần copy tay vào Compass).
+
+
+CÁCH 2 — COPY VÀO mongosh (MongoDB Atlas → Browse Collections → Open MongoDB Shell)
+  Mật khẩu tương ứng với hash bên dưới:
+    Admin:   Admin@2026!
+    Rescue:  Rescue@2026!
+
+  Đổi email trong auth.email trước khi chạy (viết thường). Trùng email sẽ lỗi unique.
+
+--------------------------------------------------------------------------------
+// Chọn database (thay tên DB đúng với MONGO_URI của bạn, ví dụ CT_KLTN_SOS)
+use("CT_KLTN_SOS");
+
+db.users.insertMany([
+  {
+    full_name: "Quản trị viên",
+    role: "Admin",
+    status: "Active",
+    profile: { avatar_url: "", address: "", emergency_contact: "" },
+    auth: {
+      type: "Password",
+      email: "admin@ctkltn.local",
+      password: "$2b$10$qn5KulT59yii3NgIWsSr5ut4066NNTv/uiKpm1uTmX6Uv3xpvPOOS",
+      phone: "",
+      firebase_uid: ""
+    },
+    created_at: new Date(),
+    updated_at: new Date()
+  },
+  {
+    full_name: "Đội cứu hộ",
+    role: "Rescue",
+    status: "Active",
+    profile: { avatar_url: "", address: "", emergency_contact: "" },
+    auth: {
+      type: "Password",
+      email: "rescue@ctkltn.local",
+      password: "$2b$10$flb65hSHLxko7Ok4rjEx5.fbTUhfJ6zNjJpYkhIZ8zwK8.qjSGoje",
+      phone: "",
+      firebase_uid: ""
+    },
+    created_at: new Date(),
+    updated_at: new Date()
+  }
+]);
+--------------------------------------------------------------------------------
+
+Sau khi chèn: đăng nhập tại Frontend /staff-login bằng email + mật khẩu ở trên.
+
+Đổi mật khẩu sau này: tạo hash mới bằng Node rồi update field auth.password:
+  node -e "import('bcryptjs').then(b=>b.default.hash('MatKhauMoi!',10).then(console.log))"
+
+
+================================================================================
+NẠN NHÂN (Victim)
+================================================================================
+Không cần chèn tay trong Mongo trừ khi test. Luồng: Firebase Phone Auth (số + OTP)
+→ app gọi POST /api/auth/firebase → backend tạo user role Victim nếu chưa có.
+Bật số test trong Firebase Console (Authentication → Phone → test numbers) khi dev.

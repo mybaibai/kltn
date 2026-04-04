@@ -1,5 +1,5 @@
 // Frontend/src/page/SosPage/index.jsx
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -9,7 +9,18 @@ import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png';
 import { sendSos } from '@/services/api/apiSos';
 import LoginRequester from './LoginRequester';
 import SOSForm from './SOSform';
-import { subscribeAuthState, logout } from '@/services/auth/session';
+import { subscribeAuthState, logout, clearAllAuth } from '@/services/auth/session';
+
+function loadStaffSession() {
+  try {
+    const t = localStorage.getItem('auth_token');
+    if (!t) return { jwt: false, profile: null };
+    const raw = localStorage.getItem('auth_user');
+    return { jwt: true, profile: raw ? JSON.parse(raw) : null };
+  } catch {
+    return { jwt: !!localStorage.getItem('auth_token'), profile: null };
+  }
+}
 
 // ── Fix Leaflet icon ──────────────────────────────────────────────────────────
 delete L.Icon.Default.prototype._getIconUrl;
@@ -33,8 +44,10 @@ function RecenterMap({ lat, lng }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function SosPage() {
+  const [staffSession, setStaffSession] = useState(loadStaffSession);
   const [user, setUser] = useState(() => {
     try {
+      if (localStorage.getItem('auth_token')) return null;
       const raw = localStorage.getItem('auth_user');
       return raw ? JSON.parse(raw) : null;
     } catch {
@@ -43,6 +56,7 @@ export default function SosPage() {
   });
   const [showLogin, setShowLogin] = useState(() => {
     try {
+      if (localStorage.getItem('auth_token')) return true;
       return !localStorage.getItem('auth_user');
     } catch {
       return true;
@@ -58,9 +72,11 @@ export default function SosPage() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const DEFAULT_CENTER = [16.0544, 108.2022];
 
-  // Auto-login: if Firebase session exists, verify with backend and close popup
+  // Auto-login nạn nhân: Firebase OTP — không chạy khi đang có JWT cứu hộ/quản trị
   useEffect(() => {
+    if (localStorage.getItem('auth_token')) return () => {};
     const unsub = subscribeAuthState(async ({ user: fbUser, idToken }) => {
+      if (localStorage.getItem('auth_token')) return;
       if (!fbUser || !idToken) return;
       try {
         const res = await fetch(
@@ -77,6 +93,8 @@ export default function SosPage() {
           phone: data.phoneNumber,
           ...(data.user || {}),
         };
+        try { localStorage.removeItem('auth_token'); } catch { /* ignore */ }
+        setStaffSession({ jwt: false, profile: null });
         setUser(nextUser);
         try { localStorage.setItem('auth_user', JSON.stringify(nextUser)); } catch {}
         setShowLogin(false);
@@ -138,7 +156,16 @@ export default function SosPage() {
     if (!position) { showToast('⚠️ Vui lòng lấy vị trí của bạn trước', 'warning'); return; }
     if (!user) {
       setShowLogin(true);
-      showToast('Vui lòng đăng nhập để tiếp tục', 'warning');
+      showToast(
+        staffSession.jwt
+          ? 'Đăng nhập bằng số điện thoại (OTP) để gửi SOS với tư cách nạn nhân.'
+          : 'Vui lòng đăng nhập để tiếp tục',
+        'warning'
+      );
+      return;
+    }
+    if (user.role && user.role !== 'Victim') {
+      showToast('Chỉ tài khoản nạn nhân mới gửi SOS tại đây.', 'warning');
       return;
     }
     setShowModal(true);
@@ -149,12 +176,14 @@ export default function SosPage() {
       phone,
       ...(backendUser?.user || backendUser || {}),
     };
+    try { localStorage.removeItem('auth_token'); } catch { /* ignore */ }
+    setStaffSession({ jwt: false, profile: null });
     setUser(nextUser);
     try {
       localStorage.setItem('auth_user', JSON.stringify(nextUser));
     } catch { /* ignore */ }
     setShowLogin(false);
-    showToast('Xác nhận người dùng thành công', 'warning');
+    showToast('Xác nhận người dùng thành công', 'success');
   };
 
   const handleLogout = async () => {
@@ -170,6 +199,14 @@ export default function SosPage() {
     setShowUserMenu(false);
     setShowLogin(true);
     showToast('Đã đăng xuất', 'warning');
+  };
+
+  const handleStaffLogout = async () => {
+    await clearAllAuth();
+    setStaffSession({ jwt: false, profile: null });
+    setShowUserMenu(false);
+    setShowLogin(true);
+    showToast('Đã đăng xuất tài khoản cứu hộ/quản trị', 'warning');
   };
 
   // Gửi SOS
@@ -238,22 +275,7 @@ export default function SosPage() {
             </Marker>
           )}
         </MapContainer>
-      {/* ── Modal xác nhận SOS ───────────────────────────────────────────── */}
-        {showModal && (
-            <SOSForm
-              position={position}
-              onConfirm={handleConfirmSos}
-              onCancel={() => setShowModal(false)}
-              sending={sending}
-            />
-          )}
-        {/* {showLogin && (
-        <LoginRequester
-          notice={loginNotice}
-          onConfirm={handleLoginSuccess}
-          onCancel={() => { setShowLogin(false); setLoginNotice(''); }}
-        />
-      )} */}
+      {/* ── Login popup ───────────────────────────────────────────────────── */}
       
       {showLogin && (
         <LoginRequester
@@ -270,8 +292,22 @@ export default function SosPage() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         background: 'linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, transparent 100%)',
       }}>
-        <div style={{ color: '#fff', fontWeight: 800, fontSize: 18, letterSpacing: '-0.3px', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
-          🚨 Hỗ trợ khẩn cấp
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ color: '#fff', fontWeight: 800, fontSize: 18, letterSpacing: '-0.3px', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+            🚨 Hỗ trợ khẩn cấp
+          </div>
+          <Link
+            to="/staff-login"
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: 'rgba(255,255,255,0.95)',
+              textDecoration: 'underline',
+              textShadow: '0 1px 3px rgba(0,0,0,0.4)',
+            }}
+          >
+            Cứu hộ / Quản trị
+          </Link>
         </div>
         <div data-user-menu style={{ position: 'relative' }}>
           <div
@@ -279,7 +315,7 @@ export default function SosPage() {
             tabIndex={0}
             onClick={() => setShowUserMenu((v) => !v)}
             onKeyDown={(e) => e.key === 'Enter' && setShowUserMenu((v) => !v)}
-            title={user ? 'Tài khoản' : 'Đăng nhập'}
+            title={user || staffSession.jwt ? 'Tài khoản' : 'Đăng nhập'}
             style={{
               width: 38,
               height: 38,
@@ -325,10 +361,10 @@ export default function SosPage() {
                       {user.full_name?.trim() ? user.full_name : 'Người dùng'}
                     </div>
                     <div style={{ fontSize: 12, color: '#374151' }}>
-                      {user.phone || user.phoneNumber || '—'}
+                      {user.phone || user.phoneNumber || user.auth?.phone || '—'}
                     </div>
                     <div style={{ fontSize: 11, color: '#6b7280' }}>
-                      Vai trò: <span style={{ fontWeight: 800, color: '#111827' }}>{user.role || 'VICTIM'}</span>
+                      Vai trò: <span style={{ fontWeight: 800, color: '#111827' }}>{user.role || 'Victim'}</span>
                     </div>
                   </div>
 
@@ -348,6 +384,74 @@ export default function SosPage() {
                     }}
                   >
                     Đăng xuất
+                  </button>
+                </>
+              ) : staffSession.jwt ? (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px', borderRadius: 12, background: '#fff', border: '1px solid rgba(0,0,0,0.06)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase' }}>
+                      Đã đăng nhập (cứu hộ)
+                    </div>
+                    <div style={{ fontSize: 12, color: '#374151' }}>
+                      {staffSession.profile?.auth?.email || '—'}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#6b7280' }}>
+                      Vai trò: <span style={{ fontWeight: 800, color: '#111827' }}>{staffSession.profile?.role || '—'}</span>
+                    </div>
+                  </div>
+                  <Link
+                    to="/staff"
+                    onClick={() => setShowUserMenu(false)}
+                    style={{
+                      marginTop: 8,
+                      display: 'block',
+                      textAlign: 'center',
+                      padding: '8px 12px',
+                      borderRadius: 12,
+                      background: '#e0e7ff',
+                      color: '#3730a3',
+                      fontWeight: 800,
+                      fontSize: 13,
+                      textDecoration: 'none',
+                    }}
+                  >
+                    Vào bảng điều khiển
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={handleStaffLogout}
+                    style={{
+                      marginTop: 10,
+                      width: '100%',
+                      border: 'none',
+                      borderRadius: 12,
+                      padding: '10px 12px',
+                      cursor: 'pointer',
+                      background: '#fee2e2',
+                      color: '#991b1b',
+                      fontWeight: 800,
+                      fontSize: 13,
+                    }}
+                  >
+                    Đăng xuất cứu hộ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowLogin(true); setShowUserMenu(false); }}
+                    style={{
+                      marginTop: 8,
+                      width: '100%',
+                      border: 'none',
+                      borderRadius: 12,
+                      padding: '10px 12px',
+                      cursor: 'pointer',
+                      background: '#dc2626',
+                      color: '#fff',
+                      fontWeight: 800,
+                      fontSize: 13,
+                    }}
+                  >
+                    Đăng nhập nạn nhân (OTP)
                   </button>
                 </>
               ) : (
@@ -499,9 +603,9 @@ export default function SosPage() {
         <div style={{
           position: 'fixed', top: 80, left: '50%', transform: 'translateX(-50%)',
           zIndex: 9998, maxWidth: 320, width: '90%',
-          background: toast.type === 'warning' ? '#fffbeb' : '#fef2f2',
-          border: `1px solid ${toast.type === 'warning' ? '#fcd34d' : '#fca5a5'}`,
-          color: toast.type === 'warning' ? '#92400e' : '#991b1b',
+          background: toast.type === 'success' ? '#ecfdf5' : (toast.type === 'warning' ? '#fffbeb' : '#fef2f2'),
+          border: `1px solid ${toast.type === 'success' ? '#6ee7b7' : (toast.type === 'warning' ? '#fcd34d' : '#fca5a5')}`,
+          color: toast.type === 'success' ? '#065f46' : (toast.type === 'warning' ? '#92400e' : '#991b1b'),
           borderRadius: 12, padding: '10px 16px', fontSize: 13, fontWeight: 500,
           boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
           animation: 'fadeIn 0.3s ease', textAlign: 'center',

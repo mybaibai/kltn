@@ -33,3 +33,15 @@ admin.initializeApp({
 });
 
 export const firebaseAdminAuth = admin.auth();
+
+// Nếu bật Firebase Auth Emulator, cấu hình để verify token chạy đúng trong môi trường dev.
+// Ví dụ thêm vào Backend/.env:
+// FIREBASE_AUTH_EMULATOR_HOST=http://localhost:9099
+const emulatorHost = process.env.FIREBASE_AUTH_EMULATOR_HOST;
+if (emulatorHost) {
+  try {
+    firebaseAdminAuth.useEmulator(emulatorHost);
+  } catch {
+    // ignore (tùy version SDK / cách host format)
+  }
+}

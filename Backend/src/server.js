@@ -11,7 +11,15 @@ dotenv.config();
 
 const app = express();
 
-app.use(cors());
+app.use(
+  cors({
+    // Cho phép tất cả origin trong dev, nhưng bắt buộc khai báo headers để tránh lỗi preflight (đặc biệt với header `Authorization`)
+    origin: true,
+    credentials: false,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 //Backend/src/server.js
 app.use(express.json());
 
