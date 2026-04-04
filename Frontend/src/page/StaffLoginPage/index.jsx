@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 
@@ -7,6 +7,17 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 export default function StaffLoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const from =
+    location.state?.from && String(location.state.from).startsWith('/admin')
+      ? location.state.from
+      : '/admin/dashboard';
+
+  useEffect(() => {
+    if (localStorage.getItem('auth_token')) {
+      navigate(from, { replace: true });
+    }
+  }, [navigate, from]);
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,7 +43,7 @@ export default function StaffLoginPage() {
         try { await signOut(auth); } catch { /* ignore */ }
         localStorage.setItem('auth_token', data.token);
         localStorage.setItem('auth_user', JSON.stringify(data.user));
-        navigate('/staff', { replace: true });
+        navigate(from, { replace: true });
       } else {
         const res = await fetch(`${base}/auth/register-email`, {
           method: 'POST',
@@ -49,7 +60,7 @@ export default function StaffLoginPage() {
         try { await signOut(auth); } catch { /* ignore */ }
         localStorage.setItem('auth_token', data.token);
         localStorage.setItem('auth_user', JSON.stringify(data.user));
-        navigate('/staff', { replace: true });
+        navigate(from, { replace: true });
       }
     } catch (e2) {
       setErr(e2?.message || 'Lỗi');

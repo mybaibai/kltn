@@ -1,4 +1,4 @@
-import { NavLink, Link } from 'react-router-dom';
+import { NavLink, Link, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -11,24 +11,23 @@ import {
   Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { logout } from '@/services/auth/session';
+import { clearAllAuth } from '@/services/auth/session';
 
 const navItems = [
-  { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: false },
+  { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/admin/incidents', label: 'Quản lý sự cố', icon: AlertTriangle, end: true },
   { to: '/admin/users', label: 'Quản lý người dùng', icon: Users, end: false },
-  { to: '/admin', label: 'Quản lý sự cố', icon: AlertTriangle, end: true },
   { to: '/admin/ai', label: 'Hoạt động AI', icon: Bot, end: false },
   { to: '/admin/history', label: 'Lịch sử', icon: History, end: false },
   { to: '/admin/settings', label: 'Cài đặt', icon: Settings, end: false },
 ];
 
 export default function AdminSidebar() {
+  const navigate = useNavigate();
+
   const handleLogout = async () => {
-    try {
-      localStorage.removeItem('auth_user');
-    } catch {}
-    await logout();
-    window.location.href = '/';
+    await clearAllAuth();
+    navigate('/staff-login', { replace: true });
   };
 
   return (
