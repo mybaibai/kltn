@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ChevronLeft,
   ChevronRight,
   Eye,
   Filter,
+  Map,
   Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -110,6 +112,7 @@ function formatTimeShort(iso) {
 const PAGE_SIZE = 10;
 
 export default function IncidentManagement() {
+  const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -374,14 +377,28 @@ export default function IncidentManagement() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => setDetailSos(sos)}
-                            className="inline-flex rounded-lg p-2 text-brand-muted transition hover:bg-brand-gray-bg hover:text-brand-brown"
-                            title="Xem chi tiết"
-                          >
-                            <Eye className="size-4" />
-                          </button>
+                          <div className="inline-flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setDetailSos(sos)}
+                              className="inline-flex size-8 items-center justify-center rounded-lg text-brand-muted transition hover:bg-brand-gray-bg hover:text-brand-brown"
+                              title="Xem chi tiết"
+                            >
+                              <Eye className="size-4" />
+                            </button>
+                            <span className="inline-flex size-8 items-center justify-center">
+                              {['ASSIGNED', 'IN_PROGRESS'].includes(normalizeStatusKey(sos.status)) ? (
+                                <button
+                                  type="button"
+                                  onClick={() => navigate(`/admin/tracking/${sos._id}`)}
+                                  className="inline-flex size-8 items-center justify-center rounded-lg text-brand-muted transition hover:bg-blue-50 hover:text-blue-600"
+                                  title="Xem trên bản đồ"
+                                >
+                                  <Map className="size-4" />
+                                </button>
+                              ) : null}
+                            </span>
+                          </div>
                         </td>
                       </tr>
                     );
