@@ -6,103 +6,148 @@ import User from "../models/userModel.js";
 
 const router = express.Router();
 
-const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES = process.env.JWT_EXPIRES_IN || "7d";
 
-function sanitizeUserDoc(u) {
-  const o = u.toObject ? u.toObject() : { ...u };
-  if (o.auth?.password) delete o.auth.password;
-  return o;
+function getJwtSecret() {
+  return process.env.JWT_SECRET;
+}
+
+function toCanonicalRole(role) {
+  const value = String(role || "").trim().toLowerCase();
+  if (value === "admin") return "Admin";
+  if (value === "rescue") return "Rescue";
+  if (value === "victim") return "Victim";
+  return role;
+}
+
+function toCanonicalStatus(status) {
+  const value = String(status || "").trim().toLowerCase();
+  if (value === "active") return "Active";
+  if (value === "blocked" || value === "inactive" || value === "banned") return "Blocked";
+  return status;
+}
+
+function sanitizeUserDoc(userDoc) {
+  const plain = userDoc.toObject ? userDoc.toObject() : { ...userDoc };
+  if (plain.auth?.password) delete plain.auth.password;
+  plain.role = toCanonicalRole(plain.role);
+  plain.status = toCanonicalStatus(plain.status);
+  return plain;
 }
 
 function signAccessToken(user) {
+  const jwtSecret = getJwtSecret();
   return jwt.sign(
     {
       sub: String(user._id),
-      role: user.role,
+      role: toCanonicalRole(user.role),
       email: user.auth?.email || "",
       typ: "access",
     },
-    JWT_SECRET,
+    jwtSecret,
     { expiresIn: JWT_EXPIRES }
   );
 }
 
-/** Đăng ký Rescue / Admin — email + mật khẩu (không OTP điện thoại). */
+/** Đăng ký email: Admin luôn được (dev). Rescue chỉ khi ALLOW_RESCUE_SELF_REGISTER=true (mặc định tắt — tài khoản cứu hộ nên do admin/seed tạo). */
 router.post("/register-email", async (req, res) => {
   try {
-    if (!JWT_SECRET) {
+    if (!getJwtSecret()) {
       return res.status(500).json({ message: "Server chưa cấu hình JWT_SECRET" });
     }
+
+    const allowRescueSelfReg =
+      String(process.env.ALLOW_RESCUE_SELF_REGISTER || "").toLowerCase() === "true";
+
     const { email, password, full_name, role } = req.body || {};
-    const em = String(email || "")
-      .trim()
-      .toLowerCase();
-    if (!em || !password || !["Rescue", "Admin"].includes(role)) {
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+    const canonicalRole = toCanonicalRole(role);
+
+    if (!normalizedEmail || !password || !["Admin", "Rescue"].includes(canonicalRole)) {
       return res.status(400).json({
-        message: "Thiếu email/password hoặc role không hợp lệ (Rescue | Admin)",
+        message: "Thiếu email/mật khẩu hoặc role không hợp lệ (Rescue | Admin)",
       });
     }
-    const exists = await User.findOne({ "auth.email": em });
-    if (exists) {
+
+    if (canonicalRole === "Rescue" && !allowRescueSelfReg) {
+      return res.status(403).json({
+        message:
+          "Không cho phép tự đăng ký tài khoản cứu hộ. Liên hệ quản trị hoặc dùng npm run seed:roles / trang quản trị.",
+      });
+    }
+
+    const existed = await User.findOne({ "auth.email": normalizedEmail });
+    if (existed) {
       return res.status(409).json({ message: "Email đã được đăng ký" });
     }
+
     const hash = await bcrypt.hash(String(password), 10);
     const user = await User.create({
       full_name: full_name || "",
-      role,
+      role: canonicalRole,
       status: "Active",
       auth: {
         type: "Password",
-        email: em,
+        email: normalizedEmail,
         password: hash,
       },
     });
-    const token = signAccessToken(user);
-    return res.status(201).json({ token, user: sanitizeUserDoc(user) });
-  } catch (err) {
-    console.error("register-email:", err);
+
+    return res.status(201).json({
+      token: signAccessToken(user),
+      user: sanitizeUserDoc(user),
+    });
+  } catch (error) {
+    console.error("register-email:", error);
     return res.status(500).json({ message: "Đăng ký thất bại" });
   }
 });
 
 router.post("/login-email", async (req, res) => {
   try {
-    if (!JWT_SECRET) {
+    if (!getJwtSecret()) {
       return res.status(500).json({ message: "Server chưa cấu hình JWT_SECRET" });
     }
+
     const { email, password } = req.body || {};
-    const em = String(email || "")
-      .trim()
-      .toLowerCase();
-    if (!em || !password) {
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+
+    if (!normalizedEmail || !password) {
       return res.status(400).json({ message: "Thiếu email hoặc mật khẩu" });
     }
-    const user = await User.findOne({ "auth.email": em });
+
+    const user = await User.findOne({ "auth.email": normalizedEmail });
     if (!user || user.auth?.type !== "Password") {
       return res.status(401).json({ message: "Email hoặc mật khẩu không đúng" });
     }
-    if (!["Rescue", "Admin"].includes(user.role)) {
+
+    const canonicalRole = toCanonicalRole(user.role);
+    if (!["Admin", "Rescue"].includes(canonicalRole)) {
       return res.status(403).json({ message: "Tài khoản không được phép đăng nhập kiểu này" });
     }
-    const ok = await bcrypt.compare(String(password), user.auth.password || "");
-    if (!ok) {
+
+    const validPassword = await bcrypt.compare(String(password), user.auth.password || "");
+    if (!validPassword) {
       return res.status(401).json({ message: "Email hoặc mật khẩu không đúng" });
     }
-    if (user.status !== "Active") {
+
+    const canonicalStatus = toCanonicalStatus(user.status);
+    if (canonicalStatus !== "Active") {
       return res.status(403).json({ message: "Tài khoản bị khóa" });
     }
-    const token = signAccessToken(user);
-    return res.json({ token, user: sanitizeUserDoc(user) });
-  } catch (err) {
-    console.error("login-email:", err);
+
+    return res.status(200).json({
+      token: signAccessToken(user),
+      user: sanitizeUserDoc(user),
+    });
+  } catch (error) {
+    console.error("login-email:", error);
     return res.status(500).json({ message: "Đăng nhập thất bại" });
   }
 });
 
-/** Victim — chỉ số điện thoại + OTP Firebase. Không dùng cho Rescue/Admin đã tạo bằng email. */
+/** Nạn nhân — Firebase Phone OTP → đồng bộ user MongoDB */
 router.post("/firebase", async (req, res) => {
-  // Khai báo ở ngoài `try` để `catch` luôn truy cập được (tránh ReferenceError).
   let decodedJwt = null;
   try {
     const { idToken } = req.body;
@@ -110,7 +155,6 @@ router.post("/firebase", async (req, res) => {
       return res.status(400).json({ message: "Missing idToken" });
     }
 
-    // Decode payload để debug nhanh (không verify chữ ký).
     decodedJwt = jwt.decode(idToken);
 
     const decoded = await firebaseAdminAuth.verifyIdToken(idToken);
@@ -121,7 +165,8 @@ router.post("/firebase", async (req, res) => {
 
     let user = await User.findOne({ phone: phoneNumber });
     if (user) {
-      if (user.auth?.type === "Password" || !["Victim"].includes(user.role)) {
+      const r = toCanonicalRole(user.role);
+      if (user.auth?.type === "Password" || r !== "Victim") {
         return res.status(403).json({
           message:
             "Tài khoản này đăng nhập bằng email/mật khẩu (cứu hộ/quản trị). Không dùng OTP số điện thoại tại đây.",
@@ -131,7 +176,6 @@ router.post("/firebase", async (req, res) => {
         { _id: user._id },
         {
           $set: {
-            // Nếu user tồn tại nhưng full_name đang rỗng (do seed/bug cũ), gán lại để pass schema required.
             full_name: user.full_name ? user.full_name : String(phoneNumber),
             "auth.type": "OTP",
             "auth.phone": phoneNumber,
@@ -143,8 +187,6 @@ router.post("/firebase", async (req, res) => {
     } else {
       user = await User.create({
         phone: phoneNumber,
-        // `userModel.full_name` đang required, không được để rỗng.
-        // Với Victim OTP, khi chưa có profile thì set placeholder bằng số điện thoại.
         full_name: String(phoneNumber),
         role: "Victim",
         status: "Active",
@@ -174,8 +216,6 @@ router.post("/firebase", async (req, res) => {
     const code = err?.code || err?.errorInfo?.code || "unknown";
     const msg = err?.message || err?.errorInfo?.message || "Invalid token";
 
-    // decodedJwt có thể null nếu idToken không phải JWT.
-    // Trả thêm iss/aud để đối chiếu project/client.
     const iss = decodedJwt?.iss;
     const aud = decodedJwt?.aud;
 

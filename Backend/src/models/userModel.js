@@ -1,4 +1,3 @@
-//Backend/src/models/userModel.js
 import mongoose from 'mongoose';
 
 const profileSchema = new mongoose.Schema(
@@ -14,8 +13,7 @@ const authSchema = new mongoose.Schema(
   {
     type: { type: String, enum: ['OTP', 'Password'], default: 'OTP' },
     phone: { type: String, default: '' },
-    // `email` chỉ dùng cho Password/Rescue/Admin.
-    // OTP không nên có field này để tránh dính unique index trên `auth.email`.
+    // Email chỉ dùng cho Password/Rescue/Admin — tránh unique rỗng với OTP
     email: { type: String },
     password: { type: String, default: '' },
     firebase_uid: { type: String, default: '' },
@@ -26,16 +24,26 @@ const authSchema = new mongoose.Schema(
 const userSchema = new mongoose.Schema(
   {
     full_name: { type: String, required: true, default: '', trim: true },
-    // Victim (OTP): bắt buộc khi đăng nhập Firebase. Rescue/Admin (email): có thể để trống.
-    phone: { type: String, sparse: true, unique: true, trim: true },
+    phone: {
+      type: String,
+      sparse: true,
+      unique: true,
+      trim: true,
+      default: undefined,
+      set: (value) => {
+        if (value === null || value === undefined) return undefined;
+        const normalized = String(value).trim();
+        return normalized ? normalized : undefined;
+      },
+    },
     role: {
       type: String,
-      enum: ['Victim', 'Rescue', 'Admin'],
+      enum: ['Victim', 'Rescue', 'Admin', 'VICTIM', 'RESCUE', 'ADMIN'],
       default: 'Victim',
     },
     status: {
       type: String,
-      enum: ['Active', 'Blocked'],
+      enum: ['Active', 'Blocked', 'ACTIVE', 'INACTIVE', 'BANNED'],
       default: 'Active',
     },
     profile: { type: profileSchema, default: () => ({}) },

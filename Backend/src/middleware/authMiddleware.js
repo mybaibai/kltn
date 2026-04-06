@@ -7,12 +7,12 @@ function bearerToken(req) {
 }
 
 /**
- * Chấp nhận Firebase ID token (Victim / OTP) hoặc JWT nội bộ (Rescue / Admin).
+ * Firebase ID token (nạn nhân / OTP) hoặc JWT nội bộ (Rescue / Admin).
  */
 export async function requireAuth(req, res, next) {
   const token = bearerToken(req);
   if (!token) {
-    return res.status(401).json({ success: false, message: "Missing auth token" });
+    return res.status(401).json({ success: false, message: "Thiếu token xác thực" });
   }
 
   try {
@@ -21,12 +21,12 @@ export async function requireAuth(req, res, next) {
     req.authKind = "firebase";
     return next();
   } catch {
-    /* thử JWT app */
+    /* thử JWT */
   }
 
   const secret = process.env.JWT_SECRET;
   if (!secret) {
-    return res.status(500).json({ success: false, message: "Server missing JWT_SECRET" });
+    return res.status(500).json({ success: false, message: "Server chưa cấu hình JWT_SECRET" });
   }
 
   try {
@@ -36,6 +36,6 @@ export async function requireAuth(req, res, next) {
     req.authKind = "jwt";
     return next();
   } catch {
-    return res.status(401).json({ success: false, message: "Invalid auth token" });
+    return res.status(401).json({ success: false, message: "Token không hợp lệ" });
   }
 }

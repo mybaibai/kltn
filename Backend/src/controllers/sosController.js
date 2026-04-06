@@ -1,13 +1,23 @@
 //Backend/src/controllers/sosController.js
-import * as sosService  from '../services/sosService.js';
+import * as sosService from '../services/sosService.js';
 import * as teamService from '../services/teamService.js';
 
 // POST /api/sos  — Requester gửi SOS
 export const create = async (req, res) => {
   try {
-    const { requester_id, victim_id, latitude, longitude, lng, lat, address, description } = req.body;
+    const {
+      requester_id,
+      victim_id,
+      latitude,
+      longitude,
+      lng,
+      lat,
+      address,
+      description,
+      incident_type_id,
+      incident_type,
+    } = req.body;
 
-    // Validate tối thiểu
     const resolvedVictimId = victim_id || requester_id;
     const resolvedLat = typeof latitude !== 'undefined' ? latitude : lat;
     const resolvedLng = typeof longitude !== 'undefined' ? longitude : lng;
@@ -24,23 +34,20 @@ export const create = async (req, res) => {
     const sos = await sosService.createSos({
       victim_id: resolvedVictimId,
       description: desc,
-      location: {
-        latitude: Number(resolvedLat),
-        longitude: Number(resolvedLng),
-      },
+      address: address || '',
+      incident_type: incident_type || incident_type_id || null,
+      location: { type: 'Point', coordinates: [Number(resolvedLng), Number(resolvedLat)] },
     });
 
-    // Tự động tìm đội gần nhất và gán
     try {
       const nearRescues = await teamService.findNearestTeam(Number(resolvedLat), Number(resolvedLng));
       if (nearRescues.length > 0) {
         await sosService.assignTeam(sos._id, nearRescues[0]._id);
       }
     } catch {
-      // Không có đội nào gần → vẫn lưu SOS, status = pending
+      /* không có đội gần — giữ PENDING */
     }
 
-    // Lấy lại data đầy đủ sau khi populate
     const fullSos = await sosService.getSosById(sos._id);
     res.status(201).json({ success: true, data: fullSos });
   } catch (err) {
@@ -48,7 +55,6 @@ export const create = async (req, res) => {
   }
 };
 
-// GET /api/sos
 export const getAll = async (req, res) => {
   try {
     const list = await sosService.getAllSos(req.query.status ? { status: req.query.status } : {});
@@ -58,7 +64,6 @@ export const getAll = async (req, res) => {
   }
 };
 
-// GET /api/sos/:id
 export const getDetail = async (req, res) => {
   try {
     const sos = await sosService.getSosById(req.params.id);
@@ -69,7 +74,6 @@ export const getDetail = async (req, res) => {
   }
 };
 
-// GET /api/sos/requester/:requesterId
 export const getByRequester = async (req, res) => {
   try {
     const list = await sosService.getSosByRequester(req.params.requesterId);
@@ -79,7 +83,6 @@ export const getByRequester = async (req, res) => {
   }
 };
 
-// GET /api/sos/team/:teamId
 export const getByTeam = async (req, res) => {
   try {
     const list = await sosService.getSosByTeam(req.params.teamId);
@@ -89,7 +92,6 @@ export const getByTeam = async (req, res) => {
   }
 };
 
-// PATCH /api/sos/:id/status
 export const updateStatus = async (req, res) => {
   try {
     const sos = await sosService.updateSosStatus(
@@ -104,7 +106,6 @@ export const updateStatus = async (req, res) => {
   }
 };
 
-// PATCH /api/sos/:id/assign
 export const assign = async (req, res) => {
   try {
     const sos = await sosService.assignTeam(req.params.id, req.body.team_id || req.body.rescue_id);

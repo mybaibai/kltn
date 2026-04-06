@@ -13,15 +13,12 @@ export const updateUser = (id, data) => User.findByIdAndUpdate(id, data, { new: 
 
 export const toggleUserActive = async (id, is_active) => {
   if (typeof is_active === 'boolean') {
-    return User.findByIdAndUpdate(
-      id,
-      { status: is_active ? 'Active' : 'Blocked' },
-      { new: true }
-    );
+    return User.findByIdAndUpdate(id, { status: is_active ? 'Active' : 'Blocked' }, { new: true });
   }
   const user = await User.findById(id);
   if (!user) return null;
-  user.status = user.status === 'Active' ? 'Blocked' : 'Active';
+  const normalized = String(user.status || '').toLowerCase();
+  user.status = normalized === 'active' ? 'Blocked' : 'Active';
   await user.save();
   return user;
 };

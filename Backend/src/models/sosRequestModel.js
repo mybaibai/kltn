@@ -11,29 +11,31 @@ const statusHistorySchema = new mongoose.Schema(
   { _id: false }
 );
 
-const locationSchema = new mongoose.Schema(
-  {
-    latitude: { type: Number, required: true },
-    longitude: { type: Number, required: true },
-  },
-  { _id: false }
-);
-
 const sosRequestSchema = new mongoose.Schema(
   {
     victim_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     description: { type: String, default: '' },
+    address: { type: String, default: '' },
+    incident_type: { type: String, default: null },
     status: {
       type: String,
-      enum: ['Pending', 'Assigned', 'InProgress', 'Resolved', 'Cancelled'],
-      default: 'Pending',
+      enum: ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'CANCELLED'],
+      default: 'PENDING',
     },
-    location: { type: locationSchema, required: true },
+    location: {
+      type: { type: String, enum: ['Point'], default: 'Point' },
+      coordinates: { type: [Number], required: true },
+    },
     status_history: { type: [statusHistorySchema], default: [] },
+    ai_priority_score: { type: Number, default: null },
+    ai_category: { type: String, default: null },
+    ai_suggestion: { type: String, default: null },
+    assigned_rescue_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   },
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );
 
+sosRequestSchema.index({ location: '2dsphere' });
 sosRequestSchema.index({ status: 1, created_at: -1 });
 sosRequestSchema.index({ victim_id: 1, created_at: -1 });
 

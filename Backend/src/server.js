@@ -1,26 +1,29 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
 import connectDB from "./config/db.js";
 import userRoutes from "./routes/userRoutes.js";
 import teamRoutes from "./routes/teamRoutes.js";
 import sosRoutes from "./routes/sosRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const app = express();
 
 app.use(
   cors({
-    // Cho phép tất cả origin trong dev, nhưng bắt buộc khai báo headers để tránh lỗi preflight (đặc biệt với header `Authorization`)
     origin: true,
     credentials: false,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-//Backend/src/server.js
+
 app.use(express.json());
 
 connectDB();
