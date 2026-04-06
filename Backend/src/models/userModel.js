@@ -13,6 +13,7 @@ const authSchema = new mongoose.Schema(
   {
     type: { type: String, enum: ['OTP', 'Password'], default: 'OTP' },
     phone: { type: String, default: '' },
+    // Email chỉ dùng cho Password/Rescue/Admin — tránh unique rỗng với OTP
     email: { type: String },
     password: { type: String, default: '' },
     firebase_uid: { type: String, default: '' },

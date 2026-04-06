@@ -1,20 +1,15 @@
 //Backend/src/services/userService.js
 import User from '../models/userModel.js';
 
-export const getAllUsers = (filter = {}) =>
-  User.find(filter);
+export const getAllUsers = (filter = {}) => User.find(filter);
 
-export const getUserById = (id) =>
-  User.findById(id);
+export const getUserById = (id) => User.findById(id);
 
-export const getUserByPhone = (phone) =>
-  User.findOne({ phone });
+export const getUserByPhone = (phone) => User.findOne({ phone });
 
-export const createUser = (data) =>
-  User.create(data);
+export const createUser = (data) => User.create(data);
 
-export const updateUser = (id, data) =>
-  User.findByIdAndUpdate(id, data, { new: true });
+export const updateUser = (id, data) => User.findByIdAndUpdate(id, data, { new: true });
 
 export const toggleUserActive = async (id, is_active) => {
   if (typeof is_active === 'boolean') {
@@ -28,5 +23,4 @@ export const toggleUserActive = async (id, is_active) => {
   return user;
 };
 
-export const deleteUser = (id) =>
-  User.findByIdAndDelete(id);
+export const deleteUser = (id) => User.findByIdAndDelete(id);

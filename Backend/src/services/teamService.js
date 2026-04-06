@@ -6,13 +6,16 @@ const RESCUE_ROLES = ['RESCUE', 'Rescue'];
 const ACTIVE_STATUSES = ['ACTIVE', 'Active'];
 
 export const getAllTeams = () =>
-  User.find({ role: { $in: RESCUE_ROLES } }).select('full_name phone role status profile auth created_at updated_at');
+  User.find({ role: { $in: RESCUE_ROLES } }).select(
+    'full_name phone role status profile auth created_at updated_at'
+  );
 
 export const getTeamById = (id) =>
-  User.findOne({ _id: id, role: { $in: RESCUE_ROLES } }).select('full_name phone role status profile auth created_at updated_at');
+  User.findOne({ _id: id, role: { $in: RESCUE_ROLES } }).select(
+    'full_name phone role status profile auth created_at updated_at'
+  );
 
-export const createTeam = (data) =>
-  User.create({ ...data, role: 'Rescue' });
+export const createTeam = (data) => User.create({ ...data, role: 'Rescue' });
 
 export const updateTeam = (id, data) =>
   User.findOneAndUpdate({ _id: id, role: { $in: RESCUE_ROLES } }, data, { new: true });
@@ -20,7 +23,10 @@ export const updateTeam = (id, data) =>
 export const updateTeamLocation = (teamId, lat, lng) =>
   UserLocation.findOneAndUpdate(
     { user_id: teamId },
-    { location: { type: 'Point', coordinates: [Number(lng), Number(lat)] }, updated_at: new Date() },
+    {
+      location: { type: 'Point', coordinates: [Number(lng), Number(lat)] },
+      updated_at: new Date(),
+    },
     { new: true, upsert: true }
   ).populate('user_id', 'full_name phone role status');
 

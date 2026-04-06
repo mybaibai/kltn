@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { ShieldCheck, Mail, LockKeyhole, Eye, EyeOff, ArrowRight } from "lucide-react";
 import "./staff-login.css";
 
@@ -92,6 +93,11 @@ export default function StaffLoginPanel({ onSubmit, loading, errorMessage }) {
           </form>
 
           <div className="staff-auth-divider" />
+          <p style={{ margin: "0 0 12px", fontSize: 13, textAlign: "center" }}>
+            <Link to="/sos" style={{ color: "#2563eb", fontWeight: 600 }}>
+              ← Trang SOS (nạn nhân)
+            </Link>
+          </p>
           <div className="staff-auth-footer">
             <div>Ban gap van de khi truy cap?</div>
             <button type="button">Lien he ky thuat he thong</button>

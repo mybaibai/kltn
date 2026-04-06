@@ -7,5 +7,5 @@ node_modules/
 # vscode / api test
 userAPI.http
 
-# firebase key (cực kỳ quan trọng)
-Backend/serviceAccountKey.json
+# Firebase service account (never commit)
+serviceAccountKey.json

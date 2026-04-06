@@ -16,12 +16,12 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 const app = express();
 
 app.use(
-	cors({
-		origin: true,
-		credentials: false,
-		methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-		allowedHeaders: ["Content-Type", "Authorization"],
-	})
+  cors({
+    origin: true,
+    credentials: false,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
 );
 
 app.use(express.json());

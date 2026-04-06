@@ -1,8 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { signOut } from "firebase/auth";
 import StaffLoginPanel from "@/components/auth/StaffLoginPanel";
 import { loginWithEmailPassword } from "@/services/auth/staffAuth";
-import { getRoleHomePath, saveStaffSession } from "@/services/auth/session";
+import {
+  getRoleHomePath,
+  saveStaffSession,
+  clearVictimProfile,
+} from "@/services/auth/session";
+import { auth } from "@/lib/firebase";
 
 export default function StaffLoginPage() {
   const navigate = useNavigate();
@@ -14,10 +20,16 @@ export default function StaffLoginPage() {
     setLoading(true);
     try {
       const data = await loginWithEmailPassword({ email, password });
+      try {
+        await signOut(auth);
+      } catch {
+        /* ignore */
+      }
+      clearVictimProfile();
       saveStaffSession(data.token, data.user);
       navigate(getRoleHomePath(data.user?.role), { replace: true });
     } catch (error) {
-      setErr(error?.message || "Dang nhap that bai");
+      setErr(error?.message || "Đăng nhập thất bại");
     } finally {
       setLoading(false);
     }

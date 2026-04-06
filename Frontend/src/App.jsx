@@ -11,7 +11,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/staff-login" replace />} />
+        <Route path="/" element={<SosPage />} />
         <Route path="/sos" element={<SosPage />} />
         <Route path="/SosPage" element={<Navigate to="/sos" replace />} />
         <Route path="/sospage" element={<Navigate to="/sos" replace />} />
