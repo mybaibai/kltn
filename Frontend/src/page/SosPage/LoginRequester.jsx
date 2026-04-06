@@ -151,39 +151,27 @@ function OtpStep({ phone, onBack, onConfirm }) {
   };
 
   const handleSubmit = async () => {
-    console.log('🔴 handleSubmit called');  // ← thêm dòng này
-  const code = otp.join('');
-    console.log('🔴 code:', code);          // ← và dòng này
-  if (code.length < OTP_LENGTH) return;
-
-  // Bước 1: Verify OTP với Firebase
-  let idToken;
-  try {
-    setLoading(true);
-    const result = await confirmOtp(code);
-    idToken = result.idToken;
-  } catch (e) {
-    console.error('Firebase OTP error:', e);
-    setError('Mã OTP không đúng hoặc đã hết hạn. Vui lòng thử lại.');
-    setLoading(false);
-    return;
-  }
-
-  // Bước 2: Gửi token lên backend (lỗi riêng, message riêng)
-  try {
-    const res = await api.post('/auth/firebase', { idToken });
-    onConfirm?.({ phone: phone.phoneE164, backendUser: res.data });
-  } catch (e) {
-    console.error('Backend auth error:', e);
-    setError('Lỗi xác thực với hệ thống. Vui lòng thử lại sau.');
-  } finally {
-    setLoading(false);
-  }
-};
+    const code = otp.join('');
+    if (code.length < OTP_LENGTH) return;
+    try {
+      setLoading(true);
+      const { idToken } = await confirmOtp(code);
+      // gửi token sang backend để xác thực / tạo user
+      const res = await api.post('/auth/firebase', { idToken });
+      onConfirm?.({ phone: phone.phoneE164, backendUser: res.data });
+    } catch (e) {
+      console.error(e);
+      const msg =
+        e?.response?.data?.message ||
+        e?.message ||
+        'Mã OTP không đúng hoặc đã hết hạn. Vui lòng thử lại.';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filled = otp.join('').length === OTP_LENGTH;
-  // console.log('OTP state:', otp, 'Filled:', filled, 'Error:', error);
-  
   const displayPhone = phone.phoneE164.replace("+84", "+84 ");
 
   return (
@@ -287,9 +275,15 @@ export default function LoginPopup({ onConfirm, onCancel }) {
   const [phone, setPhone] = useState(null);
   const modalRef = useRef(null);
 
+  const handleCancel = () => {
+    // Đóng popup thì reset OTP session để lần mở lại không bị verifier stale.
+    try { resetOtpSession(); } catch { /* ignore */ }
+    onCancel?.();
+  };
+
   const handleOverlayClick = (e) => {
     if (modalRef.current && !modalRef.current.contains(e.target)) {
-      onCancel?.();
+      handleCancel();
     }
   };
 
@@ -299,9 +293,9 @@ export default function LoginPopup({ onConfirm, onCancel }) {
       onMouseDown={handleOverlayClick}
     >
       <div ref={modalRef} className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden" style={{ fontFamily: "'Segoe UI', sans-serif" }}>
-        {/* <div id="recaptcha-container" /> */}
+        <div id="recaptcha-container" />
         <div className="flex justify-end px-5 pt-4">
-          <button onClick={onCancel} className="text-gray-300 hover:text-gray-500 transition-colors">
+          <button onClick={handleCancel} className="text-gray-300 hover:text-gray-500 transition-colors">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
               <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round"/>
             </svg>

@@ -1,4 +1,11 @@
+# env
 .env
-/node_modules
-userAPI.http 
+
+# node modules
+node_modules/
+
+# vscode / api test
+userAPI.http
+
+# Firebase service account (never commit)
 serviceAccountKey.json
