@@ -1,4 +1,4 @@
-import { NavLink, Link, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -22,7 +22,7 @@ const navItems = [
   { to: '/admin/settings', label: 'Cài đặt', icon: Settings, end: false },
 ];
 
-export default function AdminSidebar() {
+export default function AdminSidebar({ onReportClick, gpsLoading }) {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -31,7 +31,7 @@ export default function AdminSidebar() {
   };
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-r border-[#E8E8EC] bg-[#FAFAFA]">
+    <aside className="sticky top-0 flex h-dvh w-64 shrink-0 flex-col overflow-y-auto border-r border-[#E8E8EC] bg-[#FAFAFA]">
       <div className="px-5 py-6">
         <div className="text-left">
           <p className="text-lg font-bold leading-snug text-brand-blue">
@@ -65,13 +65,15 @@ export default function AdminSidebar() {
       </nav>
 
       <div className="border-t border-[#E8E8EC] p-3">
-        <Link
-          to="/"
-          className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg bg-brand-red px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+        <button
+          type="button"
+          onClick={onReportClick}
+          disabled={gpsLoading}
+          className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg bg-brand-red px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60"
         >
           <Bell className="size-4" />
-          Báo cáo sự cố mới
-        </Link>
+          {gpsLoading ? 'Đang lấy vị trí…' : 'Báo cáo sự cố mới'}
+        </button>
         <div className="flex flex-col gap-0.5">
           <button
             type="button"

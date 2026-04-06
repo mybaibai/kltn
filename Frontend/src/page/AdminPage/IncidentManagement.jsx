@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
   ChevronLeft,
   ChevronRight,
@@ -11,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { formatSosCode, getIncidentTypeDisplay } from '@/constants/incidentMeta';
 import { getAllSos } from '@/services/api/apiSos';
+import IncidentDetailModal from './IncidentDetailModal';
 
 const STATUS_FILTER_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
@@ -35,18 +35,37 @@ const TIME_FILTER_OPTIONS = [
   { value: 'month', label: '30 ngày qua' },
 ];
 
+/** Chuẩn hóa status từ DB (Pending / PENDING / …) */
+function normalizeStatusKey(raw) {
+  const x = String(raw ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+  if (x === 'pending') return 'PENDING';
+  if (x === 'assigned') return 'ASSIGNED';
+  if (x === 'in_progress' || x === 'inprogress') return 'IN_PROGRESS';
+  if (x === 'resolved') return 'RESOLVED';
+  if (x === 'cancelled' || x === 'canceled') return 'CANCELLED';
+  return String(raw ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+}
+
+/** Mức độ: chỉ theo `ai_priority_score` từ backend — không suy từ PENDING. */
 function derivePriority(sos) {
   const s = sos.ai_priority_score;
-  if (s != null) {
-    if (s >= 70) return { key: 'urgent', label: 'KHẨN CẤP' };
-    if (s >= 40) return { key: 'high', label: 'CAO' };
+  if (s != null && !Number.isNaN(Number(s))) {
+    const n = Number(s);
+    if (n >= 70) return { key: 'urgent', label: 'KHẨN CẤP' };
+    if (n >= 40) return { key: 'high', label: 'CAO' };
     return { key: 'medium', label: 'TRUNG BÌNH' };
   }
-  if (sos.status === 'PENDING') return { key: 'urgent', label: 'KHẨN CẤP' };
   return { key: 'medium', label: 'TRUNG BÌNH' };
 }
 
-function statusRow(s) {
+function statusRow(raw) {
+  const s = normalizeStatusKey(raw);
   switch (s) {
     case 'PENDING':
       return { text: 'Đang chờ', dot: 'bg-brand-muted' };
@@ -58,7 +77,7 @@ function statusRow(s) {
     case 'CANCELLED':
       return { text: 'Đã hủy', dot: 'bg-brand-muted/60' };
     default:
-      return { text: s || '—', dot: 'bg-brand-muted' };
+      return { text: raw || '—', dot: 'bg-brand-muted' };
   }
 }
 
@@ -99,6 +118,7 @@ export default function IncidentManagement() {
   const [priorityFilter, setPriorityFilter] = useState('');
   const [timeFilter, setTimeFilter] = useState('');
   const [page, setPage] = useState(1);
+  const [detailSos, setDetailSos] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -146,7 +166,9 @@ export default function IncidentManagement() {
 
   const activeCount = useMemo(
     () =>
-      rows.filter((s) => !['RESOLVED', 'CANCELLED'].includes(s.status)).length,
+      rows.filter(
+        (s) => !['RESOLVED', 'CANCELLED'].includes(normalizeStatusKey(s.status))
+      ).length,
     [rows]
   );
 
@@ -352,13 +374,14 @@ export default function IncidentManagement() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <Link
-                            to={`/tracking/${sos._id}`}
+                          <button
+                            type="button"
+                            onClick={() => setDetailSos(sos)}
                             className="inline-flex rounded-lg p-2 text-brand-muted transition hover:bg-brand-gray-bg hover:text-brand-brown"
                             title="Xem chi tiết"
                           >
                             <Eye className="size-4" />
-                          </Link>
+                          </button>
                         </td>
                       </tr>
                     );
@@ -423,6 +446,14 @@ export default function IncidentManagement() {
           </div>
         </div>
       </div>
+
+      {detailSos && (
+        <IncidentDetailModal
+          sos={detailSos}
+          onClose={() => setDetailSos(null)}
+          onStatusChanged={() => load()}
+        />
+      )}
     </div>
   );
 }
