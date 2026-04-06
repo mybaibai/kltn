@@ -22,11 +22,12 @@ export default function StaffLoginPanel({ onSubmit, loading, errorMessage }) {
             <div className="staff-brand-icon">
               <ShieldCheck size={24} strokeWidth={2.2} />
             </div>
-            <h1>He thong cuu tro</h1>
+            <h1>Hệ thống cứu trợ</h1>
           </div>
 
-          <h2 className="staff-auth-title">Dang nhap he thong</h2>
-          <p className="staff-auth-subtitle">Bang dieu khien danh cho Quan tri vien - Doi cuu tro -</p>
+          <p className="staff-auth-role-pill">Quản trị viên / Đội cứu trợ</p>
+          <h2 className="staff-auth-title">Đăng nhập hệ thống</h2>
+          <p className="staff-auth-subtitle">Truy cập bảng điều khiển để tiếp nhận, điều phối và theo dõi nhiệm vụ.</p>
 
           <form onSubmit={handleSubmit}>
             <label className="staff-auth-label" htmlFor="staff-login-email">Email</label>
@@ -43,7 +44,7 @@ export default function StaffLoginPanel({ onSubmit, loading, errorMessage }) {
               />
             </div>
 
-            <label className="staff-auth-label" htmlFor="staff-login-password">Mat khau</label>
+            <label className="staff-auth-label" htmlFor="staff-login-password">Mật khẩu</label>
             <div className="staff-auth-field">
               <LockKeyhole size={18} />
               <input
@@ -53,7 +54,7 @@ export default function StaffLoginPanel({ onSubmit, loading, errorMessage }) {
                 required
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder="Nhap mat khau"
+                placeholder="Nhập mật khẩu"
               />
               <button
                 className="staff-toggle-password"
@@ -73,19 +74,19 @@ export default function StaffLoginPanel({ onSubmit, loading, errorMessage }) {
                   checked={remember}
                   onChange={(event) => setRemember(event.target.checked)}
                 />
-                Ghi nho mat khau
+                Ghi nhớ mật khẩu
               </label>
               <button className="staff-forgot-link" type="button">
-                Quen mat khau?
+                Quên mật khẩu?
               </button>
             </div>
 
             {errorMessage ? <p className="staff-auth-error">{errorMessage}</p> : null}
 
             <button className="staff-auth-submit" type="submit" disabled={loading}>
-              {loading ? "Dang xu ly..." : (
+              {loading ? "Đang xử lý..." : (
                 <span className="staff-submit-inner">
-                  Dang nhap <ArrowRight size={24} style={{ verticalAlign: "-3px" }} />
+                  Đăng nhập <ArrowRight size={24} style={{ verticalAlign: "-3px" }} />
                 </span>
               )}
             </button>
@@ -93,8 +94,8 @@ export default function StaffLoginPanel({ onSubmit, loading, errorMessage }) {
 
           <div className="staff-auth-divider" />
           <div className="staff-auth-footer">
-            <div>Ban gap van de khi truy cap?</div>
-            <button type="button">Lien he ky thuat he thong</button>
+            <div>Bạn gặp vấn đề khi truy cập?</div>
+            <button type="button">Liên hệ kỹ thuật hệ thống</button>
           </div>
         </section>
       </div>

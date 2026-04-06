@@ -17,7 +17,7 @@ export default function StaffLoginPage() {
       saveStaffSession(data.token, data.user);
       navigate(getRoleHomePath(data.user?.role), { replace: true });
     } catch (error) {
-      setErr(error?.message || "Dang nhap that bai");
+      setErr(error?.message || "Đăng nhập thất bại");
     } finally {
       setLoading(false);
     }

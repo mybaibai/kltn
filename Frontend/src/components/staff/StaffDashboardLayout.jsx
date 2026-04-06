@@ -147,7 +147,7 @@ export default function StaffDashboardLayout({ title, description, user, childre
               fontSize: 14,
             }}
           >
-            <MapPin size={16} /> Ve trang SOS
+            <MapPin size={16} /> Về trang SOS
           </Link>
           <button
             type="button"
@@ -165,7 +165,7 @@ export default function StaffDashboardLayout({ title, description, user, childre
               fontSize: 14,
             }}
           >
-            <LogOut size={16} /> Dang xuat
+            <LogOut size={16} /> Đăng xuất
           </button>
         </div>
       </div>

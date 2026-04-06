@@ -1,0 +1,415 @@
+.team-mgmt-page {
+  min-height: 100vh;
+  background: #efeff1;
+  padding: 14px;
+  color: #1f2937;
+}
+
+.team-mgmt-shell {
+  max-width: 1320px;
+  margin: 0 auto;
+  border: 1px solid #dddfe5;
+  background: #f6f7f9;
+}
+
+.team-mgmt-topbar {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border-bottom: 1px solid #e6e8ee;
+  background: #f8f9fb;
+}
+
+.team-mgmt-back-btn,
+.team-mgmt-bell-btn {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  color: #5f6875;
+  background: transparent;
+}
+
+.team-mgmt-back-btn:hover,
+.team-mgmt-bell-btn:hover {
+  background: #eceff4;
+}
+
+.team-mgmt-brand {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 900;
+  color: #ba111d;
+  letter-spacing: 0.02em;
+}
+
+.team-mgmt-profile {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.team-mgmt-profile-meta {
+  text-align: right;
+  line-height: 1.1;
+}
+
+.team-mgmt-profile-meta strong {
+  display: block;
+  font-size: 11px;
+  color: #111827;
+}
+
+.team-mgmt-profile-meta span {
+  display: block;
+  font-size: 9px;
+  color: #157347;
+  font-weight: 900;
+}
+
+.team-mgmt-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 900;
+  color: #fff;
+  background: linear-gradient(120deg, #111827, #334155);
+}
+
+.team-mgmt-content {
+  padding: 18px 22px 22px;
+}
+
+.team-mgmt-inline-error {
+  margin-bottom: 10px;
+  border: 1px solid #f3c5ca;
+  background: #feeff1;
+  color: #9f1239;
+  border-radius: 10px;
+  min-height: 42px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.team-mgmt-inline-error button {
+  border: 0;
+  border-radius: 7px;
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  background: #be123c;
+  color: #fff;
+}
+
+.team-mgmt-title-wrap h1 {
+  margin: 0;
+  font-size: 39px;
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  color: #1f2937;
+}
+
+.team-mgmt-title-wrap p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.team-mgmt-grid {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 16px;
+  align-items: start;
+}
+
+.team-mgmt-left-col,
+.team-mgmt-right-col {
+  display: grid;
+  gap: 12px;
+}
+
+.team-mgmt-card {
+  border: 1px solid #e5e7ee;
+  border-radius: 10px;
+  background: #fcfcfd;
+}
+
+.team-mgmt-main-card {
+  padding: 14px;
+}
+
+.team-mgmt-main-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.team-mgmt-icon-box {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: #be121a;
+  background: #fcebec;
+}
+
+.team-mgmt-main-head h2 {
+  margin: 0;
+  font-size: 31px;
+  line-height: 1.1;
+}
+
+.team-mgmt-main-head p {
+  margin: 4px 0 0;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.team-mgmt-code {
+  margin-left: auto;
+  border-radius: 8px;
+  background: #f0f2f6;
+  color: #7b8191;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 7px 9px;
+}
+
+.team-mgmt-edit-btn {
+  border: 1px solid #f2b1b5;
+  color: #bd1620;
+  background: #fff;
+  border-radius: 10px;
+  min-height: 38px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.team-mgmt-main-stats {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.team-mgmt-main-stats > div {
+  border-radius: 8px;
+  background: #f3f4f7;
+  padding: 10px;
+}
+
+.team-mgmt-main-stats span {
+  display: block;
+  font-size: 10px;
+  color: #7c8390;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+}
+
+.team-mgmt-main-stats strong {
+  margin-top: 5px;
+  display: block;
+  font-size: 20px;
+  color: #1f2937;
+}
+
+.team-mgmt-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.team-mgmt-kpi-card {
+  min-height: 78px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.team-mgmt-kpi-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+}
+
+.team-mgmt-kpi-icon.success {
+  background: #def6e4;
+  color: #1d7f42;
+}
+
+.team-mgmt-kpi-icon.info {
+  background: #e0ecff;
+  color: #2f6ed8;
+}
+
+.team-mgmt-kpi-card strong {
+  font-size: 33px;
+  line-height: 1;
+}
+
+.team-mgmt-kpi-card p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.team-mgmt-state-card {
+  padding: 14px;
+}
+
+.team-mgmt-state-label {
+  margin: 0;
+  font-size: 10px;
+  color: #768091;
+  letter-spacing: 0.14em;
+  font-weight: 900;
+}
+
+.team-mgmt-state-card h3 {
+  margin: 8px 0 12px;
+  font-size: 31px;
+  line-height: 1.15;
+  color: #1f8a44;
+}
+
+.team-mgmt-toggle {
+  border: 0;
+  width: 78px;
+  height: 30px;
+  border-radius: 999px;
+  background: #d6dbe4;
+  padding: 3px;
+  position: relative;
+}
+
+.team-mgmt-toggle.is-active {
+  background: #1e7e43;
+}
+
+.team-mgmt-toggle-knob {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #fff;
+  color: #6b7280;
+  display: grid;
+  place-items: center;
+  transition: transform 0.2s ease;
+}
+
+.team-mgmt-toggle.is-active .team-mgmt-toggle-knob {
+  transform: translateX(48px);
+  color: #2f6ed8;
+}
+
+.team-mgmt-state-note {
+  margin: 12px 0 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #6b7280;
+}
+
+.team-mgmt-state-meta {
+  border-top: 1px solid #e5e7ee;
+  padding-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.team-mgmt-state-meta div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.team-mgmt-state-meta span {
+  font-size: 11px;
+  color: #778090;
+}
+
+.team-mgmt-state-meta strong {
+  font-size: 11px;
+  color: #1f2937;
+}
+
+.team-mgmt-map-card {
+  overflow: hidden;
+}
+
+.team-mgmt-map-art {
+  min-height: 210px;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(20deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    radial-gradient(circle at 55% 45%, rgba(255, 255, 255, 0.08), transparent 42%),
+    linear-gradient(140deg, #2f343b, #1f2228);
+  background-size: 18px 18px, 24px 24px, auto, auto;
+}
+
+.team-mgmt-map-card p {
+  margin: 0;
+  min-height: 30px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 900;
+  color: #e5e7eb;
+  background: #252a31;
+  width: 100%;
+}
+
+@media (max-width: 1080px) {
+  .team-mgmt-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .team-mgmt-page {
+    padding: 8px;
+  }
+
+  .team-mgmt-content {
+    padding: 14px;
+  }
+
+  .team-mgmt-title-wrap h1 {
+    font-size: 28px;
+  }
+
+  .team-mgmt-main-head h2 {
+    font-size: 23px;
+  }
+
+  .team-mgmt-kpi-row,
+  .team-mgmt-main-stats {
+    grid-template-columns: 1fr;
+  }
+}
