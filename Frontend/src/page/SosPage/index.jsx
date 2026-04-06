@@ -282,30 +282,16 @@ export default function SosPage() {
           background: 'linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, transparent 100%)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <div
-            style={{
-              color: '#fff',
-              fontWeight: 800,
-              fontSize: 18,
-              letterSpacing: '-0.3px',
-              textShadow: '0 1px 4px rgba(0,0,0,0.5)',
-            }}
-          >
-            🚨 Hỗ trợ khẩn cấp
-          </div>
-          <Link
-            to="/staff-login"
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: 'rgba(255,255,255,0.95)',
-              textDecoration: 'underline',
-              textShadow: '0 1px 3px rgba(0,0,0,0.4)',
-            }}
-          >
-            Cứu hộ / Quản trị
-          </Link>
+        <div
+          style={{
+            color: '#fff',
+            fontWeight: 800,
+            fontSize: 18,
+            letterSpacing: '-0.3px',
+            textShadow: '0 1px 4px rgba(0,0,0,0.5)',
+          }}
+        >
+          🚨 Hỗ trợ khẩn cấp
         </div>
         <div data-user-menu style={{ position: 'relative' }}>
           <div

@@ -24,9 +24,21 @@ if (!fs.existsSync(resolvedServiceAccountPath)) {
   );
 }
 
-const serviceAccount = JSON.parse(
-  fs.readFileSync(resolvedServiceAccountPath, "utf8")
-);
+let serviceAccount;
+try {
+  const raw = fs.readFileSync(resolvedServiceAccountPath, "utf8").trim();
+  if (!raw) {
+    throw new Error("File rỗng — tải JSON service account từ Firebase Console → Project settings → Service accounts.");
+  }
+  serviceAccount = JSON.parse(raw);
+} catch (e) {
+  if (e instanceof SyntaxError) {
+    throw new Error(
+      `Không đọc được JSON tại ${resolvedServiceAccountPath}. Kiểm tra file không trống và là JSON hợp lệ (copy đủ từ Firebase). Chi tiết: ${e.message}`
+    );
+  }
+  throw e;
+}
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),

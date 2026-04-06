@@ -4,39 +4,49 @@ import { auth } from "@/lib/firebase";
 let confirmationResult = null;
 let recaptchaVerifier = null;
 
-function getOrCreateRecaptcha() {
-  if (recaptchaVerifier) return recaptchaVerifier;
-  // Nếu popup đã unmount/remount, DOM `recaptcha-container` có thể thay đổi.
-  // Bắt buộc tạo lại verifier khi container không tồn tại.
-  if (typeof document !== "undefined") {
-    const el = document.getElementById("recaptcha-container");
-    if (!el) return null;
+function destroyRecaptcha() {
+  if (recaptchaVerifier) {
+    try {
+      recaptchaVerifier.clear();
+    } catch {
+      /* ignore */
+    }
+    recaptchaVerifier = null;
   }
+}
+
+function getOrCreateRecaptcha() {
+  if (typeof document === "undefined") return null;
+  const el = document.getElementById("recaptcha-container");
+  if (!el) return null;
+
+  destroyRecaptcha();
   recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
     size: "invisible",
   });
   return recaptchaVerifier;
 }
 
+/**
+ * Firebase yêu cầu luôn có ApplicationVerifier (RecaptchaVerifier).
+ * Gọi signInWithPhoneNumber(auth, phone, verifier) — thiếu tham số thứ 3 → auth/argument-error.
+ */
 export async function sendOtp(phoneE164) {
-  // OTP session có thể bị "kẹt" giữa các lần đăng nhập (đặc biệt sau logout/popup remount).
-  // Tạo verifier mới mỗi lần gửi OTP để tránh lỗi DOM/reCAPTCHA stale.
-  recaptchaVerifier = null;
-
-  // Khi bật Firebase Auth Emulator + `appVerificationDisabledForTesting`,
-  // có thể gửi OTP mà không cần reCAPTCHA/billing thật.
-  const verificationDisabled = Boolean(auth?.settings?.appVerificationDisabledForTesting);
-  if (verificationDisabled) {
-    confirmationResult = await signInWithPhoneNumber(auth, phoneE164);
-    return true;
+  const e164 = String(phoneE164 || "").trim();
+  if (!/^\+[1-9]\d{6,14}$/.test(e164)) {
+    throw new Error("Số điện thoại không đúng định dạng quốc tế (E.164), ví dụ +84901234567.");
   }
+
+  confirmationResult = null;
+  destroyRecaptcha();
 
   const verifier = getOrCreateRecaptcha();
   if (!verifier) {
     throw new Error("reCAPTCHA container chưa sẵn sàng. Vui lòng thử lại.");
   }
+
   await verifier.render();
-  confirmationResult = await signInWithPhoneNumber(auth, phoneE164, verifier);
+  confirmationResult = await signInWithPhoneNumber(auth, e164, verifier);
   return true;
 }
 
@@ -51,5 +61,5 @@ export async function confirmOtp(code) {
 
 export function resetOtpSession() {
   confirmationResult = null;
-  recaptchaVerifier = null;
+  destroyRecaptcha();
 }
