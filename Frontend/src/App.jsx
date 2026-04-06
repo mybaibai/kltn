@@ -40,7 +40,6 @@ export default function App() {
           <Route path="incidents" element={<IncidentManagement />} />
             <Route path="tracking/:sosId" element={<AdminTrackingPage />} />
           <Route path="users" element={<AdminPlaceholder title="Quản lý người dùng" />} />
-          <Route path="ai" element={<AdminPlaceholder title="Hoạt động AI" />} />
           <Route path="history" element={<AdminPlaceholder title="Lịch sử" />} />
           <Route path="settings" element={<AdminPlaceholder title="Cài đặt" />} />
         </Route>

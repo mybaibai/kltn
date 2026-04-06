@@ -3,7 +3,6 @@ import {
   LayoutDashboard,
   Users,
   AlertTriangle,
-  Bot,
   History,
   Settings,
   HelpCircle,
@@ -17,7 +16,6 @@ const navItems = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/incidents', label: 'Quản lý sự cố', icon: AlertTriangle, end: true },
   { to: '/admin/users', label: 'Quản lý người dùng', icon: Users, end: false },
-  { to: '/admin/ai', label: 'Hoạt động AI', icon: Bot, end: false },
   { to: '/admin/history', label: 'Lịch sử', icon: History, end: false },
   { to: '/admin/settings', label: 'Cài đặt', icon: Settings, end: false },
 ];
