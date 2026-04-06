@@ -60,7 +60,7 @@ export function hasValidStaffSession() {
 
 export function getRoleHomePath(role) {
   const normalized = normalizeStaffRole(role);
-  if (normalized === STAFF_ROLE_ADMIN) return "/admin";
+  if (normalized === STAFF_ROLE_ADMIN) return "/admin/dashboard";
   if (normalized === STAFF_ROLE_RESCUE) return "/responder";
   return "/staff-login";
 }

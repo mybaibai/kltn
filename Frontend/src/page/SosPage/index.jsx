@@ -58,7 +58,8 @@ export default function SosPage() {
   const [user, setUser] = useState(() => getVictimProfile());
   const [showLogin, setShowLogin] = useState(() => {
     try {
-      if (localStorage.getItem('auth_token')) return true;
+      // Cứu hộ/quản trị dùng JWT — không bật popup OTP nạn nhân
+      if (localStorage.getItem('auth_token')) return false;
       return !getVictimProfile();
     } catch {
       return true;
@@ -425,7 +426,7 @@ export default function SosPage() {
                     </div>
                   </div>
                   <Link
-                    to="/staff"
+                    to="/admin/dashboard"
                     onClick={() => setShowUserMenu(false)}
                     style={{
                       marginTop: 8,
