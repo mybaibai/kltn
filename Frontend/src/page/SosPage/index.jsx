@@ -58,8 +58,6 @@ export default function SosPage() {
   const [user, setUser] = useState(() => getVictimProfile());
   const [showLogin, setShowLogin] = useState(() => {
     try {
-      // Cứu hộ/quản trị dùng JWT — không bật popup OTP nạn nhân
-      if (localStorage.getItem('auth_token')) return false;
       return !getVictimProfile();
     } catch {
       return true;
@@ -76,9 +74,7 @@ export default function SosPage() {
   const DEFAULT_CENTER = [16.0544, 108.2022];
 
   useEffect(() => {
-    if (localStorage.getItem('auth_token')) return () => {};
     const unsub = subscribeAuthState(async ({ user: fbUser, idToken }) => {
-      if (localStorage.getItem('auth_token')) return;
       if (!fbUser || !idToken) return;
       try {
         const res = await fetch(
@@ -95,9 +91,6 @@ export default function SosPage() {
           phone: data.phoneNumber,
           ...(data.user || {}),
         };
-        try {
-          localStorage.removeItem('auth_token');
-        } catch { /* ignore */ }
         setStaffSession({ jwt: false, profile: null });
         setUser(nextUser);
         saveVictimProfile(nextUser);
@@ -182,9 +175,6 @@ export default function SosPage() {
       phone,
       ...(backendUser?.user || backendUser || {}),
     };
-    try {
-      localStorage.removeItem('auth_token');
-    } catch { /* ignore */ }
     setStaffSession({ jwt: false, profile: null });
     setUser(nextUser);
     saveVictimProfile(nextUser);

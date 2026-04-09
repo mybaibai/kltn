@@ -4,6 +4,8 @@ export default function ResponderRequestList({
   levelMeta,
   apiMessage,
   onSelectRequest,
+  onAcceptRequest,
+  acceptLoading,
 }) {
   return (
     <div className="responder-list-col">
@@ -30,7 +32,7 @@ export default function ResponderRequestList({
               <div className="responder-request-top">
                 <div className="responder-level-wrap">
                   <span className={`responder-level-badge ${meta.className}`}>{meta.label}</span>
-                  <span className="responder-distance">{item.distanceKm}km</span>
+                  <span className="responder-distance">{item.distanceKm != null ? `${item.distanceKm}km` : "—"}</span>
                 </div>
                 <span className="responder-time">{item.receivedAt}</span>
               </div>
@@ -42,6 +44,14 @@ export default function ResponderRequestList({
               <div className="responder-card-footer">
                 <button type="button" onClick={() => onSelectRequest(item.id)}>
                   Xem chi tiet
+                </button>
+                <button
+                  type="button"
+                  className="responder-accept-btn"
+                  disabled={!onAcceptRequest || acceptLoading}
+                  onClick={() => onAcceptRequest?.(item)}
+                >
+                  {acceptLoading ? "DANG XU LY..." : "Nhan"}
                 </button>
               </div>
             </article>

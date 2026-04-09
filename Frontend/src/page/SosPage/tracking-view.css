@@ -1,0 +1,297 @@
+/* Tracking View Styles */
+
+.tracking-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 100vh;
+  gap: 0;
+  background: #f5f5f5;
+}
+
+/* ===== ACCEPTED NOTIFICATION ===== */
+.accepted-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  animation: slideIn 0.3s ease-out;
+}
+
+.accepted-notification.success {
+  background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+  color: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(46, 204, 113, 0.3);
+  padding: 16px 20px;
+  min-width: 320px;
+}
+
+.notification-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.notification-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.notification-content p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.notification-title {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.notification-subtitle {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  margin-left: auto;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.notification-close:hover {
+  opacity: 1;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* ===== TRACKING INFO PANEL ===== */
+.tracking-info-panel {
+  background: white;
+  padding: 24px;
+  overflow-y: auto;
+  border-right: 1px solid #e0e0e0;
+}
+
+.info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #f0f0f0;
+  padding-bottom: 16px;
+}
+
+.info-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #2c3e50;
+}
+
+.last-update {
+  font-size: 12px;
+  color: #7f8c8d;
+}
+
+/* ===== STAGE BADGE ===== */
+.stage-badge {
+  display: inline-block;
+  padding: 12px 20px;
+  border-radius: 8px;
+  color: white;
+  font-weight: 600;
+  font-size: 16px;
+  text-align: center;
+  width: 100%;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  50% {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  }
+}
+
+/* ===== METRICS GRID ===== */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.metric-card {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  padding: 16px;
+  border-radius: 8px;
+  border-left: 4px solid #3498db;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+}
+
+.metric-label {
+  font-size: 14px;
+  color: #7f8c8d;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.metric-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+/* ===== TIMELINE SECTION ===== */
+.timeline-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 2px solid #f0f0f0;
+}
+
+.timeline-section h3 {
+  margin: 0 0 16px 0;
+  color: #2c3e50;
+  font-size: 16px;
+}
+
+.timeline {
+  position: relative;
+}
+
+.timeline::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, #3498db 0%, #2ecc71 100%);
+}
+
+.timeline-item {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.timeline-marker {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 12px;
+  margin-top: 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.timeline-content {
+  flex: 1;
+  background: #f8f9fa;
+  padding: 12px;
+  border-radius: 6px;
+}
+
+.timeline-stage {
+  margin: 0 0 6px 0;
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 14px;
+}
+
+.timeline-time {
+  margin: 0 0 4px 0;
+  font-size: 12px;
+  color: #7f8c8d;
+}
+
+.timeline-distance {
+  margin: 0;
+  font-size: 12px;
+  color: #3498db;
+  font-weight: 500;
+}
+
+/* ===== LOADING & ERROR ===== */
+.tracking-loading,
+.tracking-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  font-size: 18px;
+  color: #7f8c8d;
+}
+
+.tracking-error {
+  color: #e74c3c;
+}
+
+/* ===== MAP ===== */
+.tracking-map {
+  position: relative;
+  height: 100%;
+  width: 100%;
+}
+
+.leaflet-container {
+  background: #ecf0f1;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 1024px) {
+  .tracking-container {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .tracking-map {
+    min-height: 400px;
+  }
+}
+
+@media (max-width: 768px) {
+  .tracking-info-panel {
+    padding: 16px;
+  }
+
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .info-header h2 {
+    font-size: 18px;
+  }
+}

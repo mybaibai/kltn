@@ -132,17 +132,21 @@ export function mapSosToResponderRequests(sosList, gps) {
 
     const latText = lat !== null ? `${Math.abs(lat).toFixed(4)}° ${lat >= 0 ? "N" : "S"}` : "-";
     const lngText = lng !== null ? `${Math.abs(lng).toFixed(4)}° ${lng >= 0 ? "E" : "W"}` : "-";
+    
+    // Yêu cầu: "Nếu chưa ai nhận, không show chi tiết rescue name/location/distance/eta."
+    const status = String(sos?.status || "").toLowerCase();
+    const isPending = status === "pending";
 
     return {
       id: sos?._id || `sos-${index}`,
       level: levelFromStatus(sos?.status),
-      distanceKm,
+      distanceKm: isPending ? null : distanceKm,
       receivedAt: formatReceivedAt(sos?.created_at || sos?.createdAt),
-      title: titleFromDescription(description, index),
-      description,
-      address,
-      etaMinutes: etaFromDistance(distanceKm),
-      coords: `${latText}, ${lngText}`,
+      title: isPending ? "Yêu cầu cứu hộ" : titleFromDescription(description, index),
+      description: isPending ? "Chi tiết nhiệm vụ sẽ được hiển thị sau khi nhận." : description,
+      address: isPending ? "Đang chờ cứu hộ tiếp nhận" : address,
+      etaMinutes: isPending ? null : etaFromDistance(distanceKm),
+      coords: isPending ? "Vị trí đang chờ..." : `${latText}, ${lngText}`,
       recentAgo: formatRecentAgo(sos?.created_at || sos?.createdAt),
       source: sos,
     };
