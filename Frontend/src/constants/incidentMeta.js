@@ -12,14 +12,18 @@ export const INCIDENT_TYPE_META = {
 
 export function getIncidentTypeDisplay(incidentType) {
   if (!incidentType) {
-    return { label: 'Chưa xác định', Icon: AlertTriangle };
+    return { label: 'Chưa xác định', Icon: AlertTriangle, emoji: null };
   }
   if (typeof incidentType === 'object' && incidentType?.name) {
-    return { label: incidentType.name, Icon: AlertTriangle };
+    const emoji =
+      typeof incidentType.icon === 'string' && incidentType.icon.trim().length > 0
+        ? incidentType.icon.trim()
+        : null;
+    return { label: incidentType.name, Icon: AlertTriangle, emoji };
   }
   const meta = INCIDENT_TYPE_META[incidentType];
-  if (meta) return meta;
-  return { label: String(incidentType), Icon: AlertTriangle };
+  if (meta) return { ...meta, emoji: null };
+  return { label: String(incidentType), Icon: AlertTriangle, emoji: null };
 }
 
 export function formatSosCode(id) {

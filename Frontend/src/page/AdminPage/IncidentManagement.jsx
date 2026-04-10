@@ -328,7 +328,7 @@ export default function IncidentManagement() {
                 {!loading &&
                   !error &&
                   pageSlice.map((sos) => {
-                    const { label: typeLabel, Icon } = getIncidentTypeDisplay(
+                    const { label: typeLabel, Icon, emoji: typeEmoji } = getIncidentTypeDisplay(
                       sos.incident_type
                     );
                     const victimName =
@@ -348,7 +348,11 @@ export default function IncidentManagement() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <span className="flex size-8 items-center justify-center rounded-lg bg-brand-gray-bg text-brand-brown">
-                              <Icon className="size-4" aria-hidden />
+                              {typeEmoji ? (
+                                <span className="text-lg leading-none" aria-hidden>{typeEmoji}</span>
+                              ) : (
+                                <Icon className="size-4" aria-hidden />
+                              )}
                             </span>
                             <span className="font-medium text-brand-brown">{typeLabel}</span>
                           </div>

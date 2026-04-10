@@ -55,6 +55,7 @@ export const getAllSos = (filter = {}) =>
   SosRequest.find(filter)
     .populate('victim_id', 'full_name phone')
     .populate('assigned_rescue_id', 'full_name phone')
+    .populate('incident_type', 'name icon color_code is_active')
     .sort({ created_at: -1 });
 
 export const getSosById = (id) =>
@@ -72,12 +73,14 @@ export const getSosByRequester = (requesterId) =>
   SosRequest.find({ victim_id: requesterId })
     .populate('victim_id', 'full_name phone')
     .populate('assigned_rescue_id', 'full_name phone')
+    .populate('incident_type', 'name icon color_code')
     .sort({ created_at: -1 });
 
 export const getSosByTeam = (teamId) =>
   SosRequest.find({ assigned_rescue_id: teamId })
     .populate('victim_id', 'full_name phone')
     .populate('assigned_rescue_id', 'full_name phone')
+    .populate('incident_type', 'name icon color_code')
     .sort({ created_at: -1 });
 
 export const updateSosVictimLocation = async (sosId, lat, lng) => {
