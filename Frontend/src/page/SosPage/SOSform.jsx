@@ -51,6 +51,9 @@ export default function SOSForm({ position, onConfirm, onCancel, sending }) {
   const [selectedType, setSelectedType] = useState(null);
 
   const handleSubmit = () => {
+    if (!selectedType) {
+      return;
+    }
     onConfirm?.({ type: selectedType, description });
   };
 
@@ -188,9 +191,9 @@ export default function SOSForm({ position, onConfirm, onCancel, sending }) {
           <div className="flex items-center gap-3">
             <button
               onClick={handleSubmit}
-              disabled={sending}
+              disabled={sending || !selectedType}
               className={`flex-1 py-3.5 rounded-xl text-white font-bold text-base flex items-center justify-center gap-2 transition-all
-                ${sending ? 'bg-red-400' : 'bg-red-600 hover:bg-red-700 active:scale-[0.98]'}
+                ${sending || !selectedType ? 'bg-red-400' : 'bg-red-600 hover:bg-red-700 active:scale-[0.98]'}
               `}
             >
               {sending ? (

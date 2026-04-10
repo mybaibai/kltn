@@ -14,6 +14,9 @@ export function getIncidentTypeDisplay(incidentType) {
   if (!incidentType) {
     return { label: 'Chưa xác định', Icon: AlertTriangle };
   }
+  if (typeof incidentType === 'object' && incidentType?.name) {
+    return { label: incidentType.name, Icon: AlertTriangle };
+  }
   const meta = INCIDENT_TYPE_META[incidentType];
   if (meta) return meta;
   return { label: String(incidentType), Icon: AlertTriangle };

@@ -1,4 +1,6 @@
-import { Bell, ChevronDown } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Bell, ChevronDown, LogOut } from "lucide-react";
+import { clearAllAuth } from "@/services/auth/session";
 
 function initialsFromName(name) {
   if (!name) return "RT";
@@ -9,6 +11,17 @@ function initialsFromName(name) {
 }
 
 export default function ResponderBoardHeader({ user }) {
+  const navigate = useNavigate();
+
+  async function handleLogout() {
+    try {
+      await clearAllAuth();
+    } catch {
+      /* ignore */
+    }
+    navigate("/staff-login", { replace: true });
+  }
+
   return (
     <header className="responder-topbar">
       <div className="responder-brand">
@@ -29,6 +42,16 @@ export default function ResponderBoardHeader({ user }) {
         <button type="button" className="responder-bell-btn" aria-label="Thong bao">
           <Bell size={16} />
           <span className="responder-bell-dot">5</span>
+        </button>
+        <button
+          type="button"
+          className="responder-filter-btn"
+          onClick={handleLogout}
+          title="Dang xuat"
+          style={{ gap: 6 }}
+        >
+          <LogOut size={16} />
+          Dang xuat
         </button>
         <div className="responder-avatar-chip" title={user?.full_name || "Doi cuu tro"}>
           {initialsFromName(user?.full_name)}

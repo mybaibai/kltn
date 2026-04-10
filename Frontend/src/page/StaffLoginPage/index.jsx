@@ -6,7 +6,6 @@ import { loginWithEmailPassword } from '@/services/auth/staffAuth';
 import {
   getRoleHomePath,
   saveStaffSession,
-  clearVictimProfile,
 } from '@/services/auth/session';
 import { auth } from '@/lib/firebase';
 
@@ -39,7 +38,6 @@ export default function StaffLoginPage() {
       } catch {
         /* ignore */
       }
-      clearVictimProfile();
       saveStaffSession(data.token, data.user);
       navigate(pickPostLoginPath(data.user?.role, location.state), { replace: true });
     } catch (error) {
