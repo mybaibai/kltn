@@ -7,7 +7,6 @@ import {
   Settings,
   HelpCircle,
   LogOut,
-  Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { clearAllAuth } from '@/services/auth/session';
@@ -20,7 +19,7 @@ const navItems = [
   { to: '/admin/settings', label: 'Cài đặt', icon: Settings, end: false },
 ];
 
-export default function AdminSidebar({ onReportClick, gpsLoading }) {
+export default function AdminSidebar() {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -63,6 +62,7 @@ export default function AdminSidebar({ onReportClick, gpsLoading }) {
       </nav>
 
       <div className="border-t border-[#E8E8EC] p-3">
+        {/* Ẩn nút báo cáo SOS từ admin — bật lại khi cần
         <button
           type="button"
           onClick={onReportClick}
@@ -72,6 +72,7 @@ export default function AdminSidebar({ onReportClick, gpsLoading }) {
           <Bell className="size-4" />
           {gpsLoading ? 'Đang lấy vị trí…' : 'Báo cáo sự cố mới'}
         </button>
+        */}
         <div className="flex flex-col gap-0.5">
           <button
             type="button"
