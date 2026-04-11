@@ -101,12 +101,20 @@ function inTimeRange(createdAt, range) {
   return true;
 }
 
-function formatTimeShort(iso) {
+/** Ngày giờ gửi: dd/mm/yyyy, HH:mm */
+function formatIncidentDateTime(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleTimeString('vi-VN', {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+  const time = d.toLocaleTimeString('vi-VN', {
     hour: '2-digit',
     minute: '2-digit',
   });
+  return `${date}, ${time}`;
 }
 
 const PAGE_SIZE = 10;
@@ -361,8 +369,8 @@ export default function IncidentManagement() {
                         <td className="max-w-[200px] truncate px-4 py-3 text-brand-muted" title={sos.address}>
                           {sos.address || '—'}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-brand-muted">
-                          {formatTimeShort(sos.created_at)}
+                        <td className="min-w-[180px] whitespace-nowrap px-4 py-3 text-brand-muted">
+                          {formatIncidentDateTime(sos.created_at)}
                         </td>
                         <td className="px-4 py-3">
                           <span
