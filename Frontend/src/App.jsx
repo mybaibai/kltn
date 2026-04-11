@@ -11,6 +11,7 @@ import { StaffLoginGate, StaffRoleGuard, StaffHomeRedirect } from '@/components/
 import { STAFF_ROLE_ADMIN, STAFF_ROLE_RESCUE } from '@/services/auth/session';
 import { User, Users } from 'lucide-react';
 import UsersPage from '@/page/AdminPage/UsersPage';
+import HistoryPage from '@/page/AdminPage/HistoryPage';
 import { Toaster } from 'react-hot-toast';
 
 
@@ -57,7 +58,7 @@ export default function App() {
           <Route path="incidents" element={<IncidentManagement />} />
           <Route path="tracking/:sosId" element={<AdminTrackingPage />} />
           <Route path="users" element={<UsersPage title="Quản lý người dùng" />} />
-          <Route path="history" element={<AdminPlaceholder title="Lịch sử" />} />
+          <Route path="history" element={<HistoryPage />} />
           <Route path="settings" element={<AdminPlaceholder title="Cài đặt" />} />
         </Route>
         <Route

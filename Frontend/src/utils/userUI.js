@@ -1,40 +1,45 @@
-// import icon
-import AdminIcon from "@/assets/icons/Icon-6.svg?react";
-import UserIcon from "@/assets/icons/Icon-4.svg?react";
-import RescuerIcon from "@/assets/icons/Icon-9.svg?react";
+import {
+  Shield,
+  Truck,
+  User,
+  CircleCheck,
+  Clock,
+  AlertCircle,
+} from 'lucide-react';
 
-import VerifiedIcon from "@/assets/icons/Icon-1.svg?react";
-import PendingIcon from "@/assets/icons/Icon-5.svg?react";
-import Unverified from "@/assets/icons/Icon-8.svg?react";
-
-// ROLE
-export const ROLE_CONFIG = {
-  "Quản trị viên": {
-    icon: AdminIcon,
-    className: "bg-blue-600 text-white",
-  },
-  "Đội cứu trợ": {
-    icon: RescuerIcon,
-    className: "bg-blue-100 text-blue-600",
-  },
-  "Người dân": {
-    icon: UserIcon,
-    className: "bg-gray-100 text-gray-600",
-  },
+const roleStyle = {
+  admin: { icon: Shield, className: 'bg-blue-600 text-white' },
+  rescue: { icon: Truck, className: 'bg-blue-100 text-blue-600' },
+  victim: { icon: User, className: 'bg-gray-100 text-gray-600' },
 };
 
-// STATUS
+/** ROLE — UI tiếng Việt + giá trị API (userModel: Admin, Rescue, Victim, …) */
+export const ROLE_CONFIG = {
+  'Quản trị viên': roleStyle.admin,
+  Admin: roleStyle.admin,
+  ADMIN: roleStyle.admin,
+  'Đội cứu trợ': roleStyle.rescue,
+  Rescue: roleStyle.rescue,
+  RESCUE: roleStyle.rescue,
+  'Người dân': roleStyle.victim,
+  Victim: roleStyle.victim,
+  VICTIM: roleStyle.victim,
+};
+
+const statusStyle = {
+  ok: { icon: CircleCheck, className: 'bg-green-100 text-green-600' },
+  warn: { icon: Clock, className: 'bg-yellow-100 text-yellow-600' },
+  bad: { icon: AlertCircle, className: 'bg-red-100 text-red-500' },
+};
+
+/** STATUS — UI tiếng Việt + API (Active, Blocked, …) */
 export const STATUS_CONFIG = {
-  "Đã xác minh": {
-    icon: VerifiedIcon,
-    className: "bg-green-100 text-green-600",
-  },
-  "Đang chờ": {
-    icon: PendingIcon,
-    className: "bg-yellow-100 text-yellow-600",
-  },
-  "Chưa xác minh": {
-    icon: Unverified,
-    className: "bg-red-100 text-red-500",
-  },
+  'Đã xác minh': statusStyle.ok,
+  Active: statusStyle.ok,
+  ACTIVE: statusStyle.ok,
+  'Đang chờ': statusStyle.warn,
+  INACTIVE: statusStyle.warn,
+  'Chưa xác minh': statusStyle.bad,
+  Blocked: statusStyle.bad,
+  BANNED: statusStyle.bad,
 };

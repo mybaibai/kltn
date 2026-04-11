@@ -7,6 +7,14 @@ import UserTable from "@/components/users/UserTable";
 import UserPagination from "@/components/users/UserPagination";
 import CreateUserDrawer from "@/components/users/CreateUserDrawer";
 
+/** API GET /api/users trả { success, data: User[] } */
+function extractUserList(res) {
+  const body = res?.data;
+  if (Array.isArray(body)) return body;
+  if (body && Array.isArray(body.data)) return body.data;
+  return [];
+}
+
 const UsersPage = () => {
     const [users, setUsers] = useState([]);
     const [filters, setFilters] = useState({
@@ -28,14 +36,14 @@ const UsersPage = () => {
   
       axios
         .get("http://localhost:3001/api/users")
-        .then((res) => setUsers(res.data))
+        .then((res) => setUsers(extractUserList(res)))
         .catch((err) => console.error(err))
         .finally(() => setLoading(false));
     }, []);
   
     // 🔥 FILTER
-    const filteredUsers = (users || []).filter((user) => {
-      const name = user?.name || "";
+    const filteredUsers = (Array.isArray(users) ? users : []).filter((user) => {
+      const name = user?.name || user?.full_name || "";
   
       const matchKeyword =
         name.toLowerCase().includes(filters.keyword.toLowerCase());
@@ -118,7 +126,7 @@ const UsersPage = () => {
               setLoading(true);
 
               const res = await axios.get("http://localhost:3001/api/users");
-              setUsers(res.data);
+              setUsers(extractUserList(res));
               
               
               setOpenDrawer(false);
