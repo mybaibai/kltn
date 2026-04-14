@@ -7,6 +7,10 @@ import {
   getTrackingHistory,
   getActiveMissions,
 } from "../controllers/trackingController.js";
+import {
+  startSimulation,
+  stopSimulation,
+} from "../controllers/simulationController.js";
 import { requireAuth, attachAuthUser } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -32,5 +36,9 @@ router.get("/history/:assignmentId", getTrackingHistory);
 
 // 🗺️ Get all active missions (Admin dashboard)
 router.get("/missions/active", getActiveMissions);
+
+// 🤖 Simulation (Bot)
+router.post("/simulate/start", startSimulation);
+router.post("/simulate/stop", stopSimulation);
 
 export default router;

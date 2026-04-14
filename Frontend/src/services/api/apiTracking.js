@@ -79,3 +79,29 @@ export async function getActiveMissions() {
     throw err;
   }
 }
+
+// 🤖 Simulation (Bot)
+export async function startSimulation(assignmentId, speedKmh = 70) {
+  try {
+    const response = await api.post("/tracking/simulate/start", {
+      assignment_id: assignmentId,
+      speed_kmh: speedKmh,
+    });
+    return response.data;
+  } catch (err) {
+    console.error("❌ Error starting simulation:", err);
+    throw err;
+  }
+}
+
+export async function stopSimulation(assignmentId) {
+  try {
+    const response = await api.post("/tracking/simulate/stop", {
+      assignment_id: assignmentId,
+    });
+    return response.data;
+  } catch (err) {
+    console.error("❌ Error stopping simulation:", err);
+    throw err;
+  }
+}

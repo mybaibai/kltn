@@ -14,6 +14,9 @@ import { getSosDetail, patchVictimSosLocation } from "@/services/api/apiSos";
 import {
   getCurrentTracking,
   updateRescueLocation,
+  updateRescueStage,
+  startSimulation,
+  stopSimulation,
 } from "@/services/api/apiTracking";
 import {
   getSocket,
@@ -87,6 +90,9 @@ export default function TrackingPage() {
   const [toast, setToast] = useState(null);
   const [nearestRescues, setNearestRescues] = useState([]);
   const [loadingNearestRescues, setLoadingNearestRescues] = useState(false);
+  const [isMocking, setIsMocking] = useState(false);
+  const [mockCoords, setMockCoords] = useState(null);
+  const [botRunning, setBotRunning] = useState(false);
 
   const staffUser = useMemo(() => {
     try {
@@ -215,7 +221,7 @@ export default function TrackingPage() {
     const victimMode = persona === "victim";
     const t = setInterval(() => {
       loadTracking(assignmentId, victimMode);
-    }, 5000);
+    }, 1000);
     return () => clearInterval(t);
   }, [assignmentId, persona, loadTracking]);
 
@@ -229,16 +235,42 @@ export default function TrackingPage() {
       setToast(payload?.message || "Đội cứu hộ đã nhận nhiệm vụ");
       setTimeout(() => setToast(null), 6000);
     };
-    const onVictimUpdate = () => {
-      if (assignmentId)
-        loadTracking(assignmentId, persona === "victim");
+    const onVictimUpdate = (payload) => {
+      console.log("📡 Realtime update received:", payload);
+      // Directly update tracking state from payload to avoid API call lag
+      setTracking((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          current_stage: payload.stage ?? prev.current_stage,
+          distance_km: payload.distance_km ?? prev.distance_km,
+          eta_minutes: payload.eta_minutes ?? prev.eta_minutes,
+          rescue_location: payload.rescue_location ?? prev.rescue_location,
+        };
+      });
+    };
+
+    const onLocationConfirmed = (payload) => {
+      console.log("📡 Location confirmed:", payload);
+      setTracking((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          distance_km: payload.distance_km ?? prev.distance_km,
+          eta_minutes: payload.eta_minutes ?? prev.eta_minutes,
+          current_stage: payload.current_stage ?? prev.current_stage,
+          victim_location: payload.victim_location ?? prev.victim_location,
+        };
+      });
     };
 
     socket.on("rescue_accepted", onAccepted);
     socket.on("victim_tracking_update", onVictimUpdate);
+    socket.on("mission_location_confirmed", onLocationConfirmed);
     return () => {
       socket.off("rescue_accepted", onAccepted);
       socket.off("victim_tracking_update", onVictimUpdate);
+      socket.off("mission_location_confirmed", onLocationConfirmed);
     };
   }, [persona, assignmentId, loadTracking]);
 
@@ -269,12 +301,8 @@ export default function TrackingPage() {
   useEffect(() => {
     if (persona !== "rescue" || !assignmentId) return;
     if (!navigator.geolocation) return;
-    
-    // Rescue uses fixed location from seed - skip real-time GPS update
-    const isTestMode = import.meta.env.VITE_USE_FIXED_LOCATIONS === "true";
-    if (isTestMode) {
-      return;
-    }
+
+    if (isMocking) return; // Skip if mocking
 
     const id = navigator.geolocation.watchPosition(
       async (pos) => {
@@ -284,7 +312,6 @@ export default function TrackingPage() {
             pos.coords.latitude,
             pos.coords.longitude,
           );
-          loadTracking(assignmentId, false);
         } catch {
           /* ignore */
         }
@@ -293,7 +320,27 @@ export default function TrackingPage() {
       { enableHighAccuracy: true, maximumAge: 8000, timeout: 15000 },
     );
     return () => navigator.geolocation.clearWatch(id);
-  }, [persona, assignmentId, loadTracking]);
+  }, [persona, assignmentId, isMocking]);
+
+  // Handle Mock Location Movement
+  useEffect(() => {
+    if (!isMocking || !assignmentId || persona !== "rescue") return;
+
+    const moveInterval = setInterval(async () => {
+      if (!mockCoords) return;
+      try {
+        await updateRescueLocation(
+          assignmentId,
+          mockCoords.lat,
+          mockCoords.lng
+        );
+      } catch (e) {
+        console.error("Mock update failed:", e);
+      }
+    }, 1000);
+
+    return () => clearInterval(moveInterval);
+  }, [isMocking, mockCoords, assignmentId, persona]);
 
   const victimPt = useMemo(() => {
     const fromTrack = parseCoord(tracking?.victim_location);
@@ -305,11 +352,30 @@ export default function TrackingPage() {
         return { lat, lng };
     }
     return null;
-  }, [tracking, sos]);
+    // Dùng JSON.stringify để so sánh giá trị toạ độ thay vì reference object
+  }, [JSON.stringify(tracking?.victim_location), JSON.stringify(sos?.location)]);
 
   const rescuePt = useMemo(() => {
+    if (isMocking && mockCoords) return mockCoords;
     return parseCoord(tracking?.rescue_location);
-  }, [tracking]);
+  }, [tracking, isMocking, mockCoords]);
+
+  const handleMapClick = useCallback((e) => {
+    if (isMocking && persona === "rescue") {
+      setMockCoords({ lat: e.latlng.lat, lng: e.latlng.lng });
+    }
+  }, [isMocking, persona]);
+
+  function MapEvents() {
+    const map = useMap();
+    useEffect(() => {
+      if (isMocking) {
+        map.on("click", handleMapClick);
+        return () => map.off("click", handleMapClick);
+      }
+    }, [map]);
+    return null;
+  }
 
   // ===== OSRM Road Routing =====
   const [routeCoords, setRouteCoords] = useState([]);
@@ -368,14 +434,28 @@ export default function TrackingPage() {
   const displayEta = routeEta ?? tracking?.eta_minutes;
 
   // Load nearest rescue teams when victim location is available
+  const prevVictimPosRef = useRef(null);
   useEffect(() => {
     if (!victimPt) {
       setNearestRescues([]);
       return;
     }
 
+    // Chỉ tìm kiếm lại nếu nạn nhân di chuyển > 50m
+    if (prevVictimPosRef.current) {
+      const d = haversineDistance(
+        prevVictimPosRef.current.lat,
+        prevVictimPosRef.current.lng,
+        victimPt.lat,
+        victimPt.lng
+      );
+      if (d < 0.05 && nearestRescues.length > 0) return; // < 50m thì không fetch lại
+    }
+    prevVictimPosRef.current = victimPt;
+
     let cancelled = false;
-    setLoadingNearestRescues(true);
+    // Chỉ hiện loading nếu chưa có dữ liệu (tránh flicker khi update)
+    if (nearestRescues.length === 0) setLoadingNearestRescues(true);
 
     (async () => {
       try {
@@ -458,9 +538,59 @@ export default function TrackingPage() {
             ) : null}
           </div>
         </div>
-        <Link to={persona === "rescue" ? "/responder" : "/sos"} className="tracking-back-btn">
-          {persona === "rescue" ? "Về bảng nhiệm vụ" : "Về SOS"}
-        </Link>
+        <div className="tracking-controls">
+          {persona === "rescue" && (
+            <div className="tracking-mock-toggle" style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px" }}>
+                <input
+                  type="checkbox"
+                  checked={isMocking}
+                  onChange={(e) => {
+                    setIsMocking(e.target.checked);
+                    if (e.target.checked && !mockCoords && rescuePt) {
+                      setMockCoords(rescuePt);
+                    }
+                  }}
+                />
+                Mocking (Click bản đồ)
+              </label>
+
+              {isMocking && (
+                <button
+                  className={`tracking-bot-btn ${botRunning ? "running" : ""}`}
+                  onClick={async () => {
+                    if (!assignmentId) return;
+                    try {
+                      if (botRunning) {
+                        await stopSimulation(assignmentId);
+                        setBotRunning(false);
+                      } else {
+                        await startSimulation(assignmentId, 70);
+                        setBotRunning(true);
+                      }
+                    } catch (e) {
+                      alert("Lỗi bot: " + e.message);
+                    }
+                  }}
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: "12px",
+                    borderRadius: "4px",
+                    border: "1px solid #30363d",
+                    background: botRunning ? "#238636" : "#21262d",
+                    color: "#c9d1d9",
+                    cursor: "pointer"
+                  }}
+                >
+                  {botRunning ? "🛑 Stop Bot" : "🤖 Chạy Bot 70km/h"}
+                </button>
+              )}
+            </div>
+          )}
+          <Link to={persona === "rescue" ? "/responder" : "/sos"} className="tracking-back-btn">
+            {persona === "rescue" ? "Về bảng nhiệm vụ" : "Về SOS"}
+          </Link>
+        </div>
       </header>
 
       <div className="tracking-page-body" style={{ flex: 1, minHeight: 0 }}>
@@ -475,6 +605,7 @@ export default function TrackingPage() {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
+            <MapEvents />
             <FitBounds
               points={[
                 ...(victimPt ? [[victimPt.lat, victimPt.lng]] : []),
@@ -534,10 +665,12 @@ export default function TrackingPage() {
               <span>Đội cứu hộ</span>
               <strong>{tracking?.rescue_name || "—"}</strong>
             </div>
-            <div className="tracking-metric">
-              <span>Nạn nhân</span>
-              <strong>{tracking?.victim_name || "—"}</strong>
-            </div>
+            {persona === "rescue" && (
+              <div className="tracking-metric">
+                <span>Nạn nhân</span>
+                <strong>{tracking?.victim_name || "—"}</strong>
+              </div>
+            )}
           </div>
 
           {/* Nearest Rescue Teams Section */}
