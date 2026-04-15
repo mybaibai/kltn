@@ -12,11 +12,9 @@ import sosRoutes from "./routes/sosRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import trackingRoutes from "./routes/trackingRoutes.js";
 import * as trackingService from "./services/trackingService.js";
+import cookieParser from "cookie-parser";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
-
+dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -30,14 +28,14 @@ const io = new Server(httpServer, {
 
 app.use(
   cors({
-    origin: true,
+    origin: "http://localhost:3000",
     credentials: false,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-  }),
+  })
 );
-
 app.use(express.json());
+app.use(cookieParser());
 
 connectDB();
 
