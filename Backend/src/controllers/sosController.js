@@ -1,6 +1,5 @@
 //Backend/src/controllers/sosController.js
 import * as sosService  from '../services/sosService.js';
-import * as teamService from '../services/teamService.js';
 
 // POST /api/sos  — Requester gửi SOS
 export const create = async (req, res) => {
@@ -23,16 +22,6 @@ export const create = async (req, res) => {
       incident_type: incident_type || incident_type_id || null,
       location: { type: 'Point', coordinates: [Number(resolvedLng), Number(resolvedLat)] },
     });
-
-    // Tự động tìm đội gần nhất và gán
-    try {
-      const nearRescues = await teamService.findNearestTeam(Number(resolvedLat), Number(resolvedLng));
-      if (nearRescues.length > 0) {
-        await sosService.assignTeam(sos._id, nearRescues[0]._id);
-      }
-    } catch {
-      // Không có đội nào gần → vẫn lưu SOS, status = pending
-    }
 
     // Lấy lại data đầy đủ sau khi populate
     const fullSos = await sosService.getSosById(sos._id);

@@ -161,7 +161,11 @@ function OtpStep({ phone, onBack, onConfirm }) {
       onConfirm?.({ phone: phone.phoneE164, backendUser: res.data });
     } catch (e) {
       console.error(e);
-      setError('Mã OTP không đúng hoặc đã hết hạn. Vui lòng thử lại.');
+      const msg =
+        e?.response?.data?.message ||
+        e?.message ||
+        'Mã OTP không đúng hoặc đã hết hạn. Vui lòng thử lại.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -271,9 +275,15 @@ export default function LoginPopup({ onConfirm, onCancel }) {
   const [phone, setPhone] = useState(null);
   const modalRef = useRef(null);
 
+  const handleCancel = () => {
+    // Đóng popup thì reset OTP session để lần mở lại không bị verifier stale.
+    try { resetOtpSession(); } catch { /* ignore */ }
+    onCancel?.();
+  };
+
   const handleOverlayClick = (e) => {
     if (modalRef.current && !modalRef.current.contains(e.target)) {
-      onCancel?.();
+      handleCancel();
     }
   };
 
@@ -285,7 +295,7 @@ export default function LoginPopup({ onConfirm, onCancel }) {
       <div ref={modalRef} className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden" style={{ fontFamily: "'Segoe UI', sans-serif" }}>
         <div id="recaptcha-container" />
         <div className="flex justify-end px-5 pt-4">
-          <button onClick={onCancel} className="text-gray-300 hover:text-gray-500 transition-colors">
+          <button onClick={handleCancel} className="text-gray-300 hover:text-gray-500 transition-colors">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
               <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round"/>
             </svg>

@@ -2,22 +2,32 @@ import SosRequest from '../models/sosRequestModel.js';
 import UserLocation from '../models/userLocationModel.js';
 import RescueAssignment from '../models/rescueAssignmentModel.js';
 
-// Tạo SOS — thêm status_history ban đầu
+const ALLOWED_STATUS = ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'CANCELLED'];
+
 export const createSos = async (data) => {
   const sos = await SosRequest.create({
-    ...data,
-    status_history: [{
-      status: 'PENDING',
-      updated_by: data.victim_id || null,
-      note: 'Yêu cầu được tạo',
-    }],
+    victim_id: data.victim_id,
+    description: data.description ?? '',
+    address: data.address ?? '',
+    incident_type: data.incident_type ?? null,
+    location: data.location,
+    status_history: [
+      {
+        status: 'PENDING',
+        updated_by: data.victim_id || null,
+        updated_at: new Date(),
+        note: 'Yêu cầu được tạo',
+      },
+    ],
   });
   return sos;
 };
 
-// Cập nhật status + append vào history
 export const updateSosStatus = async (id, status, updatedBy = null, note = '') => {
-  return SosRequest.findByIdAndUpdate(
+  if (!ALLOWED_STATUS.includes(status)) {
+    throw new Error(`status không hợp lệ: ${status}`);
+  }
+  await SosRequest.findByIdAndUpdate(
     id,
     {
       status,
@@ -27,9 +37,9 @@ export const updateSosStatus = async (id, status, updatedBy = null, note = '') =
     },
     { new: true }
   );
+  return getSosById(id);
 };
 
-// Tìm RESCUE gần nhất
 export const findNearestRescue = async (lng, lat, maxDistance = 10000) => {
   return UserLocation.find({
     location: {

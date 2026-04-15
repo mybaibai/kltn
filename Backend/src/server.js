@@ -6,14 +6,19 @@ import userRoutes from "./routes/userRoutes.js";
 import teamRoutes from "./routes/teamRoutes.js";
 import sosRoutes from "./routes/sosRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import cookieParser from "cookie-parser";
 
 dotenv.config();
-
 const app = express();
 
-app.use(cors());
-//Backend/src/server.js
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    credentials: false,
+  })
+);
 app.use(express.json());
+app.use(cookieParser());
 
 connectDB();
 
