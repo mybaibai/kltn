@@ -3,6 +3,10 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 
+button {
+  cursor: pointer;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -39,6 +43,13 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
+    /* Bảng màu thương hiệu (Figma admin) */
+    --color-brand-red: #B7131A;
+    --color-brand-blue-surface: #EFF6FF;
+    --color-brand-blue: #1E40AF;
+    --color-brand-gray-bg: #F3F3F5;
+    --color-brand-muted: #6B7280;
+    --color-brand-brown: #5B403D;
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -127,4 +138,62 @@
   html {
     @apply font-sans;
     }
+}
+.pulse-container {
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+
+/* 🔴 Chấm đỏ ở giữa */
+.pulse-dot {
+  width: 12px;
+  height: 12px;
+  background: #ef4444;
+  border-radius: 50%;
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 3;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
+}
+
+/* 🌊 Vòng lan */
+.pulse-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border: 2px solid #ef4444;
+  border-radius: 50%;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  animation: pulse-wave 2s infinite;
+}
+
+/* delay tạo hiệu ứng sóng liên tục */
+.ring1 {
+  animation-delay: 0s;
+}
+.ring2 {
+  animation-delay: 0.6s;
+}
+.ring3 {
+  animation-delay: 1.2s;
+}
+
+/* animation chính */
+@keyframes pulse-wave {
+  0% {
+    transform: scale(0.3);
+    opacity: 0.7;
+  }
+  70% {
+    transform: scale(1.8);
+    opacity: 0.1;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
 }
