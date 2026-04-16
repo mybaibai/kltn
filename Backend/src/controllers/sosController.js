@@ -7,12 +7,12 @@ import { io } from '../server.js';
 
 /** Slug từ SOSform → tên loại trong DB (IncidentType) */
 const INCIDENT_SLUG_TO_NAME = {
-  thienTai: 'Thiên tai',
-  chayNo: 'Cháy nổ',
-  phuongTien: 'Sự cố phương tiện',
-  sucKhoe: 'Sức khỏe',
-  lacDuong: 'Lạc đường',
-  khac: 'Khác',
+  natural: 'Thiên tai',
+  fire: 'Cháy nổ',
+  vehicle: 'Sự cố phương tiện',
+  medical: 'Sức khỏe',
+  lost: 'Lạc đường',
+  other: 'Khác',
 };
 
 async function resolveIncidentTypeId(raw) {

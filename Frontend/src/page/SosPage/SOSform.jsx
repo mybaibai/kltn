@@ -4,7 +4,7 @@ import {
   MapPin, Send, User, Phone, Edit3,
   AlertTriangle, X, FileText, 
   // Car, Flame, PlusCircle,
-//   Waves, Compass, MoreHorizontal, FileText,
+  // Waves, Compass, MoreHorizontal, FileText,
 } from 'lucide-react';
 import Fire from '../../assets/fire.svg?react';
 import Compass from '../../assets/lost.svg?react';
@@ -53,10 +53,10 @@ export default function SOSForm({ position, onConfirm, onCancel, sending, user }
   };
   return (
     <div className="fixed inset-0 z-[99999] bg-black/40 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="w-full max-w-xl bg-white rounded-xl shadow-2xl overflow-hidden">
+      <div className="w-full max-w-xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
         {/* HEADER */}
-        <div className="px-6 py-4 flex justify-between items-center bg-gray-100 border-b">
+        <div className="px-6 py-4 flex justify-between items-center bg-gray-100 border-b flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
               <AlertTriangle className="text-red-600" />
@@ -70,7 +70,7 @@ export default function SOSForm({ position, onConfirm, onCancel, sending, user }
         </div>
 
         {/* CONTENT */}
-        <div className="px-6 py-6 space-y-6 overflow-y-auto">
+        <div className="px-6 py-6 space-y-6 overflow-y-auto flex-1">
           {error && (
             <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[999999] bg-red-500 text-white text-sm font-semibold px-5 py-3 rounded-xl shadow-lg animate-bounce">
               ⚠️ {error}
@@ -101,10 +101,11 @@ export default function SOSForm({ position, onConfirm, onCancel, sending, user }
                 );
               })}
             </div>
+          </div>
+
           {/* OTHER */}
           {selectedType === 'other' && (
             <div className="mt-4 space-y-3">
-
               <div className="relative">
                 <input
                   value={otherType}
@@ -127,93 +128,77 @@ export default function SOSForm({ position, onConfirm, onCancel, sending, user }
                   </button>
                 ))}
               </div>
-
             </div>
           )}
-        </div>
 
-        {/* DESCRIPTION */}
-        <div>
-          <p className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-2">
-            <FileText size={14} /> Mô tả chi tiết
-          </p>
-
-          <textarea
-            rows={4}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Mô tả tình trạng hiện tại..."
-            className="w-full bg-gray-100 rounded-xl px-4 py-3"
-          />
-        </div>
-
-        {/* LOCATION */}
-        <div className="p-4 bg-gray-100 rounded-xl border">
-          <div className="flex justify-between items-center mb-2">
-            <div className="flex items-center gap-2 text-green-600 font-semibold">
-              <MapPin size={16} />
-              Vị trí hiện tại
-            </div>
-            <button className="text-xs bg-green-100 text-green-600 px-3 py-1 rounded-lg font-bold">
-              Cập nhật vị trí
-            </button>
-          </div>
-
-          {position ? (
-            <p className="text-sm text-gray-700 leading-relaxed">
-              {position.address || `${position.lat.toFixed(5)}, ${position.lng.toFixed(5)}`}
-            </p>
-          ) : (
-            <p className="text-sm text-gray-400 italic">Chưa có vị trí</p>
-          )}
-        </div>
-
-        {/* USER */}
-        <div className="grid sm:grid-cols-2 gap-4">
+          {/* DESCRIPTION */}
           <div>
-            <p className="text-xs text-gray-400 flex gap-1 items-center mb-1">
-              <User size={12} /> Người gửi
+            <p className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-2">
+              <FileText size={14} /> Mô tả chi tiết
             </p>
-            <div className="p-3 bg-gray-100 rounded-xl text-sm text-gray-700">
-              {user?.full_name?.trim() || (
-                <span className="text-gray-400 italic">Chưa có tên</span>
-              )}
-            </div>
+
+            <textarea
+              rows={4}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Mô tả tình trạng hiện tại..."
+              className="w-full bg-gray-100 rounded-xl px-4 py-3"
+            />
           </div>
 
-          <div>
-            <p className="text-xs text-gray-400 flex gap-1 items-center mb-1">
-              <Phone size={12} /> Số điện thoại
-            </p>
-            <div className="p-3 bg-gray-100 rounded-xl text-sm text-gray-700">
-              {user?.phone || user?.phoneNumber || (
-                <span className="text-gray-400 italic">Chưa có số điện thoại</span>
-              )}
+          {/* LOCATION */}
+          <div className="p-4 bg-gray-100 rounded-xl border">
+            <div className="flex justify-between items-center mb-2">
+              <div className="flex items-center gap-2 text-green-600 font-semibold">
+                <MapPin size={16} />
+                Vị trí hiện tại
+              </div>
+              <button className="text-xs bg-green-100 text-green-600 px-3 py-1 rounded-lg font-bold">
+                Cập nhật vị trí
+              </button>
             </div>
-          </div>
-        </div>
-        {/* FOOTER */}
-        <div className="px-6 py-4 border-t bg-gray-100 space-y-3">
-          <button
-            onClick={handleSubmit}
-            disabled={sending}
-            className="w-full bg-red-600 text-white py-3 rounded-xl font-bold flex justify-center gap-2"
-          >
-            {sending ? (
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+
+            {position ? (
+              <p className="text-sm text-gray-700 leading-relaxed">
+                {position.address || `${position.lat.toFixed(5)}, ${position.lng.toFixed(5)}`}
+              </p>
             ) : (
-              <>
-                <Send size={18} />
-                Gửi SOS
-              </>
+              <p className="text-sm text-gray-400 italic">Chưa có vị trí</p>
             )}
-          </button>
+          </div>
 
-        <div className="px-6 py-4 border-t bg-gray-100 flex flex-col gap-2">
+          {/* USER */}
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-gray-400 flex gap-1 items-center mb-1">
+                <User size={12} /> Người gửi
+              </p>
+              <div className="p-3 bg-gray-100 rounded-xl text-sm text-gray-700">
+                {user?.full_name?.trim() || (
+                  <span className="text-gray-400 italic">Chưa có tên</span>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs text-gray-400 flex gap-1 items-center mb-1">
+                <Phone size={12} /> Số điện thoại
+              </p>
+              <div className="p-3 bg-gray-100 rounded-xl text-sm text-gray-700">
+                {user?.phone || user?.phoneNumber || (
+                  <span className="text-gray-400 italic">Chưa có số điện thoại</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* FOOTER */}
+        <div className="px-6 py-4 border-t bg-gray-100 flex flex-col gap-4 flex-shrink-0">
           <button
             onClick={handleSubmit}
             disabled={sending}
-            className="w-full bg-red-600 text-white py-3 rounded-xl font-bold flex justify-center gap-2 hover:bg-red-700 active:scale-[0.98] transition-all disabled:bg-red-400"
+            className="w-full bg-red-600 text-white py-3 rounded-xl font-bold flex justify-center gap-2 hover:bg-red-700 active:scale-[0.98] transition-all disabled:bg-red-400 shadow-lg shadow-red-200"
           >
             {sending ? (
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -238,6 +223,5 @@ export default function SOSForm({ position, onConfirm, onCancel, sending, user }
         </div>
       </div>
     </div>
-  </div>
   );
 }

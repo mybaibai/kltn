@@ -95,43 +95,40 @@ export async function startSimulation(assignmentId, speedKmh = 70) {
     console.log(`[Simulation] Path found with ${path.length} waypoints.`);
   }
 
-  const speedMs = (speedKmh * 1000) / 3600; // 70km/h -> ~19.44 m/s
-  const tickSeconds = 1; // Tăng tần suất cập nhật lên 1s cho mượt hơn
+  const speedMs = (speedKmh * 1000) / 3600; 
+  const tickSeconds = 0.2; // 5 updates per second for maximum smoothness
   const metersPerTick = speedMs * tickSeconds;
 
   let currentPathIndex = 0;
   let currentSubPos = { ...currentPos };
+  let isFinishing = false;
 
   const intervalId = setInterval(async () => {
     try {
+      if (isFinishing) return;
+
       if (currentPathIndex >= path.length - 1) {
         console.log("[Simulation] Reached end of path waypoints.");
-        stopSimulation(assignmentId);
+        triggerArrivalSequence();
         return;
       }
 
       let remainingMeters = metersPerTick;
       
-      // Xử lý việc đi qua nhiều waypoint trong 1 tick nếu cần
       while (remainingMeters > 0 && currentPathIndex < path.length - 1) {
         const nextWaypoint = path[currentPathIndex + 1];
         const distToNext = getDistanceMeters(currentSubPos.lat, currentSubPos.lng, nextWaypoint.lat, nextWaypoint.lng);
 
         if (distToNext <= remainingMeters) {
-          // Đi hết đoạn này và tiến tới waypoint tiếp theo
           currentSubPos = { ...nextWaypoint };
           remainingMeters -= distToNext;
           currentPathIndex++;
-          // console.log(`[Simulation] Hit waypoint ${currentPathIndex}`);
         } else {
-          // Chỉ đi được một phần tới waypoint tiếp theo
           currentSubPos = interpolate(currentSubPos, nextWaypoint, remainingMeters);
           remainingMeters = 0;
         }
       }
 
-      // Cập nhật vị trí lên hệ thống (Socket + DB)
-      // console.log(`[Simulation] Tick: ${currentSubPos.lat}, ${currentSubPos.lng}`);
       await trackingService.updateRescueLocation(
         assignmentId,
         currentSubPos.lat,
@@ -139,11 +136,10 @@ export async function startSimulation(assignmentId, speedKmh = 70) {
         assignment.rescue_id
       );
 
-      // Nếu đã quá gần nạn nhân (< 30m) thì dừng
       const distToVictim = getDistanceMeters(currentSubPos.lat, currentSubPos.lng, victimLat, victimLng);
       if (distToVictim < 30) {
-        console.log("[Simulation] Close enough to victim. Stopping.");
-        stopSimulation(assignmentId);
+        console.log("[Simulation] Close enough to victim. Triggering arrival sequence.");
+        triggerArrivalSequence();
       }
 
     } catch (err) {
@@ -151,6 +147,40 @@ export async function startSimulation(assignmentId, speedKmh = 70) {
       stopSimulation(assignmentId);
     }
   }, tickSeconds * 1000);
+
+  async function triggerArrivalSequence() {
+    if (isFinishing) return;
+    isFinishing = true;
+    
+    try {
+       // 1. ARRIVED
+       console.log("[Simulation] Stage: ARRIVED");
+       await trackingService.updateRescueStage(assignmentId, "ARRIVED", "Auto-bot arrived", assignment.rescue_id, "RESCUE");
+       
+       // Delay 1.2s
+       await new Promise(r => setTimeout(r, 1200));
+
+       // 2. RESCUING
+       console.log("[Simulation] Stage: RESCUING");
+       await trackingService.updateRescueStage(assignmentId, "RESCUING", "Auto-bot starts rescuing", assignment.rescue_id, "RESCUE");
+
+       // Delay 3s
+       await new Promise(r => setTimeout(r, 3000));
+
+       // 3. COMPLETED
+       console.log("[Simulation] Stage: COMPLETED");
+       await trackingService.updateRescueStage(assignmentId, "COMPLETED", "Auto-bot finished mission", assignment.rescue_id, "RESCUE");
+       
+       // Update SOS status to RESOLVED
+       const updatedSos = await SosRequest.findByIdAndUpdate(assignment.request_id, { status: "RESOLVED" }, { new: true });
+       console.log("[Simulation] SOS Request RESOLVED");
+
+    } catch (e) {
+       console.error("❌ Arrival Sequence Error:", e.message);
+    } finally {
+       stopSimulation(assignmentId);
+    }
+  }
 
   activeSimulations.set(assignmentId, intervalId);
   return { success: true, message: "Simulation started" };

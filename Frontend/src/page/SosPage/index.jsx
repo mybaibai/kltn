@@ -37,26 +37,63 @@ L.Icon.Default.mergeOptions({
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
 });
-const pulseIcon = L.divIcon({
-  className: "custom-marker",
-  html: `
-    <div class="pulse-container">
-      <span class="pulse-dot"></span>
-      <span class="pulse-ring ring1"></span>
-      <span class="pulse-ring ring2"></span>
-      <span class="pulse-ring ring3"></span>
-    </div>
-  `,
-  iconSize: [40, 40],
-  iconAnchor: [20, 20],
-});
-const redIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-  shadowUrl: markerShadowUrl,
-  iconSize: [30, 46],
-  iconAnchor: [15, 46],
-  popupAnchor: [1, -40],
-});
+// Custom Icon Renderer using divIcon for premium look
+const createCustomIcon = (bgColor, iconColor, pulse = false) => {
+  return L.divIcon({
+    className: 'custom-div-icon',
+    html: `
+      <div class="marker-container ${pulse ? 'pulse-animation' : ''}" style="background-color: ${bgColor};">
+        <div class="marker-inner" style="color: ${iconColor};">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
+          </svg>
+        </div>
+      </div>
+    `,
+    iconSize: [44, 44],
+    iconAnchor: [22, 44],
+    popupAnchor: [0, -40],
+  });
+};
+
+const premiumPulseIcon = createCustomIcon('#ff4d4f', '#ffffff', true);
+
+// Custom Style for premium markers
+const sosMapStyles = `
+  .marker-container {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+    border: 3px solid white;
+    transform: rotate(-45deg);
+    border-bottom-left-radius: 2px;
+  }
+  .marker-inner {
+    transform: rotate(45deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .pulse-animation::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    background: inherit;
+    opacity: 0.6;
+    animation: marker-pulse 2s infinite;
+    z-index: -1;
+  }
+  @keyframes marker-pulse {
+    0% { transform: scale(1); opacity: 0.6; }
+    100% { transform: scale(1.8); opacity: 0; }
+  }
+`;
 
 function RecenterMap({ lat, lng }) {
   const map = useMap();
@@ -89,9 +126,6 @@ export default function SosPage() {
     }
   });
   const navigate = useNavigate();
-  useEffect(() => {
-    if (!position) handleGetLocation();
-  }, []);
 
   const [loadingGPS, setLoadingGPS] = useState(false);
   const [gpsError, setGpsError] = useState('');
@@ -1169,8 +1203,8 @@ export default function SosPage() {
         </nav>
       </header>
   
-      {/* MAP */}
-      <div className="absolute inset-0 z-0">
+      <div className="absolute inset-0 z-0 text-sans">
+        <style>{sosMapStyles}</style>
         <MapContainer
           center={position ? [position.lat, position.lng] : DEFAULT_CENTER}
           zoom={14}
@@ -1180,7 +1214,7 @@ export default function SosPage() {
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           {position && <RecenterMap lat={position.lat} lng={position.lng} />}
           {position && (
-            <Marker position={[position.lat, position.lng]} icon={pulseIcon}>
+            <Marker position={[position.lat, position.lng]} icon={premiumPulseIcon}>
               <Popup>Vị trí của bạn</Popup>
             </Marker>
           )}
@@ -1268,11 +1302,46 @@ export default function SosPage() {
         </div>
         {/* RIGHT BUTTONS */}
         <div className="pointer-events-auto absolute bottom-8 right-8 flex flex-col gap-3">
-          <button onClick={handleGetLocation} className="w-12 h-12 bg-white rounded-xl shadow">📍</button>
+          <button
+            onClick={handleGetLocation}
+            disabled={loadingGPS}
+            title="Lấy vị trí GPS"
+            className={`flex items-center gap-2 px-4 h-12 rounded-xl shadow-lg font-semibold text-sm transition-all
+              ${loadingGPS
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : position
+                  ? 'bg-white text-gray-700 hover:bg-gray-50'
+                  : 'bg-red-500 text-white hover:bg-red-600 animate-pulse'
+              }`}
+          >
+            {loadingGPS ? (
+              <div className="w-4 h-4 border-2 border-gray-400 border-t-red-500 rounded-full animate-spin" />
+            ) : '📍'}
+            <span>{loadingGPS ? 'Đang lấy...' : position ? 'Cập nhật vị trí' : 'Lấy vị trí'}</span>
+          </button>
           <button className="w-12 h-12 bg-white rounded-xl shadow">🔔</button>
           <button className="w-12 h-12 bg-white rounded-xl shadow">ℹ️</button>
         </div>
+
+        {/* Overlay khi chưa có vị trí — nhắc người dùng nhấn nút GPS */}
+        {!position && !loadingGPS && (
+          <div className="pointer-events-auto absolute bottom-36 right-8 w-64 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-100 p-4 flex flex-col gap-2 animate-fade-in">
+            <div className="flex items-center gap-2 text-red-500 font-bold text-sm">
+              <span>📍</span> Chưa có vị trí
+            </div>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Nhấn nút <strong className="text-red-500">Lấy vị trí</strong> bên dưới để xác định điểm của bạn trước khi gửi SOS.
+            </p>
+            <button
+              onClick={handleGetLocation}
+              className="mt-1 w-full py-2 bg-red-500 text-white rounded-xl text-xs font-bold hover:bg-red-600 transition-colors"
+            >
+              📍 Lấy vị trí ngay
+            </button>
+          </div>
+        )}
       </div>
+
   
       {/* MODAL */}
       {showModal && (
