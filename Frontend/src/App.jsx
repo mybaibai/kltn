@@ -1,10 +1,13 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import SosPage from '@/page/SosPage';
 import TrackingPage from '@/page/TrackingPage';
+import AdminLayout from '@/layouts/AdminLayout';
+import IncidentManagement from '@/page/AdminPage/IncidentManagement';
+import AdminTrackingPage from '@/page/AdminPage/AdminTrackingPage';
+import AdminPlaceholder from '@/page/AdminPage/AdminPlaceholder';
 import StaffLoginPage from '@/page/StaffLoginPage';
-import AdminPage from '@/page/AdminPage';
 import ResponderPage from '@/page/ResponderPage';
-import { StaffHomeRedirect, StaffLoginGate, StaffRoleGuard } from '@/components/auth/AuthGuards';
+import { StaffLoginGate, StaffRoleGuard, StaffHomeRedirect } from '@/components/auth/AuthGuards';
 import { STAFF_ROLE_ADMIN, STAFF_ROLE_RESCUE } from '@/services/auth/session';
 
 export default function App() {
@@ -28,10 +31,18 @@ export default function App() {
           path="/admin"
           element={(
             <StaffRoleGuard allowRoles={[STAFF_ROLE_ADMIN]}>
-              <AdminPage />
+              <AdminLayout />
             </StaffRoleGuard>
           )}
-        />
+        >
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="dashboard" element={<AdminPlaceholder title="Dashboard" />} />
+          <Route path="incidents" element={<IncidentManagement />} />
+            <Route path="tracking/:sosId" element={<AdminTrackingPage />} />
+          <Route path="users" element={<AdminPlaceholder title="Quản lý người dùng" />} />
+          <Route path="history" element={<AdminPlaceholder title="Lịch sử" />} />
+          <Route path="settings" element={<AdminPlaceholder title="Cài đặt" />} />
+        </Route>
         <Route
           path="/responder"
           element={(

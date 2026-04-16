@@ -105,11 +105,49 @@ export default function TrackingPage() {
     if (!sosId) return;
     const fetchSos = async () => {
       try {
-        const res = await getSosDetail(sosId);
-        setSos(res.data.data);
-      } catch {
-        setSos(null);
-      } finally {
+        const res = preferVictimToken
+          ? await getSosDetail(sosId, { preferVictimToken: true })
+          : await getSosDetail(sosId);
+        if (cancelled) return;
+        const data = res?.data?.data;
+        if (!data) {
+          setErr("Không tải được yêu cầu SOS");
+          setLoading(false);
+          return;
+        }
+        setSos(data);
+        const aid = data.assignment?._id;
+        if (aid) setAssignmentId(aid);
+
+        const vid = data.victim_id?._id || data.victim_id;
+        const rid = data.assignment?.rescue_id;
+        const assignRescue =
+          data.assigned_rescue_id?._id || data.assigned_rescue_id;
+
+        if (victimUser && vid && String(victimUser._id) === String(vid)) {
+          setPersona("victim");
+        } else if (
+          staffUser &&
+          (String(staffUser._id) === String(rid) ||
+            String(staffUser._id) === String(assignRescue))
+        ) {
+          setPersona("rescue");
+        } else {
+          setPersona("observer");
+        }
+
+        if (data.assignment?._id) {
+          const victimMode =
+            !!victimUser &&
+            vid &&
+            String(victimUser._id) === String(vid);
+          await loadTracking(data.assignment._id, victimMode);
+        }
+
+        setLoading(false);
+      } catch (e) {
+        if (cancelled) return;
+        setErr(e?.response?.data?.message || e?.message || "Lỗi tải dữ liệu");
         setLoading(false);
       }
     };

@@ -40,11 +40,26 @@ export const findNearestTeam = async (lat, lng, maxDistance = 10000) => {
     },
   })
     .limit(5)
-    .populate('user_id', 'full_name phone role status');
+    .populate('user_id', 'full_name phone role status profile');
 
   return locations
-    .map((x) => x.user_id)
-    .filter((u) => u && RESCUE_ROLES.includes(u.role) && ACTIVE_STATUSES.includes(u.status));
+    .map((loc) => {
+      const user = loc.user_id;
+      if (!user || !RESCUE_ROLES.includes(user.role) || !ACTIVE_STATUSES.includes(user.status)) {
+        return null;
+      }
+      return {
+        _id: user._id,
+        full_name: user.full_name,
+        phone: user.phone,
+        role: user.role,
+        status: user.status,
+        profile: user.profile,
+        address: user.profile?.address || '',
+        location: loc.location,
+      };
+    })
+    .filter(Boolean);
 };
 
 export const deleteTeam = (id) =>

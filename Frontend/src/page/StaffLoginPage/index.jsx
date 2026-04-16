@@ -1,22 +1,35 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { signOut } from "firebase/auth";
-import StaffLoginPanel from "@/components/auth/StaffLoginPanel";
-import { loginWithEmailPassword } from "@/services/auth/staffAuth";
+import { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { signOut } from 'firebase/auth';
+import StaffLoginPanel from '@/components/auth/StaffLoginPanel';
+import { loginWithEmailPassword } from '@/services/auth/staffAuth';
 import {
   getRoleHomePath,
   saveStaffSession,
-  clearVictimProfile,
-} from "@/services/auth/session";
-import { auth } from "@/lib/firebase";
+} from '@/services/auth/session';
+import { auth } from '@/lib/firebase';
+
+function pickPostLoginPath(role, locationState) {
+  const fromLoc = locationState?.from;
+  const fromPath =
+    fromLoc && typeof fromLoc.pathname === 'string' ? fromLoc.pathname : null;
+  if (
+    fromPath &&
+    (fromPath.startsWith('/admin') || fromPath.startsWith('/responder'))
+  ) {
+    return fromPath;
+  }
+  return getRoleHomePath(role);
+}
 
 export default function StaffLoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
+  const [err, setErr] = useState('');
 
   async function submit({ email, password }) {
-    setErr("");
+    setErr('');
     setLoading(true);
     try {
       const data = await loginWithEmailPassword({ email, password });
@@ -25,11 +38,10 @@ export default function StaffLoginPage() {
       } catch {
         /* ignore */
       }
-      clearVictimProfile();
       saveStaffSession(data.token, data.user);
-      navigate(getRoleHomePath(data.user?.role), { replace: true });
+      navigate(pickPostLoginPath(data.user?.role, location.state), { replace: true });
     } catch (error) {
-      setErr(error?.message || "Đăng nhập thất bại");
+      setErr(error?.message || 'Đăng nhập thất bại');
     } finally {
       setLoading(false);
     }

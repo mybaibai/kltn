@@ -35,14 +35,18 @@ export const updateLocation = async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-// GET /api/teams/nearest?lat=&lng=
+// GET /api/teams/nearest?lat=&lng=&distance=
 export const findNearest = async (req, res) => {
   try {
-    const { lat, lng, distance } = req.query;
-    const teams = await teamService.findNearestTeam(
-      parseFloat(lat), parseFloat(lng),
-      distance ? parseInt(distance) : 10000
-    );
+    const lat = parseFloat(req.query.lat || req.query.latitude || 0);
+    const lng = parseFloat(req.query.lng || req.query.longitude || 0);
+    const distance = req.query.distance || req.query.max_distance || 10000;
+    
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return res.status(400).json({ success: false, message: 'Cần cung cấp lat / lng hợp lệ' });
+    }
+
+    const teams = await teamService.findNearestTeam(lat, lng, parseInt(distance));
     res.status(200).json({ success: true, data: teams });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };

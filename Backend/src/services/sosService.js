@@ -55,24 +55,44 @@ export const getAllSos = (filter = {}) =>
   SosRequest.find(filter)
     .populate('victim_id', 'full_name phone')
     .populate('assigned_rescue_id', 'full_name phone')
+    .populate('incident_type', 'name icon color_code is_active')
     .sort({ created_at: -1 });
 
 export const getSosById = (id) =>
   SosRequest.findById(id)
     .populate('victim_id', 'full_name phone profile')
-    .populate('assigned_rescue_id', 'full_name phone');
+    .populate('assigned_rescue_id', 'full_name phone')
+    .populate('incident_type', 'name icon color_code');
+
+export const getLatestAssignmentForRequest = (requestId) =>
+  RescueAssignment.findOne({ request_id: requestId })
+    .sort({ assigned_at: -1 })
+    .select('_id stage rescue_id request_id accepted_at');
 
 export const getSosByRequester = (requesterId) =>
   SosRequest.find({ victim_id: requesterId })
     .populate('victim_id', 'full_name phone')
     .populate('assigned_rescue_id', 'full_name phone')
+    .populate('incident_type', 'name icon color_code')
     .sort({ created_at: -1 });
 
 export const getSosByTeam = (teamId) =>
   SosRequest.find({ assigned_rescue_id: teamId })
     .populate('victim_id', 'full_name phone')
     .populate('assigned_rescue_id', 'full_name phone')
+    .populate('incident_type', 'name icon color_code')
     .sort({ created_at: -1 });
+
+export const updateSosVictimLocation = async (sosId, lat, lng) => {
+  await SosRequest.findByIdAndUpdate(
+    sosId,
+    {
+      location: { type: 'Point', coordinates: [Number(lng), Number(lat)] },
+    },
+    { new: true }
+  );
+  return getSosById(sosId);
+};
 
 export const assignTeam = async (sosId, rescueId) => {
   const sos = await SosRequest.findById(sosId);

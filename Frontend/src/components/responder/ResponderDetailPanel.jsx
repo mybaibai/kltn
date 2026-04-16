@@ -6,6 +6,8 @@ export default function ResponderDetailPanel({
   teamStats,
   nearestTeams,
   floatingAlerts,
+  onAcceptMission,
+  acceptLoading,
 }) {
   const [popupAlerts, setPopupAlerts] = useState([]);
 
@@ -82,17 +84,23 @@ export default function ResponderDetailPanel({
         <div className="responder-kpi-grid">
           <div>
             <p>KHOANG CACH</p>
-            <strong>{selectedRequest.distanceKm} km</strong>
+            <strong>{selectedRequest.distanceKm != null ? `${selectedRequest.distanceKm} km` : "—"}</strong>
           </div>
           <div>
             <p>THOI GIAN TOI</p>
-            <strong>~{selectedRequest.etaMinutes} phut</strong>
+            <strong>{selectedRequest.etaMinutes != null ? `~${selectedRequest.etaMinutes} phut` : "—"}</strong>
           </div>
         </div>
       </div>
 
-      <button type="button" className="responder-main-action">
-        <Ambulance size={18} /> NHAN NHIEM VU
+      <button
+        type="button"
+        className="responder-main-action"
+        disabled={acceptLoading || !onAcceptMission}
+        onClick={() => onAcceptMission?.(selectedRequest)}
+      >
+        <Ambulance size={18} />{" "}
+        {acceptLoading ? "DANG XU LY..." : "NHAN NHIEM VU"}
       </button>
 
       {popupAlerts.length ? (

@@ -12,7 +12,7 @@ import Car from '../../assets/car.svg?react';
 import PlusCircle from '../../assets/medical.svg?react';
 import Waves from '../../assets/wave.svg?react';
 import MoreHorizontal from '../../assets/more.svg?react'; // nếu có
-
+import { useNavigate } from "react-router-dom";
 
 export default function SOSForm({ position, onConfirm, onCancel, sending, user }) {
   const [selectedType, setSelectedType] = useState(null);
@@ -37,20 +37,21 @@ export default function SOSForm({ position, onConfirm, onCancel, sending, user }
     setTimeout(() => setError(''), 3000);
   };
   const handleSubmit = () => {
-    if (!selectedType) {
+    const typeValue =
+      selectedType === 'other' ? otherType : selectedType;
+  
+    if (!typeValue || !typeValue.trim()) {
       showError('Vui lòng chọn loại sự cố');
       return;
     }
-    if (selectedType === 'other' && !otherType.trim()) {
-      showError('Vui lòng nhập loại sự cố');
-      return;
-    }
+  
     onConfirm?.({
-      type: selectedType === 'other' ? otherType : selectedType,
+      type: typeValue,
       description,
       position,
     });
   };
+
   return (
     <div className="fixed inset-0 z-[99999] bg-black/40 flex items-center justify-center p-4 overflow-y-auto">
       <div className="w-full max-w-xl bg-white rounded-xl shadow-2xl overflow-hidden">
@@ -60,7 +61,7 @@ export default function SOSForm({ position, onConfirm, onCancel, sending, user }
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
               <AlertTriangle className="text-red-600" />
-            </div>
+            </div>  
             <h2 className="font-bold text-lg">Gửi yêu cầu cứu trợ</h2>
           </div>
 
