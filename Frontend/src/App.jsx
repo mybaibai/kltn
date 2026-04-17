@@ -4,6 +4,7 @@ import TrackingPage from '@/page/TrackingPage';
 import AdminLayout from '@/layouts/AdminLayout';
 import IncidentManagement from '@/page/AdminPage/IncidentManagement';
 import AdminTrackingPage from '@/page/AdminPage/AdminTrackingPage';
+import DashboardPage from '@/page/AdminPage/DashboardPage';
 import AdminPlaceholder from '@/page/AdminPage/AdminPlaceholder';
 import StaffLoginPage from '@/page/StaffLoginPage';
 import ResponderPage from '@/page/ResponderPage';
@@ -54,7 +55,7 @@ export default function App() {
           )}
         >
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
-          <Route path="dashboard" element={<AdminPlaceholder title="Dashboard" />} />
+          <Route path="dashboard" element={<DashboardPage />} />
           <Route path="incidents" element={<IncidentManagement />} />
           <Route path="tracking/:sosId" element={<AdminTrackingPage />} />
           <Route path="users" element={<UsersPage title="Quản lý người dùng" />} />
