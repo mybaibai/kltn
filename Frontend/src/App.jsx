@@ -60,7 +60,7 @@ export default function App() {
           <Route path="tracking/:sosId" element={<AdminTrackingPage />} />
           <Route path="users" element={<UsersPage title="Quản lý người dùng" />} />
           <Route path="history" element={<HistoryPage />} />
-          <Route path="settings" element={<AdminPlaceholder title="Cài đặt" />} />
+          {/* <Route path="settings" element={<AdminPlaceholder title="Cài đặt" />} /> */}
         </Route>
         <Route
           path="/responder"

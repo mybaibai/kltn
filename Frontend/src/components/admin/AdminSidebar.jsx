@@ -16,7 +16,7 @@ const navItems = [
   { to: '/admin/incidents', label: 'Quản lý sự cố', icon: AlertTriangle, end: true },
   { to: '/admin/users', label: 'Quản lý người dùng', icon: Users, end: false },
   { to: '/admin/history', label: 'Lịch sử', icon: History, end: false },
-  { to: '/admin/settings', label: 'Cài đặt', icon: Settings, end: false },
+ // { to: '/admin/settings', label: 'Cài đặt', icon: Settings, end: false },
 ];
 
 export default function AdminSidebar() {
