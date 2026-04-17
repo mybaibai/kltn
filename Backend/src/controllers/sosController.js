@@ -7,12 +7,12 @@ import { io } from '../server.js';
 
 /** Slug từ SOSform → tên loại trong DB (IncidentType) */
 const INCIDENT_SLUG_TO_NAME = {
-  thienTai: 'Thiên tai',
-  chayNo: 'Cháy nổ',
-  phuongTien: 'Sự cố phương tiện',
-  sucKhoe: 'Sức khỏe',
-  lacDuong: 'Lạc đường',
-  khac: 'Khác',
+  natural: 'Thiên tai',
+  fire: 'Cháy nổ',
+  vehicle: 'Sự cố phương tiện',
+  medical: 'Sức khỏe',
+  lost: 'Lạc đường',
+  other: 'Khác',
 };
 
 async function resolveIncidentTypeId(raw) {
@@ -34,19 +34,9 @@ const pendingBroadcastTimers = new Map();
 // POST /api/sos  — Requester gửi SOS
 export const create = async (req, res) => {
   try {
-    const {
-      requester_id,
-      victim_id,
-      latitude,
-      longitude,
-      lng,
-      lat,
-      address,
-      description,
-      incident_type_id,
-      incident_type,
-    } = req.body;
+    const { requester_id, victim_id, latitude, longitude, lng, lat, address, description, incident_type_id, incident_type } = req.body;
 
+    // Validate tối thiểu
     const resolvedVictimId = victim_id || requester_id;
     const resolvedLat = typeof latitude !== 'undefined' ? latitude : lat;
     const resolvedLng = typeof longitude !== 'undefined' ? longitude : lng;
@@ -126,6 +116,7 @@ export const create = async (req, res) => {
 
 export { pendingBroadcastTimers };
 
+// GET /api/sos
 export const getAll = async (req, res) => {
   try {
     const list = await sosService.getAllSos(req.query.status ? { status: req.query.status } : {});
@@ -135,6 +126,7 @@ export const getAll = async (req, res) => {
   }
 };
 
+// GET /api/sos/:id
 export const getDetail = async (req, res) => {
   try {
     const sos = await sosService.getSosById(req.params.id);
@@ -169,6 +161,7 @@ export const patchVictimLocation = async (req, res) => {
   }
 };
 
+// GET /api/sos/requester/:requesterId
 export const getByRequester = async (req, res) => {
   try {
     const list = await sosService.getSosByRequester(req.params.requesterId);
@@ -178,6 +171,7 @@ export const getByRequester = async (req, res) => {
   }
 };
 
+// GET /api/sos/team/:teamId
 export const getByTeam = async (req, res) => {
   try {
     const list = await sosService.getSosByTeam(req.params.teamId);
@@ -187,6 +181,7 @@ export const getByTeam = async (req, res) => {
   }
 };
 
+// PATCH /api/sos/:id/status
 export const updateStatus = async (req, res) => {
   try {
     const sos = await sosService.updateSosStatus(
@@ -201,6 +196,7 @@ export const updateStatus = async (req, res) => {
   }
 };
 
+// PATCH /api/sos/:id/assign
 export const assign = async (req, res) => {
   try {
     const sos = await sosService.assignTeam(req.params.id, req.body.team_id || req.body.rescue_id);

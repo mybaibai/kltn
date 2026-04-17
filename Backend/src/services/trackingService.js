@@ -31,12 +31,14 @@ export function calculateETA(distanceKm, avgSpeedKmh = 40) {
 
 // ===== 3. Xác định STAGE dựa vào distance =====
 export function determineStage(distanceKm, currentStage) {
-  // Auto-transition nếu distance <= 50m
-  if (
-    distanceKm <= 0.05 &&
-    (currentStage === "MOVING" || currentStage === "ASSIGNED")
-  ) {
-    return "ARRIVED";
+  // Auto-transition nếu distance <= 50m (0.05km)
+  if (distanceKm <= 0.05) {
+    if (currentStage === "MOVING" || currentStage === "ASSIGNED") {
+      return "ARRIVED";
+    }
+  } else if (distanceKm > 0.05 && currentStage === "ASSIGNED") {
+     // Nếu đã phân công và bắt đầu di chuyển (distance > 50m)
+     return "MOVING";
   }
   return currentStage || "MOVING";
 }
@@ -241,7 +243,7 @@ export async function updateRescueStage(
 }
 
 // ===== 6. Lấy tracking info hiện tại =====
-export async function getCurrentTracking(assignmentId) {
+export async function getCurrentTracking(assignmentId, isVictim = false) {
   try {
     const assignment = await RescueAssignment.findById(assignmentId)
       .populate("request_id", "victim_id address")
@@ -253,6 +255,13 @@ export async function getCurrentTracking(assignmentId) {
       "victim_id",
       "full_name phone profile",
     );
+
+    // Filter sensitive info if requester is a victim
+    const rescueInfo = {
+       _id: assignment.rescue_id._id,
+       full_name: assignment.rescue_id.full_name,
+       phone: isVictim ? undefined : assignment.rescue_id.phone
+    };
 
     // Lấy rescue location: ưu tiên assignment.current_location, fallback UserLocation
     let rescueLocation = assignment.current_location;
@@ -279,8 +288,9 @@ export async function getCurrentTracking(assignmentId) {
       data: {
         assignment_id: assignment._id,
         request_id: assignment.request_id._id,
-        rescue_id: assignment.rescue_id._id,
-        rescue_name: assignment.rescue_id.full_name,
+        rescue_id: rescueInfo._id,
+        rescue_name: rescueInfo.full_name,
+        rescue_phone: rescueInfo.phone,
         victim_id: sos.victim_id._id,
         victim_name: sos.victim_id.full_name,
         victim_location: sos.location,
