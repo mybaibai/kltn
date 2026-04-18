@@ -370,10 +370,10 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Hiệu suất phản ứng theo Phường */}
+        {/* Hiệu suất phản ứng theo Đội cứu trợ  */}
         <div className="rounded-2xl border border-[#E8E8EC] bg-white p-6 shadow-sm">
           <h2 className="mb-5 text-lg font-bold text-gray-900">
-            Hiệu suất phản ứng theo Phường
+            Hiệu suất phản ứng theo Đội cứu trợ
           </h2>
           <div className="space-y-3">
             {distribution.slice(0, 5).map((item, i) => {
