@@ -29,14 +29,13 @@ export default function AdminSidebar() {
 
   return (
     <aside className="sticky top-0 flex h-dvh w-64 shrink-0 flex-col overflow-y-auto border-r border-[#E8E8EC] bg-[#FAFAFA]">
-      <div className="px-5 py-6">
+      <div className="flex justify-center items-center">
         <div className="text-left">
-          <p className="text-lg font-bold leading-snug text-brand-blue">
-            Hệ thống cứu hộ
-          </p>
-          <p className="mt-0.5 text-sm font-normal leading-snug text-brand-brown">
-            Hệ thống quản lý khẩn cấp
-          </p>
+          <img
+            src="https://res.cloudinary.com/dgbtibqno/image/upload/v1776508857/eov6wwkurrruwrawlhhs.png"
+            alt="SOSGO — Nền tảng kết nối cứu trợ khẩn cấp thông minh"
+            className="h-auto w-full max-w-[100px] object-contain object-left"
+          />
         </div>
       </div>
 
