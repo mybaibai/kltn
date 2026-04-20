@@ -10,31 +10,29 @@ const api = axios.create({
 api.interceptors.request.use(async (config) => {
   config.headers = config.headers || {};
 
-  const url = config.url || "";
-  if (url.includes("/auth/firebase")) return config;
+  const isVictim = config.useVictim;
 
-  /** Ưu tiên Firebase (nạn nhân) dù cùng trình duyệt có JWT staff */
-  if (config.skipStaffJwt) {
+  // ✅ Nếu là victim → dùng Firebase
+  if (isVictim) {
     const user = auth.currentUser;
+
     if (user) {
       const token = await user.getIdToken();
       config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      console.warn("❌ No Firebase user");
     }
+
     return config;
   }
 
-  const jwt = typeof localStorage !== "undefined" ? localStorage.getItem("auth_token") : null;
-  if (jwt) {
-    config.headers.Authorization = `Bearer ${jwt}`;
-    return config;
+  // ✅ Nếu là staff → dùng JWT
+  const staffToken = localStorage.getItem("staff_token");
+
+  if (staffToken) {
+    config.headers.Authorization = `Bearer ${staffToken}`;
   }
 
-  const user = auth.currentUser;
-  if (user) {
-    const token = await user.getIdToken();
-    config.headers.Authorization = `Bearer ${token}`;
-  }
   return config;
 });
-
 export default api;
