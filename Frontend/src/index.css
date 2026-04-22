@@ -197,11 +197,6 @@ button {
     opacity: 0;
   }
 }
-.marker-wrapper {
-  position: relative;
-  width: 20px;
-  height: 20px;
-}
 
 .dot {
   position: absolute;
