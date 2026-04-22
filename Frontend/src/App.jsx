@@ -8,6 +8,7 @@ import ResponderPage from '@/page/ResponderPage';
 import { StaffLoginGate, StaffRoleGuard, StaffHomeRedirect } from '@/components/auth/AuthGuards';
 import { STAFF_ROLE_ADMIN, STAFF_ROLE_RESCUE } from '@/services/auth/session';
 import TrackingView from './page/SosPage/TrackingView';
+import RescueTrackingView from './components/responder/RescueTracking';
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/SosPage" element={<Navigate to="/sos" replace />} />
         {/* <Route path="/sospage" element={<Navigate to="/sos" replace />} /> */}
         <Route path="/tracking/:sosId" element={<TrackingView />} />
+        <Route path="/rescue/tracking/:sosId" element={<RescueTrackingView />} />
         <Route
           path="/staff-login"
           element={(

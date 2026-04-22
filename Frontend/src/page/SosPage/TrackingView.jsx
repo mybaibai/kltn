@@ -6,6 +6,7 @@ import {
   Marker,
   Popup,
   CircleMarker,
+  Polyline,
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -28,18 +29,22 @@ import { getCurrentTracking } from "@/services/api/apiTracking";
 import { getSosDetail } from "@/services/api/apiSos";
 import HeaderUser from "@/components/user/HeaderUser";
 import { getVictimProfile } from "@/services/auth/session";
-import MapCenterMarker from "@/components//ui/MapCenterMarker";
+
 // ─── Leaflet icons ────────────────────────────────────────────────────────────
-// const markerIcon = new L.Icon({
-//   iconUrl:
-//     "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
-//   shadowUrl:
-//     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
-//   iconSize: [25, 41],
-//   iconAnchor: [12, 41],
-//   popupAnchor: [1, -34],
-//   shadowSize: [41, 41],
-// });
+const victimIcon = new L.DivIcon({
+  className: "custom-victim-marker",
+  html: `
+    <div class="marker-wrapper">
+      <span class="pulse pulse1"></span>
+      <span class="pulse pulse2"></span>
+      <span class="pulse pulse3"></span>
+      <span class="dot"></span>
+    </div>
+  `,
+  iconSize: [24, 24],
+  iconAnchor: [12, 12],
+});
+
 const rescueMarkerIcon = new L.Icon({
   iconUrl:
     "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
@@ -113,14 +118,13 @@ const STAGE_LABEL = {
   COMPLETED: "✔️ Hoàn thành",
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatTime(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
   const pad = (n) => String(n).padStart(2, "0");
-  return `${pad(d.getHours())}:${pad(d.getMinutes())} - ${pad(
-    d.getDate()
-  )}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  return `${pad(d.getHours())}:${pad(d.getMinutes())} - ${pad(d.getDate())}/${pad(
+    d.getMonth() + 1
+  )}/${d.getFullYear()}`;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -156,16 +160,9 @@ function ProgressTracker({ currentStep }) {
         />
         {STEPS.map((step, idx) => {
           const state =
-            idx < currentStep
-              ? "done"
-              : idx === currentStep
-              ? "active"
-              : "inactive";
+            idx < currentStep ? "done" : idx === currentStep ? "active" : "inactive";
           return (
-            <div
-              key={step.key}
-              className="flex flex-col items-center gap-1.5 z-10"
-            >
+            <div key={step.key} className="flex flex-col items-center gap-1.5 z-10">
               <StepIcon state={state} />
               <span
                 className={`text-[10px] font-semibold text-center leading-tight max-w-[64px]
@@ -198,17 +195,12 @@ export default function TrackingView() {
   const [cancelled, setCancelled] = useState(false);
   const [acceptedNotification, setAcceptedNotification] = useState(null);
   const [socket, setSocket] = useState(() => getSocket());
-  const [user, setUser] = useState(() => getVictimProfile());
+  const [user] = useState(() => getVictimProfile());
+  const [, setShowLogin] = useState(false);
 
-  const [showLogin, setShowLogin] = useState(false);
+  const handleLogoutVictim = () => console.log("logout victim");
+  const handleStaffLogout = () => console.log("logout staff");
 
-  const handleLogoutVictim = () => {
-    console.log("logout victim");
-  };
-
-  const handleStaffLogout = () => {
-    console.log("logout staff");
-  };
   function loadStaffSession() {
     try {
       const t = localStorage.getItem("auth_token");
@@ -219,51 +211,14 @@ export default function TrackingView() {
       return { jwt: !!localStorage.getItem("auth_token"), profile: null };
     }
   }
-  const [staffSession, setStaffSession] = useState(loadStaffSession);
-  // Load SOS detail
-  // useEffect(() => {
-  //   if (!sosId) return;
-  //   const fetchSos = async () => {
-  //     try {
-  //       const res = await getSosDetail(sosId);
-  //       const data = res?.data?.data;
-  //       if (data) setSos(data);
-  //     } catch (e) {
-  //       console.error("❌ Error loading SOS:", e);
-  //     }
-  //   };
-  //   fetchSos();
-  //   const interval = setInterval(fetchSos, 10000);
-  //   return () => clearInterval(interval);
-  // }, [sosId]);
-  useEffect(() => {
-    if (!sosId) return;
-  
-    const fetchTracking = async () => {
-      try {
-        const res = await getCurrentTracking(sosId);
-        const data = res?.data?.data;
-        if (data) setTracking(data);
-      } catch (e) {
-        console.log("No tracking yet");
-      }
-    };
-  
-    fetchTracking();
-    const interval = setInterval(fetchTracking, 5000);
-  
-    return () => clearInterval(interval);
-  }, [sosId]);
+  const [staffSession] = useState(loadStaffSession);
 
+  // ── Load SOS detail ────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!sosId) {
-      setLoading(false); 
-      return;
-    }
-  
+    if (!sosId) { setLoading(false); return; }
     const fetchSos = async () => {
       try {
-        const res = await getSosDetail(sosId);
+        const res = await getSosDetail(sosId, { preferVictimToken: true });
         const data = res?.data?.data;
         if (data) setSos(data);
       } catch (e) {
@@ -272,18 +227,43 @@ export default function TrackingView() {
         setLoading(false);
       }
     };
-  
     fetchSos();
   }, [sosId]);
-  // Socket setup
+
+  // ── Load tracking (poll fallback) ─────────────────────────────────────────
+  useEffect(() => {
+    if (!sosId) return;
+    const fetchTracking = async () => {
+      try {
+        const res = await getCurrentTracking(sosId, { preferVictimToken: true });
+        const data = res?.data?.data;
+        if (data) setTracking(data);
+      } catch {
+        console.log("No tracking yet");
+      }
+    };
+    fetchTracking();
+    // Poll every 10s as fallback if socket fails
+    const interval = setInterval(fetchTracking, 10000);
+    return () => clearInterval(interval);
+  }, [sosId]);
+
+  // ── Socket setup ───────────────────────────────────────────────────────────
   useEffect(() => {
     if (socket) return;
     const next = initSocketFromSession();
     if (next) setSocket(next);
   }, [socket]);
 
+  // ── Join SOS room + listen events ─────────────────────────────────────────
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !sosId) return;
+
+    // Join SOS-specific room để nhận realtime từ rescue
+    socket.emit("join_sos_room", { sos_id: sosId });
+    console.log(`📡 Victim joined sos-${sosId} room`);
+
+    // Rescue đã nhận yêu cầu
     socket.on("rescue_accepted", (data) => {
       setAcceptedNotification({
         message: data.message,
@@ -291,24 +271,43 @@ export default function TrackingView() {
       });
       setTimeout(() => setAcceptedNotification(null), 5000);
     });
+
+    // Cập nhật tracking từ victim-specific room (cũ, giữ lại)
     socket.on("victim_tracking_update", (data) => {
       setTracking((prev) => ({
         ...prev,
-        stage: data.stage,
-        distance_km: data.distance_km,
-        eta_minutes: data.eta_minutes,
-        rescue_location: data.rescue_location,
+        stage: data.stage ?? prev?.stage,
+        distance_km: data.distance_km ?? prev?.distance_km,
+        eta_minutes: data.eta_minutes ?? prev?.eta_minutes,
+        rescue_location: data.rescue_location ?? prev?.rescue_location,
         stage_changed: data.stage_changed,
         last_update: data.timestamp,
       }));
     });
+
+    // ── NEW: Cập nhật từ sos-room (rescue phát, victim nhận) ────────────────
+    socket.on("sos_room_update", (data) => {
+      setTracking((prev) => ({
+        ...prev,
+        stage: data.stage ?? prev?.stage,
+        distance_km: data.distance_km ?? prev?.distance_km,
+        eta_minutes: data.eta_minutes ?? prev?.eta_minutes,
+        rescue_location: data.rescue_location ?? prev?.rescue_location,
+        victim_location: data.victim_location ?? prev?.victim_location,
+        stage_changed: data.stage_changed,
+        last_update: data.timestamp,
+      }));
+    });
+
     socket.on("error", (err) => console.error("❌ Socket error:", err));
+
     return () => {
       socket.off("rescue_accepted");
       socket.off("victim_tracking_update");
+      socket.off("sos_room_update");
       socket.off("error");
     };
-  }, [socket]);
+  }, [socket, sosId]);
 
   const handleCancel = () => {
     setCancelled(true);
@@ -321,8 +320,8 @@ export default function TrackingView() {
         <Loader2 className="animate-spin text-gray-400" size={32} />
       </div>
     );
-    console.log("auth_token:", localStorage.getItem("auth_token"));
-  // Derived values
+
+  // ── Derived values ──────────────────────────────────────────────────────────
   const currentStep = STATUS_TO_STEP[sos?.status] ?? 1;
   const isCancelled = sos?.status === "CANCELLED";
   const isResolved = sos?.status === "RESOLVED";
@@ -331,30 +330,33 @@ export default function TrackingView() {
   const requestCode = sos?._id
     ? `#SOS-${String(sos._id).slice(-4).toUpperCase()}`
     : "#SOS-????";
-    const incidentLabel =
+  const incidentLabel =
     typeof sos?.incident_type === "object"
       ? sos?.incident_type?.name
       : INCIDENT_LABEL[sos?.incident_type] || sos?.incident_type || "—";
   const userName = sos?.victim_id?.full_name || "—";
   const userPhone = sos?.victim_id?.phone || "—";
-  const userAddress = sos?.address || "—";
+  const userAddress =
+    sos?.address ||
+    (typeof sos?.description === "string"
+      ? sos.description.match(/\[Địa chỉ:\s*([^\]]+)\]/)?.[1]
+      : null) ||
+    "—";
 
   const victimLat =
-  tracking?.victim_location?.coordinates?.[1] ??
-  sos?.location?.coordinates?.[1];
+    tracking?.victim_location?.coordinates?.[1] ??
+    sos?.location?.latitude ??
+    sos?.location?.coordinates?.[1];
+  const victimLng =
+    tracking?.victim_location?.coordinates?.[0] ??
+    sos?.location?.longitude ??
+    sos?.location?.coordinates?.[0];
 
-const victimLng =
-  tracking?.victim_location?.coordinates?.[0] ??
-  sos?.location?.coordinates?.[0];
-
-  
   const rescueLat = tracking?.rescue_location?.coordinates?.[1];
   const rescueLng = tracking?.rescue_location?.coordinates?.[0];
-  const mapCenter = victimLat ? [victimLat, victimLng] : [10.7769, 106.6966];
-  console.log("tracking:", tracking);
-console.log("sos:", sos);
-console.log("victimLat:", victimLat);
-console.log("victimLng:", victimLng);
+  const hasVictimPoint = Number.isFinite(victimLat) && Number.isFinite(victimLng);
+  const hasRescuePoint = Number.isFinite(rescueLat) && Number.isFinite(rescueLng);
+  const mapCenter = hasVictimPoint ? [victimLat, victimLng] : [10.7769, 106.6966];
 
   return (
     <div className="flex h-screen w-full overflow-hidden font-sans">
@@ -387,7 +389,8 @@ console.log("victimLng:", victimLng);
           ✅ Đã huỷ yêu cầu cứu trợ
         </div>
       )}
-      {/* ══════════════ MAP  ══════════════ */}
+
+      {/* ══════════════ MAP ══════════════ */}
       <div className="flex-1 relative">
         <MapContainer
           center={mapCenter}
@@ -398,51 +401,69 @@ console.log("victimLng:", victimLng);
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution="&copy; OpenStreetMap contributors"
           />
-          {victimLat && victimLng && (
-            <MapCenterMarker position={[victimLat, victimLng]} >
+
+          {hasVictimPoint && (
+            <Marker position={[victimLat, victimLng]} icon={victimIcon}>
               <Popup>
                 <strong>📍 Nạn nhân</strong>
                 <p>{tracking?.victim_name || userName}</p>
               </Popup>
-            </MapCenterMarker>
+            </Marker>
           )}
 
-          {
-            rescueLat &&
-            rescueLng && (
-              <>
-                <Marker
-                  position={[rescueLat, rescueLng]}
-                  icon={rescueMarkerIcon}
-                >
-                  <Popup>
-                    <strong>🚑 Đội cứu hộ</strong>
-                    <p>
-                      {tracking?.rescue_name ||
-                        sos?.assigned_rescue_id?.full_name}
-                    </p>
-                    <p>Distance: {tracking?.distance_km?.toFixed(2)}km</p>
-                  </Popup>
-                </Marker>
+          {hasRescuePoint && (
+            <>
+              <Marker position={[rescueLat, rescueLng]} icon={rescueMarkerIcon}>
+                <Popup>
+                  <strong>🚑 Đội cứu hộ</strong>
+                  <p>{tracking?.rescue_name || sos?.assigned_rescue_id?.full_name}</p>
+                  <p>Khoảng cách: {tracking?.distance_km?.toFixed(2)}km</p>
+                </Popup>
+              </Marker>
 
-                {tracking?.stage === "ARRIVED" && (
-                  <CircleMarker
-                    center={[victimLat, victimLng]}
-                    radius={50}
-                    color="#2ecc71"
-                    weight={2}
-                    opacity={0.5}
-                    fill
-                    fillColor="#2ecc71"
-                    fillOpacity={0.1}
-                  >
-                    <Popup>Vùng cứu hộ (50m)</Popup>
-                  </CircleMarker>
-                )}
-              </>
-            )}
+              {/* ── NEW: Line từ rescue đến victim ── */}
+              {hasVictimPoint && (
+                <Polyline
+                  positions={[
+                    [rescueLat, rescueLng],
+                    [victimLat, victimLng],
+                  ]}
+                  color="#3b82f6"
+                  weight={2}
+                  opacity={0.4}
+                  dashArray="8 6"
+                />
+              )}
+
+              {tracking?.stage === "ARRIVED" && (
+                <CircleMarker
+                  center={[victimLat, victimLng]}
+                  radius={50}
+                  color="#2ecc71"
+                  weight={2}
+                  opacity={0.5}
+                  fill
+                  fillColor="#2ecc71"
+                  fillOpacity={0.1}
+                >
+                  <Popup>Vùng cứu hộ (50m)</Popup>
+                </CircleMarker>
+              )}
+            </>
+          )}
         </MapContainer>
+
+        {/* ── NEW: Realtime indicator overlay ── */}
+        {hasRescuePoint && (
+          <div className="absolute bottom-4 left-4 z-[1000] bg-white/90 backdrop-blur-sm border border-gray-200 rounded-xl shadow-lg px-3 py-2 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+            <span className="text-xs font-semibold text-gray-700">
+              Đội cứu hộ đang di chuyển
+            </span>
+          </div>
+        )}
       </div>
+
       {/* ══════════════ RIGHT PANEL ══════════════ */}
       <div className="w-96 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
         <HeaderUser
@@ -452,6 +473,7 @@ console.log("victimLng:", victimLng);
           onLogoutVictim={handleLogoutVictim}
           onStaffLogout={handleStaffLogout}
         />
+
         {/* Header */}
         <div className="px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center justify-between gap-3">
@@ -497,7 +519,7 @@ console.log("victimLng:", victimLng);
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
-          {/* Stage badge (from tracking) */}
+          {/* Stage badge */}
           {tracking?.stage && (
             <div
               className={`inline-flex items-center px-3 py-1 rounded-full text-white text-xs font-semibold ${
@@ -514,9 +536,7 @@ console.log("victimLng:", victimLng);
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">
                 Loại sự cố
               </p>
-              <p className="text-sm font-semibold text-gray-800">
-                {incidentLabel}
-              </p>
+              <p className="text-sm font-semibold text-gray-800">{incidentLabel}</p>
             </div>
             <div className="bg-gray-50 rounded-xl p-3">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">
@@ -580,9 +600,7 @@ console.log("victimLng:", victimLng);
             </p>
             <div className="flex items-start gap-2">
               <MapPin size={12} className="text-red-500 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-gray-700 leading-relaxed">
-                {userAddress}
-              </p>
+              <p className="text-xs text-gray-700 leading-relaxed">{userAddress}</p>
             </div>
           </div>
 
@@ -635,7 +653,7 @@ console.log("victimLng:", victimLng);
             </div>
           )}
 
-          {/* Timeline */}
+          {/* Timeline stage history */}
           {tracking?.stage_history?.length > 0 && (
             <div>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">
@@ -695,7 +713,7 @@ console.log("victimLng:", victimLng);
         {/* Footer */}
         <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 flex gap-3 flex-shrink-0">
           <button
-            onClick={() => navigate("/")}
+            onClick={() => window.location.reload()}
             className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-500 hover:bg-gray-100 transition-colors"
           >
             <RefreshCw size={13} />
