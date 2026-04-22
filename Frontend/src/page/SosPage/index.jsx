@@ -38,61 +38,56 @@ L.Icon.Default.mergeOptions({
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
 });
-// Custom Icon Renderer using divIcon for premium look
-const createCustomIcon = (bgColor, iconColor, pulse = false) => {
-  return L.divIcon({
-    className: 'custom-div-icon',
-    html: `
-      <div class="marker-container ${pulse ? 'pulse-animation' : ''}" style="background-color: ${bgColor};">
-        <div class="marker-inner" style="color: ${iconColor};">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
-          </svg>
-        </div>
-      </div>
-    `,
-    iconSize: [44, 44],
-    iconAnchor: [22, 44],
-    popupAnchor: [0, -40],
-  });
-};
+const premiumPulseIcon = L.divIcon({
+  className: 'custom-div-icon',
+  html: `
+    <div class="marker-wrapper">
+      <span class="pulse pulse1"></span>
+      <span class="pulse pulse2"></span>
+      <span class="pulse pulse3"></span>
+      <span class="dot"></span>
+    </div>
+  `,
+  iconSize: [20, 20],
+  iconAnchor: [10, 10],
+  popupAnchor: [0, -10],
+});
 
-const premiumPulseIcon = createCustomIcon('#ff4d4f', '#ffffff', true);
-
-// Custom Style for premium markers
 const sosMapStyles = `
-  .marker-container {
-    width: 44px;
-    height: 44px;
-    border-radius: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 8px 15px rgba(0,0,0,0.2);
-    border: 3px solid white;
-    transform: rotate(-45deg);
-    border-bottom-left-radius: 2px;
+  .marker-wrapper {
+    position: relative;
+    width: 20px;
+    height: 20px;
   }
-  .marker-inner {
-    transform: rotate(45deg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .pulse-animation::after {
-    content: '';
+  .pulse1 { animation-delay: 0s; }
+  .pulse2 { animation-delay: 0.6s; }
+  .pulse3 { animation-delay: 1.2s; }
+  .dot {
+    width: 12px;
+    height: 12px;
+    background: #ef4444;
+    border-radius: 50%;
     position: absolute;
-    width: 100%;
-    height: 100%;
-    border-radius: inherit;
-    background: inherit;
-    opacity: 0.6;
-    animation: marker-pulse 2s infinite;
-    z-index: -1;
+    top: 4px;
+    left: 4px;
+    z-index: 3;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
   }
-  @keyframes marker-pulse {
-    0% { transform: scale(1); opacity: 0.6; }
-    100% { transform: scale(1.8); opacity: 0; }
+  .pulse {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #ef4444;
+    border-radius: 50%;
+    top: 0;
+    left: 0;
+    opacity: 0;
+    animation: pulse-wave 2s infinite;
+  }
+  @keyframes pulse-wave {
+    0% { transform: scale(0.5); opacity: 0.8; }
+    70% { transform: scale(2.5); opacity: 0.1; }
+    100% { transform: scale(3); opacity: 0; }
   }
 `;
 
