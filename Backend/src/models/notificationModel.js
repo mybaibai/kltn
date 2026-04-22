@@ -1,3 +1,4 @@
+﻿// Backend/src/models/notificationModel.js
 //Backend/src/models/notificationModel.js
 import mongoose from 'mongoose';
 
@@ -17,3 +18,4 @@ const notificationSchema = new mongoose.Schema(
 );
 
 export default mongoose.model('Notification', notificationSchema, 'notifications');
+

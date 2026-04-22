@@ -1,3 +1,4 @@
+﻿// Frontend/src/services/auth/staffAuth.js
 import api from "@/services/api/index.js";
 
 function readApiMessage(error) {
@@ -18,3 +19,4 @@ export async function loginWithEmailPassword({ email, password }) {
     throw new Error(readApiMessage(error));
   }
 }
+

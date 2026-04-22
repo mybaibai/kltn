@@ -1,3 +1,4 @@
+// Backend/src/config/firebaseAdmin.js
 import admin from "firebase-admin";
 import dotenv from "dotenv";
 import path from "path";
@@ -57,3 +58,4 @@ if (emulatorHost) {
     // ignore (tùy version SDK / cách host format)
   }
 }
+

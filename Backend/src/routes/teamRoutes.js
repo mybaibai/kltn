@@ -1,3 +1,4 @@
+// Backend/src/routes/teamRoutes.js
 //Backend/src/routes/teamRoutes.js
 import express from 'express';
 import { getAll, getDetail, create, update, updateLocation, findNearest, remove }

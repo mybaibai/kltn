@@ -1,3 +1,4 @@
+// Backend/src/controllers/userController.js
 //Backend/src/controllers/userController.js
 import * as userService from '../services/userService.js';
 
@@ -43,3 +44,4 @@ export const remove = async (req, res) => {
     res.status(200).json({ success: true, message: 'Đã xóa user' });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
+

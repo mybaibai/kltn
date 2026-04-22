@@ -1,3 +1,4 @@
+﻿// Frontend/src/components/responder/ResponderBoardHeader.jsx
 import { useNavigate } from "react-router-dom";
 import { Bell, ChevronDown, LogOut } from "lucide-react";
 import { clearAllAuth } from "@/services/auth/session";
@@ -60,3 +61,4 @@ export default function ResponderBoardHeader({ user }) {
     </header>
   );
 }
+

@@ -1,3 +1,4 @@
+﻿// Backend/src/controllers/trackingController.js
 import * as trackingService from "../services/trackingService.js";
 import RescueAssignment from "../models/rescueAssignmentModel.js";
 import SosRequest from "../models/sosRequestModel.js";
@@ -6,71 +7,66 @@ import { io } from "../server.js";
 
 // ===== 0. POST /api/tracking/accept-mission =====
 // Rescue chấp nhận mission → notify victim
+// POST /api/tracking/accept-mission
 export const acceptMission = async (req, res) => {
   try {
     const { assignment_id } = req.body;
     const rescue_id = req.user?._id;
 
     if (!assignment_id) {
-      return res.status(400).json({
-        success: false,
-        message: "Thiếu assignment_id",
-      });
+      return res.status(400).json({ success: false, message: "Thiếu assignment_id" });
     }
 
-    // Update assignment
+    // Cập nhật assignment
     const assignment = await RescueAssignment.findByIdAndUpdate(
-      assignment_id,
-      { accepted_at: new Date() },
-      { new: true },
-    );
+  assignment_id,
+  { accepted_at: new Date() },  // chỉ set accepted_at
+  { new: true }
+);
 
     if (!assignment) {
-      return res.status(404).json({
-        success: false,
-        message: "Assignment not found",
-      });
+      return res.status(404).json({ success: false, message: "Assignment không tồn tại" });
     }
 
     if (String(assignment.rescue_id) !== String(rescue_id)) {
-      return res.status(403).json({
-        success: false,
-        message: "Bạn không phải đội được phân công cho nhiệm vụ này",
+      return res.status(403).json({ success: false, message: "Không phải đội được phân công" });
+    }
+
+    // Lấy SOS và kiểm tra null
+    const sos = await SosRequest.findById(assignment.request_id);
+    if (!sos) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "SOS request không tồn tại hoặc đã bị xóa" 
       });
     }
 
-    // Get rescue info
     const rescue = await User.findById(rescue_id).select("full_name phone");
-    const sos = await SosRequest.findById(assignment.request_id);
 
-    // ===== BROADCAST SOCKET EVENTS =====
-    // 📢 Broadcast to VICTIM - Toast notification
+    // Broadcast realtime
     io.to(`victim-${sos.victim_id}`).emit("rescue_accepted", {
-      rescue_name: rescue.full_name,
-      // HIDE phone for victim privacy
-      message: `${rescue.full_name} đã chấp nhận cứu hộ`,
+      rescue_name: rescue?.full_name || "Đội cứu hộ",
+      message: `${rescue?.full_name || "Đội cứu hộ"} đã chấp nhận cứu hộ bạn`,
+      assignment_id: assignment._id,
       timestamp: new Date(),
     });
 
-    // 📢 Broadcast to ADMIN
-    io.to("admin-dashboard").emit("rescue_accepted", {
+    io.to("admin-dashboard").emit("mission_accepted", {
       assignment_id: assignment._id,
-      request_id: assignment.request_id,
-      rescue_name: rescue.full_name,
+      request_id: sos._id,
+      rescue_name: rescue?.full_name,
+      victim_id: sos.victim_id,
       timestamp: new Date(),
     });
 
     res.status(200).json({
       success: true,
+      message: "Đã chấp nhận nhiệm vụ",
       data: assignment,
-      message: `${rescue.full_name} đã chấp nhận`,
     });
-  } catch (err) {
-    console.error("❌ Error accepting mission:", err.message);
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+  } catch (error) {
+    console.error("❌ acceptMission error:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -361,3 +357,4 @@ export async function broadcastMissionAccepted(assignmentId, rescueName) {
     console.error("❌ Error broadcasting mission accepted:", err.message);
   }
 }
+

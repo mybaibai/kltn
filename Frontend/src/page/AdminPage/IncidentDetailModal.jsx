@@ -1,3 +1,4 @@
+// Frontend/src/page/AdminPage/IncidentDetailModal.jsx
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Clock, AlertTriangle, MapPin, Phone, Navigation } from 'lucide-react';
@@ -210,3 +211,4 @@ export default function IncidentDetailModal({ sos, onClose, onStatusChanged }) {
     </>
   );
 }
+

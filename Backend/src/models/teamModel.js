@@ -1,3 +1,4 @@
+﻿// Backend/src/models/teamModel.js
 import mongoose from 'mongoose';
 
 const teamSchema = new mongoose.Schema({

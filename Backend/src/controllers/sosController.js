@@ -1,3 +1,4 @@
+// Backend/src/controllers/sosController.js
 //Backend/src/controllers/sosController.js
 import mongoose from 'mongoose';
 import * as sosService from '../services/sosService.js';
@@ -155,7 +156,23 @@ export const patchVictimLocation = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Không có quyền cập nhật vị trí' });
     }
     const updated = await sosService.updateSosVictimLocation(req.params.id, Number(la), Number(ln));
-    res.status(200).json({ success: true, data: updated });
+    // Broadcast vị trí victim mới cho rescue và admin
+const assignment = await sosService.getLatestAssignmentForRequest(req.params.id);
+if (assignment) {
+  const rescueId = assignment.rescue_id;
+  io.to(`rescue-${rescueId}`).emit("victim_location_updated", {
+    request_id: req.params.id,
+    location: updated.location,
+    timestamp: new Date(),
+  });
+}
+io.to("admin-dashboard").emit("victim_location_updated", {
+  request_id: req.params.id,
+  location: updated.location,
+  timestamp: new Date(),
+});
+
+res.status(200).json({ success: true, data: updated });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -197,31 +214,39 @@ export const updateStatus = async (req, res) => {
 };
 
 // PATCH /api/sos/:id/assign
+// PATCH /api/sos/:id/assign
 export const assign = async (req, res) => {
   try {
-    const sos = await sosService.assignTeam(req.params.id, req.body.team_id || req.body.rescue_id);
+    const sos = await sosService.assignTeam(
+      req.params.id,
+      req.body.team_id || req.body.rescue_id
+    );
 
     if (sos) {
       const rescueId = sos.assigned_rescue_id?._id || sos.assigned_rescue_id;
       const victimId = sos.victim_id?._id || sos.victim_id;
 
-      // Broadcast to update other rescue dashboards
+      // Hủy broadcast timer 60s nếu có
+      const timer = pendingBroadcastTimers.get(String(req.params.id));
+      if (timer) {
+        clearTimeout(timer);
+        pendingBroadcastTimers.delete(String(req.params.id));
+      }
+
       io.to("rescue-all").emit("sos_assigned", {
         request_id: sos._id,
         rescue_id: rescueId,
-        status: sos.status
+        status: sos.status,
       });
 
-      // Notify the victim
       if (victimId) {
         io.to(`victim-${victimId}`).emit("rescue_accepted", {
           message: "Một đội cứu hộ đã tiếp nhận yêu cầu của bạn",
           rescue_name: sos.assigned_rescue_id?.full_name || "Đội cứu hộ",
-          request_id: sos._id
+          request_id: sos._id,
         });
       }
-      
-      // Notify Admin
+
       io.to("admin-dashboard").emit("sos_assigned", {
         request_id: sos._id,
         rescue_id: rescueId,
@@ -231,6 +256,8 @@ export const assign = async (req, res) => {
 
     res.status(200).json({ success: true, data: sos });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    // 409 Conflict nếu đã assign rồi
+    const status = err.message.includes("đã được phân công") ? 409 : 500;
+    res.status(status).json({ success: false, message: err.message });
   }
 };

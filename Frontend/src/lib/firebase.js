@@ -1,3 +1,4 @@
+// Frontend/src/lib/firebase.js
 import { initializeApp } from "firebase/app";
 import { getAuth, connectAuthEmulator } from "firebase/auth";
 
@@ -44,3 +45,4 @@ const disableForTesting =
 if (devTesting || disableForTesting) {
   setAppVerificationDisabledForTesting();
 }
+

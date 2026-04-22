@@ -1,3 +1,4 @@
+﻿// Frontend/src/page/AdminPage/LiveMissionsMonitor.jsx
 import { useEffect, useState } from "react";
 import {
   MapContainer,
@@ -55,7 +56,7 @@ export default function LiveMissionsMonitor() {
 
     // Listen for updates
     socket.on("location_update", (data) => {
-      console.log("📍 Location update:", data);
+      console.log("ðŸ“ Location update:", data);
       setMissions((prev) =>
         prev.map((mission) =>
           mission.assignment_id === data.assignment_id
@@ -71,7 +72,7 @@ export default function LiveMissionsMonitor() {
     });
 
     socket.on("stage_changed", (data) => {
-      console.log("🔄 Stage changed:", data);
+      console.log("ðŸ”„ Stage changed:", data);
       const nextStage = data.new_stage || data.stage;
       setMissions((prev) =>
         prev.map((mission) =>
@@ -88,7 +89,7 @@ export default function LiveMissionsMonitor() {
     });
 
     socket.on("rescue_accepted", (data) => {
-      console.log("✅ Rescue accepted:", data);
+      console.log("âœ… Rescue accepted:", data);
       loadMissions(); // Reload to get new mission
     });
 
@@ -107,7 +108,7 @@ export default function LiveMissionsMonitor() {
         setMissions(response.data || []);
       }
     } catch (err) {
-      console.error("❌ Error loading missions:", err);
+      console.error("âŒ Error loading missions:", err);
     } finally {
       setLoading(false);
     }
@@ -126,11 +127,11 @@ export default function LiveMissionsMonitor() {
 
   const getStageLabel = (stage) => {
     const labels = {
-      ASSIGNED: "📍 Assigned",
-      MOVING: "🚑 Moving",
-      ARRIVED: "✅ Arrived",
-      RESCUING: "⏳ Rescuing",
-      COMPLETED: "✔️ Completed",
+      ASSIGNED: "ðŸ“ Assigned",
+      MOVING: "ðŸš‘ Moving",
+      ARRIVED: "âœ… Arrived",
+      RESCUING: "â³ Rescuing",
+      COMPLETED: "âœ”ï¸ Completed",
     };
     return labels[stage] || stage;
   };
@@ -166,15 +167,15 @@ export default function LiveMissionsMonitor() {
       {/* ===== LEFT PANEL: MISSION LIST ===== */}
       <div className="missions-panel">
         <div className="missions-header">
-          <h2>🗺️ Live Missions Monitor</h2>
+          <h2>ðŸ—ºï¸ Live Missions Monitor</h2>
           <div className="mission-count">
-            {loading ? "⏳ Loading..." : `${missions.length} Active`}
+            {loading ? "â³ Loading..." : `${missions.length} Active`}
           </div>
         </div>
 
         <div className="missions-list">
           {loading ? (
-            <div className="loading-state">⏳ Loading missions...</div>
+            <div className="loading-state">â³ Loading missions...</div>
           ) : missions.length === 0 ? (
             <div className="empty-state">No active missions</div>
           ) : (
@@ -187,7 +188,7 @@ export default function LiveMissionsMonitor() {
                 <div className="mission-card-header">
                   <div className="mission-title">
                     <p className="victim-name">{mission.victim_name}</p>
-                    <p className="rescue-name">→ {mission.rescue_name}</p>
+                    <p className="rescue-name">â†’ {mission.rescue_name}</p>
                   </div>
                   <div
                     className="stage-badge-small"
@@ -199,19 +200,19 @@ export default function LiveMissionsMonitor() {
 
                 <div className="mission-card-body">
                   <div className="metric-row">
-                    <span className="metric-label">📍 Distance:</span>
+                    <span className="metric-label">ðŸ“ Distance:</span>
                     <span className="metric-value">
                       {mission.distance_km?.toFixed(2)}km
                     </span>
                   </div>
                   <div className="metric-row">
-                    <span className="metric-label">⏱️ ETA:</span>
+                    <span className="metric-label">â±ï¸ ETA:</span>
                     <span className="metric-value">
                       {mission.eta_minutes} min
                     </span>
                   </div>
                   <div className="metric-row">
-                    <span className="metric-label">📱 Victim:</span>
+                    <span className="metric-label">ðŸ“± Victim:</span>
                     <span className="metric-value">{mission.victim_phone}</span>
                   </div>
                 </div>
@@ -258,9 +259,9 @@ export default function LiveMissionsMonitor() {
                       <Popup>
                         <div className="popup-content">
                           <p>
-                            <strong>👤 {mission.victim_name}</strong>
+                            <strong>ðŸ‘¤ {mission.victim_name}</strong>
                           </p>
-                          <p>📱 {mission.victim_phone}</p>
+                          <p>ðŸ“± {mission.victim_phone}</p>
                         </div>
                       </Popup>
                     </Marker>
@@ -276,11 +277,11 @@ export default function LiveMissionsMonitor() {
                         <Popup>
                           <div className="popup-content">
                             <p>
-                              <strong>🚑 {mission.rescue_name}</strong>
+                              <strong>ðŸš‘ {mission.rescue_name}</strong>
                             </p>
-                            <p>📱 {mission.rescue_phone}</p>
-                            <p>📍 {mission.distance_km?.toFixed(2)}km</p>
-                            <p>⏱️ {mission.eta_minutes} min</p>
+                            <p>ðŸ“± {mission.rescue_phone}</p>
+                            <p>ðŸ“ {mission.distance_km?.toFixed(2)}km</p>
+                            <p>â±ï¸ {mission.eta_minutes} min</p>
                           </div>
                         </Popup>
                       </Marker>
@@ -309,10 +310,10 @@ export default function LiveMissionsMonitor() {
         {/* Mission Details */}
         {selectedMission && (
           <div className="mission-details">
-            <h3>📋 Mission Details</h3>
+            <h3>ðŸ“‹ Mission Details</h3>
 
             <div className="details-section">
-              <h4>👤 Victim Information</h4>
+              <h4>ðŸ‘¤ Victim Information</h4>
               <p>
                 <strong>Name:</strong> {selectedMission.victim_name}
               </p>
@@ -326,7 +327,7 @@ export default function LiveMissionsMonitor() {
             </div>
 
             <div className="details-section">
-              <h4>🚑 Rescue Team Information</h4>
+              <h4>ðŸš‘ Rescue Team Information</h4>
               <p>
                 <strong>Name:</strong> {selectedMission.rescue_name}
               </p>
@@ -340,7 +341,7 @@ export default function LiveMissionsMonitor() {
             </div>
 
             <div className="details-section">
-              <h4>📊 Mission Status</h4>
+              <h4>ðŸ“Š Mission Status</h4>
               <p>
                 <strong>Stage:</strong> {getStageLabel(selectedMission.stage)}
               </p>
@@ -354,14 +355,14 @@ export default function LiveMissionsMonitor() {
             </div>
 
             <div className="details-section timeline">
-              <h4>📅 Stage History</h4>
+              <h4>ðŸ“… Stage History</h4>
               {selectedMission.stage_history?.map((stage, idx) => (
                 <div key={idx} className="timeline-item-small">
                   <span className="stage-label">
                     {getStageLabel(stage.stage)}
                   </span>
                   <span className="stage-eta">
-                    {stage.distance_at_stage_km?.toFixed(2)}km •{" "}
+                    {stage.distance_at_stage_km?.toFixed(2)}km â€¢{" "}
                     {stage.eta_minutes}min
                   </span>
                 </div>
@@ -373,3 +374,4 @@ export default function LiveMissionsMonitor() {
     </div>
   );
 }
+

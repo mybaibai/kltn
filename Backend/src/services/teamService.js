@@ -1,3 +1,4 @@
+﻿// Backend/src/services/teamService.js
 //Backend/src/services/teamService.js
 import User from '../models/userModel.js';
 import UserLocation from '../models/userLocationModel.js';
@@ -64,3 +65,4 @@ export const findNearestTeam = async (lat, lng, maxDistance = 10000) => {
 
 export const deleteTeam = (id) =>
   User.findOneAndDelete({ _id: id, role: { $in: RESCUE_ROLES } });
+

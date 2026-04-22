@@ -1,3 +1,4 @@
+// Frontend/src/page/TrackingPage/index.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
@@ -17,7 +18,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from "framer-motion";
 
-import { getSosDetail, patchVictimSosLocation } from "@/services/api/apiSos";
+import { getSosDetail } from "@/services/api/apiSos";
 import {
   getCurrentTracking,
   updateRescueLocation,

@@ -1,3 +1,4 @@
+﻿// Backend/src/services/userService.js
 //Backend/src/services/userService.js
 import User from '../models/userModel.js';
 
@@ -24,3 +25,4 @@ export const toggleUserActive = async (id, is_active) => {
 };
 
 export const deleteUser = (id) => User.findByIdAndDelete(id);
+

@@ -1,3 +1,4 @@
+﻿/* Frontend/src/components/responder/responder-mission-board.css */
 .responder-board-page {
   min-height: 100vh;
   background: linear-gradient(135deg, #eff0f3 0%, #f7f7f9 46%, #f2f1f4 100%);
@@ -653,3 +654,4 @@
     grid-template-columns: 1fr;
   }
 }
+

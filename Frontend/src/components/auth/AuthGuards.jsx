@@ -1,3 +1,4 @@
+﻿// Frontend/src/components/auth/AuthGuards.jsx
 import { Navigate, useLocation } from "react-router-dom";
 import { getAuthToken, getAuthUser, getRoleHomePath, isStaffRole } from "@/services/auth/session";
 
@@ -39,3 +40,4 @@ export function StaffHomeRedirect() {
   if (!token || !roleOk) return <Navigate to="/staff-login" replace />;
   return <Navigate to={getRoleHomePath(user.role)} replace />;
 }
+

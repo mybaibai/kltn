@@ -1,3 +1,4 @@
+﻿// Frontend/src/components/responder/ResponderBottomStats.jsx
 import { Clock3, Gauge, Siren } from "lucide-react";
 
 export default function ResponderBottomStats({ teamStats, nearestTeamsCount, requestStats }) {
@@ -15,3 +16,4 @@ export default function ResponderBottomStats({ teamStats, nearestTeamsCount, req
     </div>
   );
 }
+

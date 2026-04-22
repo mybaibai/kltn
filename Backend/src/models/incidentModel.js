@@ -1,3 +1,4 @@
+// Backend/src/models/incidentModel.js
 // Ghi nhận sự cố / ghi chú admin gắn với SOS (collection: incidents)
 import mongoose from 'mongoose';
 
@@ -11,3 +12,4 @@ const incidentSchema = new mongoose.Schema(
 );
 
 export default mongoose.model('Incident', incidentSchema, 'incidents');
+

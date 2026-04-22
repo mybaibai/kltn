@@ -1,3 +1,4 @@
+// Backend/src/models/userModel.js
 import mongoose from 'mongoose';
 
 const profileSchema = new mongoose.Schema(
@@ -55,3 +56,4 @@ const userSchema = new mongoose.Schema(
 userSchema.index({ 'auth.email': 1 }, { sparse: true, unique: true });
 
 export default mongoose.model('User', userSchema, 'users');
+

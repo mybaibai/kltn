@@ -1,3 +1,4 @@
+﻿// Frontend/src/services/api/apiTeam.js
 import api from './index.js';
 
 export const getAllTeams = () => api.get('/teams');
@@ -8,3 +9,4 @@ export const updateTeamLocation = (id, lat, lng) => api.patch(`/teams/${id}/loca
 export const findNearestTeams = (lat, lng, distance = 10000) =>
   api.get('/teams/nearest', { params: { lat, lng, distance } });
 export const removeTeam = (id) => api.delete(`/teams/${id}`);
+

@@ -1,3 +1,4 @@
+// Frontend/src/page/AdminPage/AdminTrackingPage.jsx
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, RefreshCw, Clock, MapPin } from 'lucide-react';
@@ -210,3 +211,4 @@ export default function AdminTrackingPage() {
     </div>
   );
 }
+

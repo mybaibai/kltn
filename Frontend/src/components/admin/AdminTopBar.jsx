@@ -1,3 +1,4 @@
+// Frontend/src/components/admin/AdminTopBar.jsx
 import { useMemo } from 'react';
 import { Bell } from 'lucide-react';
 
@@ -43,3 +44,4 @@ export default function AdminTopBar() {
     </header>
   );
 }
+

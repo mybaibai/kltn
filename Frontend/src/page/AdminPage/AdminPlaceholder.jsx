@@ -1,3 +1,4 @@
+// Frontend/src/page/AdminPage/AdminPlaceholder.jsx
 export default function AdminPlaceholder({ title }) {
   return (
     <div className="p-8">
@@ -6,3 +7,4 @@ export default function AdminPlaceholder({ title }) {
     </div>
   );
 }
+

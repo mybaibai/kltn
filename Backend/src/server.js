@@ -1,3 +1,4 @@
+// Backend/src/server.js
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
@@ -5,6 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createServer } from "http";
 import { Server } from "socket.io";
+import jwt from "jsonwebtoken";                    // ← THÊM
 import connectDB from "./config/db.js";
 import userRoutes from "./routes/userRoutes.js";
 import teamRoutes from "./routes/teamRoutes.js";
@@ -13,10 +15,13 @@ import authRoutes from "./routes/authRoutes.js";
 import trackingRoutes from "./routes/trackingRoutes.js";
 import * as trackingService from "./services/trackingService.js";
 import cookieParser from "cookie-parser";
+import { firebaseAdminAuth } from "./config/firebaseAdmin.js";   // ← THÊM (kiểm tra đường dẫn)
 
 dotenv.config();
+
 const app = express();
 const httpServer = createServer(app);
+
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.FRONTEND_URL || "http://localhost:3000",
@@ -26,10 +31,11 @@ const io = new Server(httpServer, {
   transports: ["websocket", "polling"],
 });
 
+// Middleware
 app.use(
   cors({
-    origin: "http://localhost:3000",
-    credentials: false,
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
@@ -47,132 +53,74 @@ app.use("/api/tracking", trackingRoutes);
 
 app.get("/", (_, res) => res.json({ message: "✅ SOS API đang chạy" }));
 
-// ===== SOCKET.IO MIDDLEWARE =====
-io.use((socket, next) => {
-  const token = socket.handshake.auth.token;
-  // TODO: Verify JWT token nếu cần
-  if (!token) console.log("⚠️ Socket connected without token");
-  socket.userId = socket.handshake.auth.userId;
-  socket.userRole = socket.handshake.auth.userRole;
-  next();
+// ==================== SOCKET.IO AUTHENTICATION MIDDLEWARE ====================
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization;
+
+    if (!token) {
+      console.log("⚠️ Socket connected without token");
+      return next(new Error("Authentication error: No token provided"));
+    }
+
+    const cleanToken = token.replace("Bearer ", "").trim();
+
+    // 1. Thử verify JWT (Rescue / Admin / Staff)
+    try {
+      const payload = jwt.verify(cleanToken, process.env.JWT_SECRET);
+      socket.userId = payload.sub || payload.id || payload.userId;
+      socket.userRole = (payload.role || "RESCUE").toUpperCase();
+      socket.isAuthenticated = true;
+      console.log(`✅ Socket authenticated (JWT): ${socket.userRole} - ${socket.userId}`);
+      return next();
+    } catch (jwtErr) {
+      // JWT thất bại → thử Firebase cho Victim
+    }
+
+    // 2. Thử verify Firebase ID Token (Victim)
+    try {
+      const decodedToken = await firebaseAdminAuth.verifyIdToken(cleanToken);
+      socket.userId = decodedToken.uid;
+      socket.userRole = "VICTIM";
+      socket.isAuthenticated = true;
+      console.log(`✅ Socket authenticated (Firebase): VICTIM - ${socket.userId}`);
+      return next();
+    } catch (firebaseErr) {
+      console.error("❌ Socket auth failed for both JWT and Firebase");
+      return next(new Error("Authentication error: Invalid token"));
+    }
+  } catch (err) {
+    console.error("Socket middleware error:", err.message);
+    return next(new Error("Authentication error"));
+  }
 });
 
-// ===== SOCKET.IO EVENTS =====
+// ==================== SOCKET.IO EVENTS ====================
 io.on("connection", (socket) => {
-  console.log(`✅ Socket connected: ${socket.id} (User: ${socket.userId})`);
+  console.log(`✅ Socket connected: ${socket.id} | Role: ${socket.userRole} | User: ${socket.userId}`);
 
-  // === Join rooms by role ===
-  if (socket.userRole === "VICTIM") {
+  // Join rooms dựa trên role
+  if (socket.userRole === "VICTIM" && socket.userId) {
     socket.join(`victim-${socket.userId}`);
-    console.log(
-      `👤 Victim ${socket.userId} joined room victim-${socket.userId}`,
-    );
+    console.log(`👤 Victim joined room: victim-${socket.userId}`);
   }
 
-  if (socket.userRole === "RESCUE" || socket.userRole === "RESPONDER") {
+  if ((socket.userRole === "RESCUE" || socket.userRole === "RESPONDER") && socket.userId) {
     socket.join(`rescue-${socket.userId}`);
     socket.join("rescue-all");
-    console.log(
-      `🚑 Rescue ${socket.userId} joined room rescue-${socket.userId} + rescue-all`,
-    );
+    console.log(`🚑 Rescue joined rooms: rescue-${socket.userId} + rescue-all`);
   }
 
-  if (socket.userRole === "ADMIN" || socket.userRole === "STAFF") {
+  if ((socket.userRole === "ADMIN" || socket.userRole === "STAFF") && socket.userId) {
     socket.join("admin-dashboard");
-    console.log(`🛡️ Admin joined admin-dashboard`);
+    console.log(`🛡️ Admin/Staff joined admin-dashboard`);
   }
 
-  // === Responder location update ===
-  socket.on("responder_location_update", async (data) => {
-    try {
-      const { assignment_id, latitude, longitude } = data;
-      console.log("📍 Location update:", {
-        assignment_id,
-        latitude,
-        longitude,
-      });
-
-      // Gọi tracking service
-      const result = await trackingService.updateRescueLocation(
-        assignment_id,
-        latitude,
-        longitude,
-        socket.userId,
-      );
-
-      if (!result.success) {
-        socket.emit("error", { message: result.message });
-        return;
-      }
-
-      // Load SOS để lấy victim_id
-      const SosRequest = (await import("./models/sosRequestModel.js")).default;
-      const RescueAssignment = (
-        await import("./models/rescueAssignmentModel.js")
-      ).default;
-      const assignment = await RescueAssignment.findById(assignment_id);
-      const sos = await SosRequest.findById(assignment.request_id);
-
-      const trackingData = {
-        assignment_id,
-        stage: result.assignment.stage,
-        distance_km: result.distance_km,
-        eta_minutes: result.eta_minutes,
-        rescue_location: result.assignment.current_location,
-        victim_location: sos.location,
-        stage_changed: result.stage_changed,
-        timestamp: new Date(),
-      };
-
-      // 📢 Broadcast to VICTIM
-      io.to(`victim-${sos.victim_id}`).emit("victim_tracking_update", {
-        stage: result.assignment.stage,
-        distance_km: result.distance_km,
-        eta_minutes: result.eta_minutes,
-        rescue_location: result.assignment.current_location,
-        stage_changed: result.stage_changed,
-        timestamp: new Date(),
-      });
-
-      // 📢 Broadcast to RESCUE (confirm)
-      socket.emit("mission_location_confirmed", {
-        distance_km: result.distance_km,
-        eta_minutes: result.eta_minutes,
-        victim_location: sos.location,
-        current_stage: result.assignment.stage,
-      });
-
-      // 📢 Broadcast to ADMIN
-      if (result.stage_changed) {
-        io.to("admin-dashboard").emit("stage_changed", {
-          assignment_id,
-          request_id: assignment.request_id,
-          stage: result.assignment.stage,
-          distance_km: result.distance_km,
-          timestamp: new Date(),
-        });
-      } else {
-        io.to("admin-dashboard").emit("location_update", {
-          assignment_id,
-          request_id: assignment.request_id,
-          distance_km: result.distance_km,
-          eta_minutes: result.eta_minutes,
-          timestamp: new Date(),
-        });
-      }
-    } catch (err) {
-      console.error("❌ Error in location update:", err.message);
-      socket.emit("error", { message: err.message });
-    }
-  });
-
-  // === Responder stage change ===
+  // === Responder stage change event ===
   socket.on("responder_stage_change", async (data) => {
     try {
       const { assignment_id, new_stage, reason } = data;
-      console.log("🔄 Stage change:", { assignment_id, new_stage });
 
-      // Gọi tracking service
       const result = await trackingService.updateRescueStage(
         assignment_id,
         new_stage,
@@ -186,13 +134,15 @@ io.on("connection", (socket) => {
         return;
       }
 
-      // Load SOS để lấy victim_id
-      const RescueAssignment = (
-        await import("./models/rescueAssignmentModel.js")
-      ).default;
-      const SosRequest = (await import("./models/sosRequestModel.js")).default;
-      const assignment = await RescueAssignment.findById(assignment_id);
-      const sos = await SosRequest.findById(assignment.request_id);
+      // Load SOS để broadcast cho victim
+      const RescueAssignmentModel = (await import("./models/rescueAssignmentModel.js")).default;
+      const SosRequestModel = (await import("./models/sosRequestModel.js")).default;
+
+      const assignment = await RescueAssignmentModel.findById(assignment_id);
+      if (!assignment) return;
+
+      const sos = await SosRequestModel.findById(assignment.request_id);
+      if (!sos) return;
 
       const stageChangeData = {
         assignment_id,
@@ -202,24 +152,22 @@ io.on("connection", (socket) => {
         timestamp: new Date(),
       };
 
-      // 📢 Broadcast to VICTIM
+      // Broadcast
       io.to(`victim-${sos.victim_id}`).emit("victim_tracking_update", {
         stage: result.new_stage,
         stage_changed: true,
         timestamp: new Date(),
       });
 
-      // 📢 Broadcast to RESCUE
       socket.emit("mission_stage_update", {
         stage: result.new_stage,
         stage_changed: true,
         message: `Stage: ${result.prev_stage} → ${result.new_stage}`,
       });
 
-      // 📢 Broadcast to ADMIN
       io.to("admin-dashboard").emit("stage_changed", stageChangeData);
     } catch (err) {
-      console.error("❌ Error in stage change:", err.message);
+      console.error("❌ Error in responder_stage_change:", err.message);
       socket.emit("error", { message: err.message });
     }
   });
@@ -231,8 +179,8 @@ io.on("connection", (socket) => {
 
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
-  console.log(`🚀 Server: http://localhost:${PORT}`);
-  console.log(`📡 Socket.IO: ws://localhost:${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`📡 Socket.IO listening on ws://localhost:${PORT}`);
 });
 
 export { io, app };

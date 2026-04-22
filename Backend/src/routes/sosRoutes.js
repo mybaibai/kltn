@@ -1,3 +1,4 @@
+﻿// Backend/src/routes/sosRoutes.js
 import express from 'express';
 import { create, getAll, getDetail, getByRequester, getByTeam, updateStatus, assign, patchVictimLocation }
   from '../controllers/sosController.js';
@@ -18,3 +19,4 @@ router.patch('/:id/status',              updateStatus);
 router.patch('/:id/assign',              assign);
 
 export default router;
+

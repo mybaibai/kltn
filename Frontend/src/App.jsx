@@ -1,3 +1,4 @@
+// Frontend/src/App.jsx
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import SosPage from '@/page/SosPage';
 import TrackingPage from '@/page/TrackingPage';

@@ -1,3 +1,4 @@
+// Frontend/src/components/responder/ResponderDetailPanel.jsx
 import { useEffect, useState } from "react";
 import { Ambulance, MapPin } from "lucide-react";
 
@@ -129,3 +130,4 @@ export default function ResponderDetailPanel({
     </aside>
   );
 }
+

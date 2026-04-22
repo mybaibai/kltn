@@ -1,3 +1,4 @@
+// Frontend/src/components/Map/index.jsx
 import { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';

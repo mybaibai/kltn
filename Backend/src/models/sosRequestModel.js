@@ -1,3 +1,4 @@
+﻿// Backend/src/models/sosRequestModel.js
 //Backend/src/models/sosRequestModel.js
 import mongoose from "mongoose";
 
@@ -57,3 +58,4 @@ sosRequestSchema.index({ status: 1, created_at: -1 });
 sosRequestSchema.index({ victim_id: 1, created_at: -1 });
 
 export default mongoose.model("SosRequest", sosRequestSchema, "sos_requests");
+

@@ -1,3 +1,4 @@
+// Frontend/src/components/admin/AdminSidebar.jsx
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -93,3 +94,4 @@ export default function AdminSidebar({ onReportClick, gpsLoading }) {
     </aside>
   );
 }
+

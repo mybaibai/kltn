@@ -1,3 +1,4 @@
+// Frontend/src/layouts/AdminLayout.jsx
 import { useState, useCallback } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import AdminSidebar from '@/components/admin/AdminSidebar';
@@ -91,3 +92,4 @@ export default function AdminLayout() {
     </div>
   );
 }
+

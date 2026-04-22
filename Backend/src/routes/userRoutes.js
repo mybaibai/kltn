@@ -1,3 +1,4 @@
+﻿// Backend/src/routes/userRoutes.js
 //Backend/src/routes/userRoutes.js
 import express from 'express';
 import { create, getAll, getDetail, update, toggleActive, remove }
@@ -12,4 +13,5 @@ router.patch('/:id/toggle-active',  toggleActive);
 router.delete('/:id',               remove);
 // router.post('/login', login);
 export default router;
+
 

@@ -1,3 +1,4 @@
+// Backend/src/routes/authRoutes.js
 import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -258,3 +259,4 @@ router.post("/firebase", async (req, res) => {
 });
 
 export default router;
+

@@ -1,3 +1,4 @@
+// Frontend/src/services/api/apiSos.js
 import api from './index.js';
 import { auth } from '@/lib/firebase';
 
@@ -35,3 +36,4 @@ export const patchVictimSosLocation = (sosId, latitude, longitude) =>
   api.patch(`/sos/${sosId}/victim-location`, { latitude, longitude }, { skipStaffJwt: true });
 
 export default api;
+

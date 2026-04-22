@@ -1,3 +1,4 @@
+﻿// Frontend/src/components/staff/StaffDashboardLayout.jsx
 import { Link, useNavigate } from "react-router-dom";
 import { Shield, Ambulance, LogOut, MapPin, UserCircle2 } from "lucide-react";
 import { clearAllAuth } from "@/services/auth/session";
@@ -172,3 +173,4 @@ export default function StaffDashboardLayout({ title, description, user, childre
     </div>
   );
 }
+

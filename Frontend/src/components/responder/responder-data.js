@@ -1,3 +1,4 @@
+// Frontend/src/components/responder/responder-data.js
 export const REQUESTS = [
   {
     id: "sample-1",
@@ -152,3 +153,4 @@ export function mapSosToResponderRequests(sosList, gps) {
     };
   });
 }
+

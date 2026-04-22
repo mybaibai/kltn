@@ -1,3 +1,4 @@
+// Backend/src/models/otpModel.js
 //Backend/src/models/otpModel.js
 import mongoose from 'mongoose';
 

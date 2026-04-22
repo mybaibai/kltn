@@ -1,3 +1,4 @@
+// Frontend/src/services/socket.js
 import io from "socket.io-client";
 import { auth } from "@/lib/firebase";
 
@@ -118,3 +119,4 @@ export function disconnectSocket() {
 }
 
 export default socketInstance;
+

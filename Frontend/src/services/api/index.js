@@ -1,3 +1,4 @@
+// Frontend/src/services/api/index.js
 import axios from "axios";
 import { auth } from "@/lib/firebase";
 
@@ -38,3 +39,4 @@ api.interceptors.request.use(async (config) => {
 });
 
 export default api;
+

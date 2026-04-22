@@ -1,3 +1,4 @@
+// D:/KLTN/Frontend/src/page/SosPage/index.jsx
 // Frontend/src/page/SosPage/index.jsx
 import { useNavigate, Link } from 'react-router-dom';
 import { useState, useRef, useEffect } from 'react';
@@ -1357,3 +1358,4 @@ export default function SosPage() {
   );
   
 }
+

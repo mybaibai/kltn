@@ -1,3 +1,4 @@
+// Frontend/src/constants/incidentMeta.js
 import { AlertTriangle, Car, CloudRain, Flame, MapPin, Stethoscope } from 'lucide-react';
 
 /** Khớp id loại sự cố từ SOSform */
@@ -32,3 +33,4 @@ export function formatSosCode(id) {
   const tail = s.slice(-5).toUpperCase().padStart(5, '0');
   return `#GR-${tail}`;
 }
+

@@ -1,3 +1,4 @@
+// Frontend/src/services/auth/session.js
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { resetOtpSession } from "./phoneAuth";
@@ -133,3 +134,4 @@ export async function clearAllAuth() {
     /* ignore */
   }
 }
+

@@ -1,3 +1,4 @@
+// Backend/src/services/sosService.js
 import SosRequest from '../models/sosRequestModel.js';
 import UserLocation from '../models/userLocationModel.js';
 import RescueAssignment from '../models/rescueAssignmentModel.js';
@@ -95,24 +96,52 @@ export const updateSosVictimLocation = async (sosId, lat, lng) => {
 };
 
 export const assignTeam = async (sosId, rescueId) => {
-  const sos = await SosRequest.findById(sosId);
-  if (!sos) return null;
+  try {
+    const sos = await SosRequest.findById(sosId);
+    if (!sos) throw new Error("SOS không tồn tại");
 
-  await RescueAssignment.create({
-    request_id: sos._id,
-    rescue_id: rescueId,
-    assigned_at: new Date(),
-  });
+    // KIỂM TRA DUPLICATE
+    const existing = await RescueAssignment.findOne({ 
+      request_id: sos._id,
+      // rescue_id: rescueId   // nếu muốn chỉ 1 rescue per SOS thì bỏ comment
+    });
 
-  sos.assigned_rescue_id = rescueId;
-  sos.status = 'ASSIGNED';
-  sos.status_history.push({
-    status: 'ASSIGNED',
-    updated_by: rescueId,
-    updated_at: new Date(),
-    note: 'Đã phân công cứu trợ',
-  });
-  await sos.save();
+    if (existing) {
+      throw new Error("SOS này đã được phân công cho đội cứu hộ rồi");
+    }
 
-  return getSosById(sos._id);
+    // Tạo assignment mới
+    const assignment = await RescueAssignment.create({
+      request_id: sos._id,
+      rescue_id: rescueId,
+      assigned_at: new Date(),
+      current_location: sos.location, // khởi tạo vị trí ban đầu
+      stage: 'ASSIGNED',
+      stage_history: [{
+        stage: 'ASSIGNED',
+        started_at: new Date(),     // ← đúng tên field trong rescueAssignmentModel.js
+        distance_at_stage_km: 0,
+        eta_minutes: 0,
+      }]
+    });
+
+    // Cập nhật SOS
+    sos.status = 'ASSIGNED';
+    sos.assigned_rescue_id = rescueId;
+
+    if (!sos.status_history) sos.status_history = [];
+    sos.status_history.push({
+      status: 'ASSIGNED',
+      updated_by: rescueId,
+      updated_at: new Date(),
+      note: 'Đã phân công đội cứu hộ'
+    });
+
+    await sos.save();
+    return getSosById(sos._id);
+  } catch (error) {
+    console.error("assignTeam error:", error.message);
+    throw error;
+  }
 };
+

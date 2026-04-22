@@ -1,3 +1,4 @@
+﻿// Backend/src/models/userLocationModel.js
 //Backend/src/models/userLocationModel.js
 import mongoose from 'mongoose';
 
@@ -16,3 +17,4 @@ const userLocationSchema = new mongoose.Schema(
 userLocationSchema.index({ location: '2dsphere' });
 
 export default mongoose.model('UserLocation', userLocationSchema, 'user_locations');
+

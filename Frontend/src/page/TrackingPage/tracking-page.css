@@ -1,3 +1,4 @@
+﻿// Frontend/src/page/TrackingPage/tracking-page.css
 .tracking-page-root {
   min-height: 100vh;
   display: flex;
@@ -199,3 +200,4 @@
     border-left: 1px solid rgba(255, 255, 255, 0.08);
   }
 }
+

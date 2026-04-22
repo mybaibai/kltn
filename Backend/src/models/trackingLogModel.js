@@ -1,3 +1,4 @@
+// Backend/src/models/trackingLogModel.js
 // Để admin xem chi tiết tất cả events
 import mongoose from "mongoose";
 
@@ -48,3 +49,4 @@ export default mongoose.model(
   trackingLogSchema,
   "tracking_logs",
 );
+

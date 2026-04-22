@@ -1,3 +1,4 @@
+﻿// Frontend/src/components/auth/staff-login.css
 .staff-auth-page {
   position: relative;
   min-height: 100vh;
@@ -214,3 +215,4 @@
     font-size: 25px;
   }
 }
+

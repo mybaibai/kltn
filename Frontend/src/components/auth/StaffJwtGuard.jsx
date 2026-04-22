@@ -1,3 +1,4 @@
+// Frontend/src/components/auth/StaffJwtGuard.jsx
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 
 /** Vai trò được phép vào khu vực cứu hộ/quản trị sau khi đăng nhập email (JWT). */
@@ -30,3 +31,4 @@ export default function StaffJwtGuard({ allowedRoles = DEFAULT_ALLOWED }) {
 
   return <Outlet />;
 }
+

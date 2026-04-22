@@ -1,3 +1,4 @@
+// Backend/src/services/trackingService.js
 import RescueAssignment from "../models/rescueAssignmentModel.js";
 import SosRequest from "../models/sosRequestModel.js";
 import TrackingLog from "../models/trackingLogModel.js";
@@ -19,7 +20,7 @@ export function calculateDistance(lat1, lng1, lat2, lng2) {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const distance = R * c;
 
-  return Math.round(distance * 1000) / 1000; // Round to 3 decimals
+  return Math.round(distance * 1000) / 1000; // Round tmovedDistanceKmo 3 decimals
 }
 
 // ===== 2. Tính ETA (phút) dựa vào distance =====
@@ -60,53 +61,69 @@ export async function updateRescueLocation(
     // Lấy vị trí victim
     const [victimLng, victimLat] = sos.location.coordinates;
 
-    // Tính distance từ rescue tới victim
-    const distanceKm = calculateDistance(
+    // Tính khoảng cách HIỆN TẠI từ rescue đến victim (dùng để ETA và stage)
+    const currentDistanceToVictimKm = calculateDistance(
       latitude,
       longitude,
       victimLat,
       victimLng,
     );
-    const etaMinutes = calculateETA(distanceKm);
 
-    // Xác định stage mới
-    const newStage = determineStage(distanceKm, assignment.stage);
+    const etaMinutes = calculateETA(currentDistanceToVictimKm);
+
+    // === PHẦN SỬA CHÍNH: Tính khoảng cách thực tế rescue đã di chuyển ===
+    let movedDistanceKm = 0;
+
+    if (assignment.current_location?.coordinates?.length === 2) {
+      const [prevLng, prevLat] = assignment.current_location.coordinates;
+
+      // Chỉ tính distance nếu có vị trí cũ
+      movedDistanceKm = calculateDistance(
+        prevLat,
+        prevLng,
+        latitude,
+        longitude
+      );
+    }
+
+    // Xác định stage mới dựa trên khoảng cách đến victim
+    const newStage = determineStage(currentDistanceToVictimKm, assignment.stage);
     const stageChanged = newStage !== assignment.stage;
 
-    // Update assignment
+    // === UPDATE ASSIGNMENT ===
     assignment.current_location = {
       type: "Point",
       coordinates: [longitude, latitude],
     };
-    assignment.current_distance_km = distanceKm;
+
+    assignment.current_distance_km = currentDistanceToVictimKm;
     assignment.eta_minutes = etaMinutes;
+
+    // Cập nhật tổng quãng đường thực tế rescue đã di chuyển
     assignment.total_distance_km =
-      (assignment.total_distance_km || 0) + distanceKm;
+      (assignment.total_distance_km || 0) + movedDistanceKm;
 
     // Nếu stage thay đổi → add to history
     if (stageChanged) {
       const prevStage = assignment.stage;
       assignment.stage = newStage;
 
-      // Cập nhật stage_history
       assignment.stage_history.push({
         stage: newStage,
         started_at: new Date(),
-        distance_at_stage_km: distanceKm,
+        distance_at_stage_km: currentDistanceToVictimKm,
         eta_minutes: etaMinutes,
+        moved_distance_km: movedDistanceKm,   // thêm thông tin hữu ích
       });
 
-      // Nếu chuyển sang ARRIVED
       if (newStage === "ARRIVED") {
         assignment.arrived_at = new Date();
       }
-
-      // Nếu chuyển sang RESCUING
       if (newStage === "RESCUING") {
         assignment.rescuing_started_at = new Date();
       }
 
-      // Log event
+      // Log stage change
       await createTrackingLog({
         assignment_id: assignmentId,
         request_id: assignment.request_id,
@@ -116,14 +133,15 @@ export async function updateRescueLocation(
         payload: {
           from: prevStage,
           to: newStage,
-          distance_km: distanceKm,
+          distance_to_victim_km: currentDistanceToVictimKm,
+          moved_distance_km: movedDistanceKm,
           latitude,
           longitude,
           eta_minutes: etaMinutes,
         },
       });
     } else {
-      // Nếu stage không thay đổi → chỉ log location update
+      // Chỉ update vị trí
       await createTrackingLog({
         assignment_id: assignmentId,
         request_id: assignment.request_id,
@@ -131,7 +149,8 @@ export async function updateRescueLocation(
         actor_role: "RESCUE",
         actor_id: rescueId,
         payload: {
-          distance_km: distanceKm,
+          distance_to_victim_km: currentDistanceToVictimKm,
+          moved_distance_km: movedDistanceKm,
           latitude,
           longitude,
           eta_minutes: etaMinutes,
@@ -145,7 +164,8 @@ export async function updateRescueLocation(
       success: true,
       assignment,
       stage_changed: stageChanged,
-      distance_km: distanceKm,
+      distance_to_victim_km: currentDistanceToVictimKm,
+      moved_distance_km: movedDistanceKm,
       eta_minutes: etaMinutes,
       current_stage: assignment.stage,
     };
@@ -272,10 +292,36 @@ export async function getCurrentTracking(assignmentId, isVictim = false) {
       }
     }
 
-    // Nếu vẫn không có rescue location, return error
-    if (!rescueLocation || !rescueLocation.coordinates || rescueLocation.coordinates.length === 0) {
-      throw new Error("Rescue location not available");
-    }
+// ✅ FIX — trả null thay vì crash
+if (!rescueLocation || !rescueLocation.coordinates?.length) {
+  // Rescue chưa gửi vị trí lần nào — trả về null, không throw
+  return {
+    success: true,
+    data: {
+      assignment_id: assignment._id,
+      request_id: assignment.request_id._id,
+      rescue_id: rescueInfo._id,
+      rescue_name: rescueInfo.full_name,
+      rescue_phone: rescueInfo.phone,
+      victim_id: sos.victim_id._id,
+      victim_name: sos.victim_id.full_name,
+      victim_location: sos.location,
+      rescue_location: null,           // ← null thay vì crash
+      current_stage: assignment.stage,
+      distance_km: null,
+      eta_minutes: null,
+      total_distance_km: assignment.total_distance_km || 0,
+      timestamps: {
+        assigned_at: assignment.assigned_at,
+        accepted_at: assignment.accepted_at,
+        arrived_at: assignment.arrived_at,
+        rescuing_started_at: assignment.rescuing_started_at,
+        completed_at: assignment.completed_at,
+      },
+      stage_history: assignment.stage_history,
+    },
+  };
+}
 
     // Tính lại distance & ETA nếu location đã thay đổi
     const [victimLng, victimLat] = sos.location.coordinates;
@@ -351,46 +397,34 @@ export async function createTrackingLog(data) {
 
 // ===== 9. Get all active missions (cho Admin dashboard) =====
 export async function getActiveMissions() {
-  try {
-    const assignments = await RescueAssignment.find({
-      stage: { $in: ["ASSIGNED", "MOVING", "ARRIVED", "RESCUING"] },
+  const assignments = await RescueAssignment.find({
+    stage: { $in: ["ASSIGNED", "MOVING", "ARRIVED", "RESCUING"] },
+  })
+    .populate({
+      path: "request_id",
+      populate: { path: "victim_id", select: "full_name phone" },
     })
-      .populate("request_id")
-      .populate("rescue_id", "full_name phone")
-      .sort({ updated_at: -1 });
+    .populate("rescue_id", "full_name phone")
+    .sort({ assigned_at: -1 });
 
-    const missions = [];
-    for (const assignment of assignments) {
-      const sos = await SosRequest.findById(assignment.request_id).populate(
-        "victim_id",
-        "full_name phone",
-      );
-
-      missions.push({
-        assignment_id: assignment._id,
-        request_id: assignment.request_id._id,
-        victim_name: sos.victim_id.full_name,
-        victim_phone: sos.victim_id.phone,
-        victim_location: sos.location,
-        rescue_name: assignment.rescue_id.full_name,
-        rescue_phone: assignment.rescue_id.phone,
-        rescue_location: assignment.current_location,
-        stage: assignment.stage,
-        distance_km: assignment.current_distance_km,
-        eta_minutes: assignment.eta_minutes,
-        stage_history: assignment.stage_history,
-      });
-    }
-
-    return {
-      success: true,
-      data: missions,
-    };
-  } catch (err) {
-    console.error("❌ Error getting active missions:", err.message);
-    return {
-      success: false,
-      message: err.message,
-    };
-  }
+  return {
+    success: true,
+    data: assignments
+      .filter(a => a.request_id && a.request_id.victim_id)
+      .map(a => ({
+        assignment_id: a._id,
+        request_id: a.request_id._id,
+        victim_name: a.request_id.victim_id.full_name,
+        victim_phone: a.request_id.victim_id.phone,
+        victim_location: a.request_id.location,
+        rescue_name: a.rescue_id.full_name,
+        rescue_phone: a.rescue_id.phone,
+        rescue_location: a.current_location,
+        stage: a.stage,
+        distance_km: a.current_distance_km,
+        eta_minutes: a.eta_minutes,
+        stage_history: a.stage_history,
+      })),
+  };
 }
+

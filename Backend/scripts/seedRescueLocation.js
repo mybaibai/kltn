@@ -1,3 +1,4 @@
+// Backend/scripts/seedRescueLocation.js
 /**
  * Đặt vị trí cố định cho tài khoản rescue (test) — ví dụ gần 15 Ngô Thì Hương, Đà Nẵng.
  * Usage: node scripts/seedRescueLocation.js [email]
@@ -48,3 +49,4 @@ main().catch(async (e) => {
   } catch {}
   process.exit(1);
 });
+

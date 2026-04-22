@@ -1,3 +1,4 @@
+// Frontend/src/page/SosPage/SOSform.jsx
 
 import { useState } from 'react';
 import {
@@ -225,3 +226,4 @@ export default function SOSForm({ position, onConfirm, onCancel, sending, user }
     </div>
   );
 }
+

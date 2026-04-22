@@ -1,3 +1,4 @@
+// Frontend/src/page/StaffHomePage/index.jsx
 import { Navigate } from 'react-router-dom';
 
 /** Alias: có JWT → vào bảng quản trị; không có → đăng nhập. */
@@ -9,3 +10,4 @@ export default function StaffHomePage() {
   }
   return <Navigate to="/admin/dashboard" replace />;
 }
+

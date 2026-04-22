@@ -1,3 +1,4 @@
+// Frontend/src/components/auth/StaffLoginPanel.jsx
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ShieldCheck, Mail, LockKeyhole, Eye, EyeOff, ArrowRight } from "lucide-react";
@@ -107,3 +108,4 @@ export default function StaffLoginPanel({ onSubmit, loading, errorMessage }) {
     </div>
   );
 }
+

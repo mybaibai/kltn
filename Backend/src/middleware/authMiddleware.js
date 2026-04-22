@@ -1,3 +1,4 @@
+// Backend/src/middleware/authMiddleware.js
 import jwt from "jsonwebtoken";
 import { firebaseAdminAuth } from "../config/firebaseAdmin.js";
 import User from "../models/userModel.js";
@@ -89,3 +90,4 @@ export async function attachAuthUser(req, res, next) {
     return res.status(500).json({ success: false, message: err.message });
   }
 }
+

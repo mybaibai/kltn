@@ -1,3 +1,4 @@
+﻿// Backend/src/controllers/simulationController.js
 import * as simulationService from "../services/simulationService.js";
 
 export const startSimulation = async (req, res) => {
@@ -31,3 +32,4 @@ export const stopSimulation = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+

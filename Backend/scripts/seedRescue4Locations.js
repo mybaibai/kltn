@@ -1,3 +1,4 @@
+// Backend/scripts/seedRescue4Locations.js
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
@@ -111,3 +112,4 @@ main().catch(async (err) => {
   } catch {}
   process.exit(1);
 });
+

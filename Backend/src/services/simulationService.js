@@ -1,3 +1,4 @@
+// Backend/src/services/simulationService.js
 import RescueAssignment from "../models/rescueAssignmentModel.js";
 import SosRequest from "../models/sosRequestModel.js";
 import * as trackingService from "./trackingService.js";
@@ -195,3 +196,4 @@ export function stopSimulation(assignmentId) {
   }
   return { success: false, message: "No active simulation found" };
 }
+

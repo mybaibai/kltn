@@ -1,3 +1,4 @@
+// Frontend/src/page/SosPage/TrackingView.jsx
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
@@ -318,3 +319,4 @@ export default function TrackingView({ user }) {
     </div>
   );
 }
+
