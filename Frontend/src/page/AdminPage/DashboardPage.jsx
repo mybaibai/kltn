@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   TrendingUp,
@@ -38,6 +38,20 @@ function calculateDuration(sos) {
   return mins >= 0 ? mins : null;
 }
 
+/** Tên đội cứu trợ đã gán (populate `full_name` như History / backend) */
+function getAssignedRescueLabel(sos) {
+  const ar = sos?.assigned_rescue_id;
+  if (ar && typeof ar === 'object') {
+    const name = ar.full_name?.trim();
+    if (name) return name;
+  }
+  if (typeof ar === 'string' && ar.trim().length > 0) {
+    const id = ar.trim();
+    return `Đội (…${id.slice(-6)})`;
+  }
+  return 'Chưa phân công';
+}
+
 function StatCard({ icon, title, value, subtitle, trend, color = 'blue' }) {
   const bgMap = {
     blue: 'bg-blue-50',
@@ -72,20 +86,75 @@ function StatCard({ icon, title, value, subtitle, trend, color = 'blue' }) {
   );
 }
 
-function DistributionRow({ label, emoji, count, percent, color }) {
+/** Màu cung donut + chú thích (đồng bộ với bảng phân loại) */
+const DISTRIBUTION_CHART_COLORS = [
+  '#22c55e',
+  '#3b82f6',
+  '#eab308',
+  '#f97316',
+  '#ef4444',
+  '#8b5cf6',
+  '#06b6d4',
+  '#64748b',
+];
+
+/** Vòng khuyên từ góc a0 → a1 (radian), bắt đầu từ đỉnh (-π/2), chiều kim đồng hồ trên màn hình */
+function describeDonutSlicePath(cx, cy, rInner, rOuter, a0, a1) {
+  const sweep = a1 - a0;
+  const large = sweep > Math.PI ? 1 : 0;
+  const xos = cx + rOuter * Math.cos(a0);
+  const yos = cy + rOuter * Math.sin(a0);
+  const xoe = cx + rOuter * Math.cos(a1);
+  const yoe = cy + rOuter * Math.sin(a1);
+  const xis = cx + rInner * Math.cos(a1);
+  const yis = cy + rInner * Math.sin(a1);
+  const xie = cx + rInner * Math.cos(a0);
+  const yie = cy + rInner * Math.sin(a0);
+  return [
+    `M ${xos} ${yos}`,
+    `A ${rOuter} ${rOuter} 0 ${large} 1 ${xoe} ${yoe}`,
+    `L ${xis} ${yis}`,
+    `A ${rInner} ${rInner} 0 ${large} 0 ${xie} ${yie}`,
+    'Z',
+  ].join(' ');
+}
+
+/** Cột: loại/đội — phần trăm — số lượng (đồng bộ với DistributionRow) */
+const METRIC_TABLE_GRID =
+  'grid grid-cols-[minmax(0,9.5rem)_minmax(6.5rem,1fr)_minmax(5.5rem,7.25rem)] items-center gap-x-3';
+
+function DistributionMetricHeader({ firstColumnLabel }) {
   return (
-    <div className="flex items-center justify-between py-2">
-      <div className="flex items-center gap-2">
-        {emoji && <span className="text-lg">{emoji}</span>}
-        <span className="text-sm font-medium text-gray-700">{label}</span>
+    <div
+      className={cn(
+        METRIC_TABLE_GRID,
+        'border-b border-gray-100 pb-2 text-[11px] font-semibold text-gray-500',
+      )}
+    >
+      <span className="min-w-0 truncate">{firstColumnLabel}</span>
+      <span className="text-center">Phần trăm %</span>
+      <span className="text-right">Số lượng</span>
+    </div>
+  );
+}
+
+function DistributionRow({ label, emoji, count, percent, barColor }) {
+  return (
+    <div className={cn(METRIC_TABLE_GRID, 'py-2')}>
+      <div className="flex min-w-0 items-center gap-2">
+        {emoji && <span className="shrink-0 text-lg leading-none">{emoji}</span>}
+        <span className="truncate text-sm font-medium text-gray-700">{label}</span>
       </div>
-      <div className="flex items-center gap-3">
-        <div className="h-2 w-32 overflow-hidden rounded-full bg-gray-100">
-          <div className={cn('h-full rounded-full', color)} style={{ width: `${percent}%` }} />
+      <div className="flex min-w-0 flex-col gap-1">
+        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+          <div
+            className="h-full rounded-full"
+            style={{ width: `${percent}%`, backgroundColor: barColor }}
+          />
         </div>
-        <span className="w-12 text-right text-sm font-bold text-gray-900">{percent}%</span>
-        <span className="w-8 text-right text-xs text-gray-500">{count}</span>
+        <span className="text-center text-sm font-bold text-gray-900">{percent}%</span>
       </div>
+      <span className="text-right text-sm font-bold text-gray-900 tabular-nums">{count}</span>
     </div>
   );
 }
@@ -191,6 +260,106 @@ export default function DashboardPage() {
       percent: Math.round((item.count / total) * 100),
     }));
   }, [allSos]);
+
+  /** Số sự cố theo đội được phân công (không dùng phân loại loại sự cố) */
+  const rescueTeamDistribution = useMemo(() => {
+    const teamMap = new Map();
+    allSos.forEach((s) => {
+      const label = getAssignedRescueLabel(s);
+      if (!teamMap.has(label)) teamMap.set(label, { label, emoji: null, count: 0 });
+      teamMap.get(label).count += 1;
+    });
+    const sorted = Array.from(teamMap.values()).sort((a, b) => b.count - a.count);
+    const total = allSos.length || 1;
+    return sorted.map((item) => ({
+      ...item,
+      percent: Math.round((item.count / total) * 100),
+    }));
+  }, [allSos]);
+
+  const donutSlices = useMemo(() => {
+    const total = allSos.length;
+    if (total === 0 || distribution.length === 0) return [];
+    const cx = 50;
+    const cy = 50;
+    const rInner = 34;
+    const rOuter = 46;
+
+    if (distribution.length === 1) {
+      const item = distribution[0];
+      return [
+        {
+          key: `${item.label}-0`,
+          fullRing: true,
+          fill: DISTRIBUTION_CHART_COLORS[0],
+          label: item.label,
+          emoji: item.emoji,
+          count: item.count,
+          percent: item.percent,
+        },
+      ];
+    }
+
+    let acc = 0;
+    return distribution.map((item, i) => {
+      const frac = item.count / total;
+      const a0 = acc * 2 * Math.PI - Math.PI / 2;
+      acc += frac;
+      const a1 = acc * 2 * Math.PI - Math.PI / 2;
+      const fill = DISTRIBUTION_CHART_COLORS[i % DISTRIBUTION_CHART_COLORS.length];
+      const d = describeDonutSlicePath(cx, cy, rInner, rOuter, a0, a1);
+      return {
+        key: `${item.label}-${i}`,
+        fullRing: false,
+        d,
+        fill,
+        label: item.label,
+        emoji: item.emoji,
+        count: item.count,
+        percent: item.percent,
+      };
+    });
+  }, [allSos.length, distribution]);
+
+  const donutChartRef = useRef(null);
+  const [donutHover, setDonutHover] = useState(null);
+
+  const updateDonutTooltipPos = useCallback((e) => {
+    const wrap = donutChartRef.current;
+    if (!wrap) return;
+    const rect = wrap.getBoundingClientRect();
+    setDonutHover((prev) =>
+      prev
+        ? {
+            ...prev,
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+          }
+        : null,
+    );
+  }, []);
+
+  const showDonutTooltip = useCallback((e, slice) => {
+    const wrap = donutChartRef.current;
+    if (!wrap) return;
+    const rect = wrap.getBoundingClientRect();
+    setDonutHover({
+      key: slice.key,
+      label: slice.label,
+      emoji: slice.emoji,
+      count: slice.count,
+      percent: slice.percent,
+      color: slice.fill,
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    });
+  }, []);
+
+  const hideDonutTooltipIfLeavingChart = useCallback((e) => {
+    const rel = e.relatedTarget;
+    if (rel instanceof Node && donutChartRef.current?.contains(rel)) return;
+    setDonutHover(null);
+  }, []);
 
   const trendData = useMemo(() => {
     const dayLabels = ['THỨ 2', 'THỨ 3', 'THỨ 4', 'THỨ 5', 'THỨ 6', 'THỨ 7', 'CHỦ NHẬT'];
@@ -312,58 +481,113 @@ export default function DashboardPage() {
         <div className="rounded-2xl border border-[#E8E8EC] bg-white p-6 shadow-sm">
           <h2 className="mb-5 text-lg font-bold text-gray-900">Phân loại sự cố</h2>
           <div className="mb-4 flex items-center justify-center">
-            <div className="relative size-40">
-              <svg viewBox="0 0 100 100" className="rotate-[-90deg]">
+            <div ref={donutChartRef} className="relative size-40 overflow-visible">
+              <svg
+                viewBox="0 0 100 100"
+                className="size-full"
+                onMouseLeave={hideDonutTooltipIfLeavingChart}
+              >
                 <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" strokeWidth="12" />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="#22c55e"
-                  strokeWidth="12"
-                  strokeDasharray={`${(stats.resolved / Math.max(stats.total, 1)) * 251.2} 251.2`}
-                />
+                {donutSlices.map((slice) =>
+                  slice.fullRing ? (
+                    <circle
+                      key={slice.key}
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      fill="none"
+                      stroke={slice.fill}
+                      strokeWidth="12"
+                      className="cursor-pointer opacity-100 transition-opacity hover:opacity-90"
+                      onMouseEnter={(e) => showDonutTooltip(e, slice)}
+                      onMouseMove={updateDonutTooltipPos}
+                    />
+                  ) : (
+                    <path
+                      key={slice.key}
+                      d={slice.d}
+                      fill={slice.fill}
+                      stroke={slice.fill}
+                      strokeWidth={0.35}
+                      strokeLinejoin="round"
+                      className="cursor-pointer transition-opacity hover:opacity-85"
+                      onMouseEnter={(e) => showDonutTooltip(e, slice)}
+                      onMouseMove={updateDonutTooltipPos}
+                    />
+                  ),
+                )}
               </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                 <p className="text-3xl font-bold text-gray-900">
                   {loading ? '—' : stats.total.toLocaleString('vi-VN')}
                 </p>
                 <p className="text-xs font-medium uppercase tracking-wide text-gray-400">TỔNG SỐ</p>
               </div>
+              {donutHover && (
+                <div
+                  className="pointer-events-none absolute z-10 min-w-[11rem] max-w-[14rem] rounded-lg border border-gray-200 bg-white px-3 py-2 text-left shadow-md"
+                  style={{
+                    left: `clamp(4px, ${donutHover.x + 8}px, calc(100% - 7.5rem))`,
+                    top: `clamp(4px, ${donutHover.y + 8}px, calc(100% - 5rem))`,
+                  }}
+                >
+                  <div className="flex items-start gap-2">
+                    <span
+                      className="mt-0.5 size-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: donutHover.color }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-gray-900">
+                        {donutHover.emoji ? `${donutHover.emoji} ` : ''}
+                        {donutHover.label}
+                      </p>
+                      <p className="mt-1 text-[11px] leading-snug text-gray-600">
+                        <span className="font-medium text-gray-800">{donutHover.count}</span> sự cố
+                        <span className="mx-1 text-gray-300">•</span>
+                        <span className="font-medium text-gray-800">{donutHover.percent}%</span> tổng
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-          <div className="space-y-2 border-t border-gray-100 pt-4">
-            <div className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-2 text-gray-600">
-                <span className="size-2 rounded-full bg-green-500" />
-                Giao thông ({Math.round((distribution[0]?.count ?? 0) / Math.max(stats.total, 1) * 100)}%)
-              </span>
-              <span className="font-semibold text-gray-800">{distribution[0]?.count ?? 0}</span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-2 text-gray-600">
-                <span className="size-2 rounded-full bg-blue-500" />
-                Hỏa hoạn ({Math.round((distribution[1]?.count ?? 0) / Math.max(stats.total, 1) * 100)}%)
-              </span>
-              <span className="font-semibold text-gray-800">{distribution[1]?.count ?? 0}</span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-2 text-gray-600">
-                <span className="size-2 rounded-full bg-yellow-500" />
-                Y tế ({Math.round((distribution[2]?.count ?? 0) / Math.max(stats.total, 1) * 100)}%)
-              </span>
-              <span className="font-semibold text-gray-800">{distribution[2]?.count ?? 0}</span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-2 text-gray-600">
-                <span className="size-2 rounded-full bg-gray-400" />
-                Khác ({Math.round((distribution.slice(3).reduce((a, b) => a + b.count, 0)) / Math.max(stats.total, 1) * 100)}%)
-              </span>
-              <span className="font-semibold text-gray-800">
-                {distribution.slice(3).reduce((a, b) => a + b.count, 0)}
-              </span>
-            </div>
+          <div className="max-h-48 space-y-0 overflow-y-auto border-t border-gray-100 pt-4">
+            {distribution.length === 0 && !loading ? (
+              <p className="text-center text-xs text-gray-400">Chưa có dữ liệu phân loại</p>
+            ) : (
+              <>
+                <DistributionMetricHeader firstColumnLabel="Loại" />
+                <div className="divide-y divide-gray-50">
+                  {distribution.map((item, i) => (
+                    <div
+                      key={item.label + String(i)}
+                      className={cn(METRIC_TABLE_GRID, 'py-2 text-xs')}
+                    >
+                      <span className="flex min-w-0 items-center gap-2 text-gray-700">
+                        <span
+                          className="size-2 shrink-0 rounded-full"
+                          style={{
+                            backgroundColor:
+                              DISTRIBUTION_CHART_COLORS[i % DISTRIBUTION_CHART_COLORS.length],
+                          }}
+                        />
+                        {item.emoji && (
+                          <span className="shrink-0 text-base leading-none">{item.emoji}</span>
+                        )}
+                        <span className="truncate font-medium">{item.label}</span>
+                      </span>
+                      <span className="text-center font-semibold tabular-nums text-gray-800">
+                        {item.percent}%
+                      </span>
+                      <span className="text-right font-semibold tabular-nums text-gray-800">
+                        {item.count}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -374,20 +598,30 @@ export default function DashboardPage() {
           <h2 className="mb-5 text-lg font-bold text-gray-900">
             Hiệu suất phản ứng theo Đội cứu trợ
           </h2>
-          <div className="space-y-3">
-            {distribution.slice(0, 5).map((item, i) => {
-              const colors = ['bg-green-500', 'bg-blue-500', 'bg-yellow-500', 'bg-orange-500', 'bg-red-500'];
-              return (
-                <DistributionRow
-                  key={item.label}
-                  label={item.label}
-                  emoji={item.emoji}
-                  count={item.count}
-                  percent={item.percent}
-                  color={colors[i % colors.length]}
-                />
-              );
-            })}
+          <div className="space-y-0">
+            {loading && (
+              <p className="text-sm text-gray-400">Đang tải…</p>
+            )}
+            {!loading && rescueTeamDistribution.length === 0 && (
+              <p className="text-sm text-gray-400">Chưa có dữ liệu phân công đội.</p>
+            )}
+            {!loading && rescueTeamDistribution.length > 0 && (
+              <>
+                <DistributionMetricHeader firstColumnLabel="Loại" />
+                <div className="divide-y divide-gray-50">
+                  {rescueTeamDistribution.slice(0, 5).map((item, i) => (
+                    <DistributionRow
+                      key={item.label + String(i)}
+                      label={item.label}
+                      emoji={item.emoji}
+                      count={item.count}
+                      percent={item.percent}
+                      barColor={DISTRIBUTION_CHART_COLORS[i % DISTRIBUTION_CHART_COLORS.length]}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
 
