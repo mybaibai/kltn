@@ -29,14 +29,12 @@ export default function AdminSidebar() {
 
   return (
     <aside className="sticky top-0 flex h-dvh w-64 shrink-0 flex-col overflow-y-auto border-r border-[#E8E8EC] bg-[#FAFAFA]">
-      <div className="flex justify-center items-center">
-        <div className="text-left">
-          <img
-            src="https://res.cloudinary.com/dgbtibqno/image/upload/v1776508857/eov6wwkurrruwrawlhhs.png"
-            alt="SOSGO — Nền tảng kết nối cứu trợ khẩn cấp thông minh"
-            className="h-auto w-full max-w-[100px] object-contain object-left"
-          />
-        </div>
+      <div className="flex items-center justify-start px-3 py-4">
+        <img
+          src="https://res.cloudinary.com/dgbtibqno/image/upload/v1776916527/kjblpw26innfxt4xeuqt.png"
+          alt="SOSGO — Nền tảng kết nối cứu trợ khẩn cấp thông minh"
+          className="h-auto w-auto max-w-[120px] object-contain object-left"
+        />
       </div>
 
       <nav className="flex flex-1 flex-col gap-0.5 p-3">
