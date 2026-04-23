@@ -247,7 +247,6 @@ export default function DashboardPage() {
           icon={<AlertTriangle className="size-6" />}
           title="Đang hoạt động"
           value={loading ? '—' : stats.active.toLocaleString('vi-VN')}
-          subtitle="Pending + Assigned + In Progress"
           trend={stats.trendPercent > 0 ? `+${stats.trendPercent}% so với tuần trước` : stats.trendPercent < 0 ? `${stats.trendPercent}% so với tuần trước` : null}
           color="yellow"
         />
