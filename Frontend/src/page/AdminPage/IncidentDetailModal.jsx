@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Clock, AlertTriangle, MapPin, Phone, Navigation } from 'lucide-react';
+import { X, Clock, AlertTriangle, MapPin, Phone, Navigation, StickyNote } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatSosCode, getIncidentTypeDisplay } from '@/constants/incidentMeta';
 import { updateSosStatus } from '@/services/api/apiSos';
@@ -57,20 +57,55 @@ function formatTimeFull(iso) {
   }).toUpperCase();
 }
 
+/** Lý do hủy: `note` của bản ghi CANCELLED mới nhất trong lịch sử */
+function getCancelReasonFromHistory(sos) {
+  const hist = sos?.status_history;
+  if (!Array.isArray(hist) || hist.length === 0) return null;
+  const lastCancelled = [...hist].reverse().find((h) => normalizeStatusKey(h?.status) === 'CANCELLED');
+  const note = lastCancelled?.note != null ? String(lastCancelled.note).trim() : '';
+  return note.length > 0 ? note : null;
+}
+
 function ConfirmCancelDialog({ onConfirm, onDismiss, loading }) {
+  const [reason, setReason] = useState('');
+  const trimmed = reason.trim();
+  const canSubmit = trimmed.length > 0;
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+      <div className="mx-4 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
         <h3 className="mb-1 text-lg font-bold text-gray-900">Xác nhận hủy xử lý</h3>
-        <p className="mb-6 text-sm text-gray-500">
-          Bạn có chắc chắn muốn hủy xử lý sự cố này?
+        <p className="mb-4 text-sm text-gray-500">
+          Bạn có chắc chắn muốn hủy xử lý sự cố này? Vui lòng ghi rõ lý do để lưu vào lịch sử trạng thái.
         </p>
+        <label htmlFor="cancel-reason" className="mb-1.5 block text-xs font-semibold text-gray-700">
+          Lý do hủy <span className="text-brand-red">*</span>
+        </label>
+        <textarea
+          id="cancel-reason"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={4}
+          disabled={loading}
+          placeholder="Ví dụ: trùng báo cáo, thông tin sai, người gửi yêu cầu đóng…"
+          className="mb-4 w-full resize-y rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-red focus:outline-none focus:ring-2 focus:ring-brand-red/20 disabled:bg-gray-50"
+        />
         <div className="flex gap-3">
-          <button type="button" onClick={onDismiss} disabled={loading} className="flex-1 rounded-xl border px-4 py-2.5 text-sm font-semibold">
+          <button
+            type="button"
+            onClick={onDismiss}
+            disabled={loading}
+            className="flex-1 rounded-xl border px-4 py-2.5 text-sm font-semibold transition hover:bg-gray-50"
+          >
             Không
           </button>
-          <button type="button" onClick={onConfirm} disabled={loading} className="flex-1 rounded-xl bg-brand-red px-4 py-2.5 text-sm font-semibold text-white">
-            {loading ? '…' : 'Xác nhận'}
+          <button
+            type="button"
+            onClick={() => onConfirm(trimmed)}
+            disabled={loading || !canSubmit}
+            className="flex-1 rounded-xl bg-brand-red px-4 py-2.5 text-sm font-semibold text-white transition enabled:hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? '…' : 'Xác nhận hủy'}
           </button>
         </div>
       </div>
@@ -100,12 +135,16 @@ export default function IncidentDetailModal({ sos, onClose, onStatusChanged }) {
   const rescue = sos.assigned_rescue_id;
   const rescueName = typeof rescue === 'object' && rescue?.full_name ? rescue.full_name : null;
 
-  const canCancel = !['RESOLVED', 'CANCELLED'].includes(normalizeStatusKey(sos.status));
+  const statusKey = normalizeStatusKey(sos.status);
+  const canCancel = !['RESOLVED', 'CANCELLED'].includes(statusKey);
+  const cancelReasonDisplay = statusKey === 'CANCELLED' ? getCancelReasonFromHistory(sos) : null;
 
-  async function handleCancelConfirm() {
+  async function handleCancelConfirm(cancelNote) {
+    const note = String(cancelNote ?? '').trim();
+    if (!note) return;
     setCancelling(true);
     try {
-      await updateSosStatus(sos._id, 'CANCELLED');
+      await updateSosStatus(sos._id, 'CANCELLED', { note });
       onStatusChanged?.();
       onClose();
     } catch {
@@ -133,6 +172,18 @@ export default function IncidentDetailModal({ sos, onClose, onStatusChanged }) {
               <span className="rounded-md bg-brand-red px-3 py-1 text-xs font-bold uppercase text-white">{typeLabel}</span>
               <span className={cn('rounded-md px-3 py-1 text-xs font-bold uppercase', statusBadgeClass(sos.status))}>{statusLabel(sos.status)}</span>
             </div>
+
+            {statusKey === 'CANCELLED' && (
+              <div className="flex gap-3 rounded-xl border border-amber-200/80 bg-amber-50/90 px-4 py-3">
+                <StickyNote className="mt-0.5 size-5 shrink-0 text-amber-700" aria-hidden />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-amber-900/90">Lý do hủy</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-gray-800">
+                    {cancelReasonDisplay ?? 'Không có ghi chú lý do trong lịch sử.'}
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="grid gap-5 lg:grid-cols-[1fr_260px]">
               <div className="space-y-4">

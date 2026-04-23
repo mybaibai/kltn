@@ -28,7 +28,9 @@ export const getSosByRequester = async (requesterId) => {
 };
 export const getSosByTeam = (teamId) => api.get(`/sos/team/${teamId}`);
 export const getAllSos = (status) => api.get('/sos', { params: status ? { status } : {} });
-export const updateSosStatus = (id, status) => api.patch(`/sos/${id}/status`, { status });
+/** @param {Record<string, unknown>} [extra] — ví dụ `{ note: 'Lý do hủy' }` khi đổi trạng thái */
+export const updateSosStatus = (id, status, extra = {}) =>
+  api.patch(`/sos/${id}/status`, { status, ...extra });
 export const assignTeam = (sosId, teamId) => api.patch(`/sos/${sosId}/assign`, { team_id: teamId });
 
 export const patchVictimSosLocation = (sosId, latitude, longitude) =>
