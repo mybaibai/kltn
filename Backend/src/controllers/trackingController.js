@@ -5,31 +5,23 @@ import User from "../models/userModel.js";
 import { io } from "../server.js";
 
 // ===== 0. POST /api/tracking/accept-mission =====
-// Rescue chấp nhận mission → notify victim
 export const acceptMission = async (req, res) => {
   try {
     const { assignment_id } = req.body;
     const rescue_id = req.user?._id;
 
     if (!assignment_id) {
-      return res.status(400).json({
-        success: false,
-        message: "Thiếu assignment_id",
-      });
+      return res.status(400).json({ success: false, message: "Thiếu assignment_id" });
     }
 
-    // Update assignment
     const assignment = await RescueAssignment.findByIdAndUpdate(
       assignment_id,
       { accepted_at: new Date() },
-      { new: true },
+      { new: true }
     );
 
     if (!assignment) {
-      return res.status(404).json({
-        success: false,
-        message: "Assignment not found",
-      });
+      return res.status(404).json({ success: false, message: "Assignment not found" });
     }
 
     if (String(assignment.rescue_id) !== String(rescue_id)) {
@@ -39,20 +31,15 @@ export const acceptMission = async (req, res) => {
       });
     }
 
-    // Get rescue info
     const rescue = await User.findById(rescue_id).select("full_name phone");
     const sos = await SosRequest.findById(assignment.request_id);
 
-    // ===== BROADCAST SOCKET EVENTS =====
-    // 📢 Broadcast to VICTIM - Toast notification
     io.to(`victim-${sos.victim_id}`).emit("rescue_accepted", {
       rescue_name: rescue.full_name,
-      // HIDE phone for victim privacy
       message: `${rescue.full_name} đã chấp nhận cứu hộ`,
       timestamp: new Date(),
     });
 
-    // 📢 Broadcast to ADMIN
     io.to("admin-dashboard").emit("rescue_accepted", {
       assignment_id: assignment._id,
       request_id: assignment.request_id,
@@ -67,44 +54,34 @@ export const acceptMission = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error accepting mission:", err.message);
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
 // ===== 1. POST /api/tracking/location =====
-// Rescue gửi vị trí GPS → tính distance → broadcast realtime
 export const updateLocation = async (req, res) => {
   try {
     const { assignment_id, latitude, longitude } = req.body;
     const rescue_id = req.user?._id || req.body.rescue_id;
 
-    if (
-      !assignment_id ||
-      typeof latitude === "undefined" ||
-      typeof longitude === "undefined"
-    ) {
+    if (!assignment_id || typeof latitude === "undefined" || typeof longitude === "undefined") {
       return res.status(400).json({
         success: false,
         message: "Thiếu assignment_id, latitude hoặc longitude",
       });
     }
 
-    // Update location + tính distance
     const result = await trackingService.updateRescueLocation(
       assignment_id,
       latitude,
       longitude,
-      rescue_id,
+      rescue_id
     );
 
     if (!result.success) {
       return res.status(400).json(result);
     }
 
-    // ===== BROADCAST SOCKET EVENTS =====
     const assignment = result.assignment;
     const sos = await SosRequest.findById(assignment.request_id);
 
@@ -119,18 +96,17 @@ export const updateLocation = async (req, res) => {
       stage_changed: result.stage_changed,
     };
 
-    // 📢 Broadcast to VICTIM
+    // Broadcast to VICTIM
     io.to(`victim-${sos.victim_id}`).emit("victim_tracking_update", {
       stage: assignment.stage,
       distance_km: assignment.current_distance_km,
       eta_minutes: assignment.eta_minutes,
       rescue_location: assignment.current_location,
-      // Victim không xem vị trí rescue khi ASSIGNED
       stage_changed: result.stage_changed,
       timestamp: new Date(),
     });
 
-    // 📢 Broadcast to RESCUE (confirm location received)
+    // Broadcast to RESCUE
     io.to(`rescue-${rescue_id}`).emit("mission_location_confirmed", {
       distance_km: assignment.current_distance_km,
       eta_minutes: assignment.eta_minutes,
@@ -138,7 +114,17 @@ export const updateLocation = async (req, res) => {
       current_stage: assignment.stage,
     });
 
-    // 📢 Broadcast to ADMIN
+    // Broadcast qua sos-room (cả victim lẫn rescue trong cùng 1 room)
+    io.to(`sos-${sos._id}`).emit("sos_room_update", {
+      rescue_location: assignment.current_location,
+      victim_location: sos.location,
+      distance_km: assignment.current_distance_km,
+      eta_minutes: assignment.eta_minutes,
+      stage: assignment.stage,
+      timestamp: new Date(),
+    });
+
+    // Broadcast to ADMIN
     if (result.stage_changed) {
       io.to("admin-dashboard").emit("stage_changed", {
         assignment_id: assignment._id,
@@ -157,22 +143,14 @@ export const updateLocation = async (req, res) => {
       });
     }
 
-    res.status(200).json({
-      success: true,
-      data: trackingData,
-      message: "Vị trí đã cập nhật",
-    });
+    res.status(200).json({ success: true, data: trackingData, message: "Vị trí đã cập nhật" });
   } catch (err) {
     console.error("❌ Error updating location:", err.message);
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
 // ===== 2. PATCH /api/tracking/stage =====
-// Rescue/Admin update stage thủ công (MOVING → ARRIVED → RESCUING → COMPLETED)
 export const updateStage = async (req, res) => {
   try {
     const { assignment_id, new_stage, reason } = req.body;
@@ -186,20 +164,18 @@ export const updateStage = async (req, res) => {
       });
     }
 
-    // Update stage
     const result = await trackingService.updateRescueStage(
       assignment_id,
       new_stage,
       reason,
       actor_id,
-      actor_role,
+      actor_role
     );
 
     if (!result.success) {
       return res.status(400).json(result);
     }
 
-    // ===== BROADCAST SOCKET EVENTS =====
     const assignment = result.assignment;
     const sos = await SosRequest.findById(assignment.request_id);
 
@@ -211,21 +187,24 @@ export const updateStage = async (req, res) => {
       timestamp: new Date(),
     };
 
-    // 📢 Broadcast to VICTIM
     io.to(`victim-${sos.victim_id}`).emit("victim_tracking_update", {
       stage: assignment.stage,
       stage_changed: true,
       timestamp: new Date(),
     });
 
-    // 📢 Broadcast to RESCUE
+    io.to(`sos-${sos._id}`).emit("sos_room_update", {
+      stage: assignment.stage,
+      stage_changed: true,
+      timestamp: new Date(),
+    });
+
     io.to(`rescue-${assignment.rescue_id}`).emit("mission_stage_update", {
       stage: assignment.stage,
       stage_changed: true,
       message: `Stage updated: ${result.prev_stage} → ${result.new_stage}`,
     });
 
-    // 📢 Broadcast to ADMIN
     io.to("admin-dashboard").emit("stage_changed", stageChangeData);
 
     res.status(200).json({
@@ -235,34 +214,29 @@ export const updateStage = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error updating stage:", err.message);
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
 // ===== 3. GET /api/tracking/current/:assignmentId =====
-// Victim/Rescue/Admin get current tracking status
 export const getCurrentTracking = async (req, res) => {
   try {
     const { assignmentId } = req.params;
     const user_id = req.user?._id;
     const user_role = req.user?.role;
 
-    // Permission check
     const assignment = await RescueAssignment.findById(assignmentId);
     if (!assignment) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Assignment not found" });
+      return res.status(404).json({ success: false, message: "Assignment not found" });
     }
 
     const sos = await SosRequest.findById(assignment.request_id);
+    if (!sos) {
+      return res.status(404).json({ success: false, message: "SOS not found" });
+    }
 
-    // Check permission: victim/rescue/admin only
-    const isVictim = user_id.toString() === sos.victim_id.toString();
-    const isRescue = user_id.toString() === assignment.rescue_id.toString();
+    const isVictim = String(user_id) === String(sos.victim_id);
+    const isRescue = String(user_id) === String(assignment.rescue_id);
     const r = String(user_role || "").toUpperCase();
     const isAdmin = r === "ADMIN" || r === "STAFF";
 
@@ -274,25 +248,79 @@ export const getCurrentTracking = async (req, res) => {
     }
 
     const result = await trackingService.getCurrentTracking(assignmentId, isVictim);
+    console.log("🚀 TRACKING RESULT:", JSON.stringify(result, null, 2));
+    
+      // Service giờ trả về { success, data } hoặc { success: false, message }
+      // Không throw nữa → không bao giờ ECONNRESET
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      res.status(200).json(result);
+    } catch (err) {
+      console.error("❌ Error getting current tracking:", err.message);
+      res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// ===== 3b. GET /api/tracking/current/by-sos/:sosId =====
+// FIX: Victim chỉ có sosId, không có assignmentId
+// Frontend victim gọi endpoint này thay vì /current/:assignmentId
+export const getCurrentTrackingBySosId = async (req, res) => {
+  try {
+    const { sosId } = req.params;
+    const user_id = req.user?._id;
+    const user_role = req.user?.role;
+
+    // Kiểm tra SOS tồn tại
+    const sos = await SosRequest.findById(sosId);
+    if (!sos) {
+      return res.status(404).json({ success: false, message: "SOS not found" });
+    }
+
+    // Permission: victim của SOS này, hoặc rescue đang xử lý, hoặc admin
+    const isVictim = String(user_id) === String(sos.victim_id);
+    const r = String(user_role || "").toUpperCase();
+    const isAdmin = r === "ADMIN" || r === "STAFF";
+
+    // Kiểm tra rescue có phải đang xử lý SOS này không
+    let isRescue = false;
+    if (!isVictim && !isAdmin) {
+      const assignment = await RescueAssignment.findOne({
+        request_id: sosId,
+        rescue_id: user_id,
+        stage: { $nin: ["CANCELLED"] },
+      });
+      isRescue = !!assignment;
+    }
+
+    if (!isVictim && !isRescue && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: "Không có quyền xem tracking này",
+      });
+    }
+
+    const result = await trackingService.getCurrentTrackingBySosId(sosId, isVictim);
+
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
     res.status(200).json(result);
   } catch (err) {
-    console.error("❌ Error getting current tracking:", err.message);
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+    console.error("❌ Error getting tracking by sosId:", err.message);
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
 // ===== 4. GET /api/tracking/history/:assignmentId =====
-// Admin get tracking history & timeline
 export const getTrackingHistory = async (req, res) => {
   try {
     const { assignmentId } = req.params;
     const user_role = req.user?.role;
     const r = String(user_role || "").toUpperCase();
 
-    // Admin only
     if (r !== "ADMIN" && r !== "STAFF") {
       return res.status(403).json({
         success: false,
@@ -304,21 +332,16 @@ export const getTrackingHistory = async (req, res) => {
     res.status(200).json(result);
   } catch (err) {
     console.error("❌ Error getting tracking history:", err.message);
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// ===== 5. GET /api/tracking/active-missions =====
-// Admin get all active missions for dashboard
+// ===== 5. GET /api/tracking/missions/active =====
 export const getActiveMissions = async (req, res) => {
   try {
     const user_role = req.user?.role;
     const r = String(user_role || "").toUpperCase();
 
-    // Admin only
     if (r !== "ADMIN" && r !== "STAFF") {
       return res.status(403).json({
         success: false,
@@ -330,27 +353,20 @@ export const getActiveMissions = async (req, res) => {
     res.status(200).json(result);
   } catch (err) {
     console.error("❌ Error getting active missions:", err.message);
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// ===== 6. HELPER: Broadcast mission accepted (khi rescue chấp nhận) =====
+// ===== 6. HELPER: Broadcast mission accepted =====
 export async function broadcastMissionAccepted(assignmentId, rescueName) {
   try {
     const assignment = await RescueAssignment.findById(assignmentId);
     const sos = await SosRequest.findById(assignment.request_id);
-
-    // 📢 Broadcast to VICTIM
     io.to(`victim-${sos.victim_id}`).emit("rescue_accepted", {
       rescue_name: rescueName,
       message: `${rescueName} đã chấp nhận cứu hộ`,
       timestamp: new Date(),
     });
-
-    // 📢 Broadcast to ADMIN
     io.to("admin-dashboard").emit("rescue_accepted", {
       assignment_id: assignmentId,
       request_id: assignment.request_id,

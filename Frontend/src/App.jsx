@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import SosPage from '@/page/SosPage';
-import TrackingPage from '@/page/TrackingPage';
 import AdminLayout from '@/layouts/AdminLayout';
 import IncidentManagement from '@/page/AdminPage/IncidentManagement';
 import AdminTrackingPage from '@/page/AdminPage/AdminTrackingPage';
@@ -10,12 +9,11 @@ import StaffLoginPage from '@/page/StaffLoginPage';
 import ResponderPage from '@/page/ResponderPage';
 import { StaffLoginGate, StaffRoleGuard, StaffHomeRedirect } from '@/components/auth/AuthGuards';
 import { STAFF_ROLE_ADMIN, STAFF_ROLE_RESCUE } from '@/services/auth/session';
-import { User, Users } from 'lucide-react';
 import UsersPage from '@/page/AdminPage/UsersPage';
 import HistoryPage from '@/page/AdminPage/HistoryPage';
 import { Toaster } from 'react-hot-toast';
-
-
+import TrackingView from './page/SosPage/TrackingView';
+import RescueTrackingView from './components/responder/RescueTracking';
 
 export default function App() {
   return (
@@ -36,8 +34,8 @@ export default function App() {
         <Route path="/sos" element={<SosPage />} />
         <Route path="/SosPage" element={<Navigate to="/sos" replace />} />
         <Route path="/sospage" element={<Navigate to="/sos" replace />} />
-        <Route path="/tracking/:sosId" element={<TrackingPage />} />
-        
+        <Route path="/tracking/:sosId" element={<TrackingView />} />
+        <Route path="/rescue/tracking/:sosId" element={<RescueTrackingView />} />
         <Route
           path="/staff-login"
           element={(
@@ -60,7 +58,7 @@ export default function App() {
           <Route path="tracking/:sosId" element={<AdminTrackingPage />} />
           <Route path="users" element={<UsersPage title="Quản lý người dùng" />} />
           <Route path="history" element={<HistoryPage />} />
-          {/* <Route path="settings" element={<AdminPlaceholder title="Cài đặt" />} /> */}
+          <Route path="settings" element={<AdminPlaceholder title="Cài đặt" />} />
         </Route>
         <Route
           path="/responder"

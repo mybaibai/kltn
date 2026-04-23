@@ -310,7 +310,7 @@ export default function ResponderMissionBoard({ user }) {
       }
 
       await acceptMission(finalAssignmentId);
-      navigate(`/tracking/${selectedRequest.id}`);
+      navigate(`/rescue/tracking/${selectedRequest.id}`);
     } catch (e) {
       setApiMessage(
         e?.response?.data?.message ||

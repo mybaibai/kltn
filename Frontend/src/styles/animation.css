@@ -38,3 +38,98 @@
   .animate-slide-in {
     animation: slideIn 0.3s ease;
   }
+
+  
+  .dot {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: #dc2626; /* đỏ */
+    border-radius: 9999px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 6px rgba(220, 38, 38, 0.8);
+  }
+  
+  /* vòng toả */
+  .pulse {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 9999px;
+    background: rgba(220, 38, 38, 0.4);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.5);
+    animation: ripple 2s infinite;
+  }
+  
+  /* delay từng vòng */
+  .pulse1 {
+    animation-delay: 0s;
+  }
+  .pulse2 {
+    animation-delay: 0.6s;
+  }
+  .pulse3 {
+    animation-delay: 1.2s;
+  }
+  
+  .marker-wrapper {
+    position: relative;
+    width: 20px;
+    height: 20px;
+  }
+  
+  .dot {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: #dc2626; /* đỏ */
+    border-radius: 9999px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 6px rgba(220, 38, 38, 0.8);
+  }
+  
+  /* vòng toả */
+  .pulse {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 9999px;
+    background: rgba(220, 38, 38, 0.4);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.5);
+    animation: ripple 2s infinite;
+  }
+  
+  /* delay từng vòng */
+  .pulse1 {
+    animation-delay: 0s;
+  }
+  .pulse2 {
+    animation-delay: 0.6s;
+  }
+  .pulse3 {
+    animation-delay: 1.2s;
+  }
+  
+  @keyframes ripple {
+    0% {
+      transform: translate(-50%, -50%) scale(0.5);
+      opacity: 0.8;
+    }
+    70% {
+      transform: translate(-50%, -50%) scale(2.5);
+      opacity: 0.2;
+    }
+    100% {
+      transform: translate(-50%, -50%) scale(3);
+      opacity: 0;
+    }
+  }
+ 

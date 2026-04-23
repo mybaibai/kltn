@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { sendOtp, confirmOtp, resetOtpSession } from '@/services/auth/phoneAuth';
 import api from '@/services/api';
 
@@ -6,9 +7,11 @@ function PhoneStep({ onNext }) {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [staffOnly, setStaffOnly] = useState(false);
 
   const handleConfirm = async () => {
     setError('');
+    setStaffOnly(false);
     const raw = phone.trim();
     if (!raw) return;
     const normalized = raw.replace(/\D/g, '');
@@ -19,11 +22,22 @@ function PhoneStep({ onNext }) {
     try {
       setLoading(true);
       const phoneE164 = `+84${normalized.replace(/^0/, '')}`;
+      const eligibility = await api.get('/auth/otp-eligibility', {
+        params: { phone: phoneE164 },
+      });
+      if (!eligibility?.data?.eligible) {
+        setStaffOnly(eligibility?.data?.code === 'STAFF_ACCOUNT');
+        setError(
+          eligibility?.data?.message ||
+            'Số này không dùng được cho đăng nhập OTP nạn nhân.'
+        );
+        return;
+      }
       await sendOtp(phoneE164);
       onNext({ phoneRaw: normalized, phoneE164 });
     } catch (e) {
       console.error(e);
-      setError('Không gửi được OTP. Vui lòng thử lại.');
+      setError(e?.response?.data?.message || 'Không gửi được OTP. Vui lòng thử lại.');
     } finally {
       setLoading(false);
     }
@@ -37,8 +51,15 @@ function PhoneStep({ onNext }) {
         </svg>
       </div>
 
-      <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight mb-1">Đăng Nhập</h2>
-      <p className="text-sm text-gray-400 mb-6">Vui lòng nhập số điện thoại để tiếp tục</p>
+      <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight mb-1">Đăng Nhập (Nạn nhân)</h2>
+      <p className="text-sm text-gray-400 mb-6">
+        Trang SOS chỉ dùng OTP cho nạn nhân. Cứu hộ / Quản trị dùng
+        {' '}
+        <Link to="/staff-login" className="text-red-600 font-semibold underline">
+          email &amp; mật khẩu
+        </Link>
+        .
+      </p>
 
       <div className="w-full mb-4">
         <p className="text-xs font-bold text-gray-500 tracking-widest uppercase mb-2">Số điện thoại</p>
@@ -58,7 +79,14 @@ function PhoneStep({ onNext }) {
           />
         </div>
         {error && (
-          <p className="mt-1 text-xs text-red-500">{error}</p>
+          <div className="mt-1 text-xs text-red-500">
+            <p>{error}</p>
+            {staffOnly && (
+              <Link to="/staff-login" className="inline-block mt-1 font-bold underline">
+                → Đăng nhập Cứu hộ / Quản trị
+              </Link>
+            )}
+          </div>
         )}
       </div>
 
@@ -101,6 +129,7 @@ function OtpStep({ phone, onBack, onConfirm }) {
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(60);
   const [error, setError] = useState('');
+  const [staffOnly, setStaffOnly] = useState(false);
   const refs = useRef([]);
 
   useEffect(() => { refs.current[0]?.focus(); }, []);
@@ -161,6 +190,7 @@ function OtpStep({ phone, onBack, onConfirm }) {
       onConfirm?.({ phone: phone.phoneE164, backendUser: res.data });
     } catch (e) {
       console.error(e);
+      setStaffOnly(e?.response?.data?.code === 'STAFF_ACCOUNT');
       const msg =
         e?.response?.data?.message ||
         e?.message ||
@@ -220,12 +250,19 @@ function OtpStep({ phone, onBack, onConfirm }) {
       </div>
 
       {error && (
-        <p className="text-xs text-red-500 flex items-center gap-1 mb-2 mt-1">
-          <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5 flex-shrink-0">
-            <path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-          </svg>
-          {error}
-        </p>
+        <div className="text-xs text-red-500 mb-2 mt-1">
+          <p className="flex items-center gap-1">
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5 flex-shrink-0">
+              <path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+            </svg>
+            {error}
+          </p>
+          {staffOnly && (
+            <Link to="/staff-login" className="inline-block mt-1 font-bold underline">
+              → Đăng nhập Cứu hộ / Quản trị
+            </Link>
+          )}
+        </div>
       )}
 
       <div className="text-sm text-gray-400 mb-5 mt-2">
