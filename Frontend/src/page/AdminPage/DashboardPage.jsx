@@ -145,14 +145,14 @@ function DistributionRow({ label, emoji, count, percent, barColor }) {
         {emoji && <span className="shrink-0 text-lg leading-none">{emoji}</span>}
         <span className="truncate text-sm font-medium text-gray-700">{label}</span>
       </div>
-      <div className="flex min-w-0 flex-col gap-1">
-        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+      <div className="flex min-w-0 items-center gap-2">
+        <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100">
           <div
             className="h-full rounded-full"
             style={{ width: `${percent}%`, backgroundColor: barColor }}
           />
         </div>
-        <span className="text-center text-sm font-bold text-gray-900">{percent}%</span>
+        <span className="shrink-0 text-sm font-bold tabular-nums text-gray-900">{percent}%</span>
       </div>
       <span className="text-right text-sm font-bold text-gray-900 tabular-nums">{count}</span>
     </div>
