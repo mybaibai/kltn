@@ -3,15 +3,13 @@ import { useState } from 'react';
 import {
   MapPin, Send, User, Phone, Edit3,
   AlertTriangle, X, FileText, 
-  // Car, Flame, PlusCircle,
-  // Waves, Compass, MoreHorizontal, FileText,
 } from 'lucide-react';
 import Fire from '../../assets/fire.svg?react';
 import Compass from '../../assets/lost.svg?react';
 import Car from '../../assets/car.svg?react';    
 import PlusCircle from '../../assets/medical.svg?react';
 import Waves from '../../assets/wave.svg?react';
-import MoreHorizontal from '../../assets/more.svg?react'; // nếu có
+import MoreHorizontal from '../../assets/more.svg?react'; 
 
 
 export default function SOSForm({ position, onConfirm, onCancel, sending, user }) {

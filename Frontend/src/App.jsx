@@ -7,6 +7,7 @@ import AdminTrackingPage from '@/page/AdminPage/AdminTrackingPage';
 import AdminPlaceholder from '@/page/AdminPage/AdminPlaceholder';
 import StaffLoginPage from '@/page/StaffLoginPage';
 import ResponderPage from '@/page/ResponderPage';
+import RequesterProfile from '@/components/requester/RequesterProfile';
 import { StaffLoginGate, StaffRoleGuard, StaffHomeRedirect } from '@/components/auth/AuthGuards';
 import { STAFF_ROLE_ADMIN, STAFF_ROLE_RESCUE } from '@/services/auth/session';
 
@@ -16,9 +17,10 @@ export default function App() {
       <Routes>
         <Route path="/" element={<SosPage />} />
         <Route path="/sos" element={<SosPage />} />
-        <Route path="/SosPage" element={<Navigate to="/sos" replace />} />
+        <Route path="/profile" element={<RequesterProfile />} />
         <Route path="/sospage" element={<Navigate to="/sos" replace />} />
         <Route path="/tracking/:sosId" element={<TrackingPage />} />
+        <Route path="/profile" element={<Navigate to="/profile" replace />} />
         <Route
           path="/staff-login"
           element={(
