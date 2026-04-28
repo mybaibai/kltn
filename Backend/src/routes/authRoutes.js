@@ -6,14 +6,6 @@ import User from "../models/userModel.js";
 
 const router = express.Router();
 
-function normalizePhoneE164(input) {
-  const digits = String(input || "").replace(/\D/g, "");
-  if (!digits) return null;
-  if (digits.startsWith("84")) return `+${digits}`;
-  if (digits.startsWith("0")) return `+84${digits.slice(1)}`;
-  return `+84${digits}`;
-}
-
 const JWT_EXPIRES = process.env.JWT_EXPIRES_IN || "7d";
 
 function getJwtSecret() {
@@ -61,43 +53,6 @@ function signAccessToken(user) {
     { expiresIn: JWT_EXPIRES }
   );
 }
-
-/**
- * Luồng OTP chỉ dành cho Victim.
- * Rescue/Admin (tài khoản Password) phải đăng nhập bằng email tại /staff-login.
- */
-router.get("/otp-eligibility", async (req, res) => {
-  try {
-    const phone = normalizePhoneE164(req.query.phone);
-    if (!phone) {
-      return res.status(400).json({
-        eligible: false,
-        code: "INVALID_PHONE",
-        message: "Số điện thoại không hợp lệ.",
-      });
-    }
-
-    const user = await User.findOne({ phone }).select("role auth.type");
-    if (!user) {
-      return res.json({ eligible: true });
-    }
-
-    const role = toCanonicalRole(user.role);
-    if (role === "Rescue" || role === "Admin" || user.auth?.type === "Password") {
-      return res.json({
-        eligible: false,
-        code: "STAFF_ACCOUNT",
-        message:
-          "Số này thuộc tài khoản cứu hộ/quản trị. Vui lòng đăng nhập bằng email ở trang Cứu hộ / Quản trị.",
-      });
-    }
-
-    return res.json({ eligible: true });
-  } catch (error) {
-    console.error("otp-eligibility:", error);
-    return res.status(500).json({ eligible: false, message: "Lỗi máy chủ" });
-  }
-});
 
 /** Đăng ký email: Admin luôn được (dev). Rescue chỉ khi ALLOW_RESCUE_SELF_REGISTER=true (mặc định tắt — tài khoản cứu hộ nên do admin/seed tạo). */
 router.post("/register-email", async (req, res) => {
@@ -241,7 +196,6 @@ router.post("/firebase", async (req, res) => {
       const r = toCanonicalRole(user.role);
       if (user.auth?.type === "Password" || r !== "Victim") {
         return res.status(403).json({
-          code: "STAFF_ACCOUNT",
           message:
             "Tài khoản này đăng nhập bằng email/mật khẩu (cứu hộ/quản trị). Không dùng OTP số điện thoại tại đây.",
         });
