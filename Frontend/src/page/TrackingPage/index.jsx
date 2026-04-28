@@ -43,6 +43,7 @@ import Car from '../../assets/car.svg?react';
 import PlusCircle from '../../assets/medical.svg?react';
 import Waves from '../../assets/wave.svg?react';
 import MoreHorizontal from '../../assets/more.svg?react'; 
+import Header from "@/components/requester/Header";
 // Custom Icon Renderer using divIcon for premium look
 const createCustomIcon = () => {
   return L.divIcon({
@@ -518,13 +519,13 @@ export default function TrackingPage() {
   const requestCode = sos._id ? `#SOS-${String(sos._id).slice(-4).toUpperCase()}` : '#SOS-????';
 
   return (
-    <div className="h-screen w-full bg-gray-50 flex flex-col lg:flex-row overflow-hidden font-sans">
+    <div className="h-screen w-full bg-gray-50 flex flex-col overflow-hidden font-sans">
+      <Header />
       <style>{mapStyles}</style>
-
+    <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
       <AnimatePresence>
         {toaster && <Toast {...toaster} onClose={() => setToaster(null)} />}
       </AnimatePresence>
-      
       {/* LEFT: MAP SECTION */}
       <div className="flex-1 h-[45vh] lg:h-full relative shadow-inner">
         <MapContainer center={victimPt ? [victimPt.lat, victimPt.lng] : [16.0544, 108.2022]} zoom={15} style={{ height: '100%', width: '100%' }} zoomControl={false}>
@@ -571,10 +572,10 @@ export default function TrackingPage() {
       </div>
 
       {/* RIGHT: SIDEBAR SECTION */}
-      <div className="w-full lg:w-[450px] bg-white h-[55vh] lg:h-full flex flex-col shadow-2xl z-10 border-l border-gray-100 overflow-hidden">
+      <div className="w-full lg:w-[450px] bg-[#F2F4F6] h-[55vh] lg:h-full flex flex-col shadow-2xl z-10 border-l border-gray-100 overflow-hidden">
         
         {/* SIDEBAR HEADER */}
-        <div className="p-6 bg-gradient-to-br from-gray-900 to-gray-800 text-white shrink-0">
+        <div className="p-6 from-gray-900 to-gray-800 text-black shrink-0">
           <div className="flex justify-between items-start mb-6">
             <div className="px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-xl border border-white/10 text-[10px] font-bold tracking-wider uppercase">
               {requestCode}
@@ -588,7 +589,7 @@ export default function TrackingPage() {
           <h1 className="text-2xl font-bold leading-tight mb-2">
             Theo dõi cứu trợ
           </h1>
-          <p className="text-white/60 text-[11px] font-medium uppercase tracking-widest">
+          <p className="text-[#43474F] text-[11px] font-medium uppercase tracking-widest">
             {isResolved ? 'Nhiệm vụ đã kết thúc' : 'Thông tin cập nhật thời gian thực'}
           </p>
         </div>
@@ -596,7 +597,7 @@ export default function TrackingPage() {
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           
           {/* STEPPER */}
-          <div className="p-8 border-b border-gray-50">
+          <div className="p-6 border-b border-gray-50">
             <div className="relative flex justify-between items-start">
               <div className="absolute top-5 left-8 right-8 h-1 bg-gray-100 rounded-full" />
               <div className="absolute top-5 left-8 h-1 bg-emerald-500 transition-all duration-1000 ease-out rounded-full shadow-[0_0_15px_rgba(16,185,129,0.4)]"
@@ -637,7 +638,7 @@ export default function TrackingPage() {
 
           {/* INFORMATION CARDS */}
           <div className="px-6 space-y-4 pb-10">
-            <div className="bg-gray-50 rounded-3xl p-5 border border-gray-100 flex items-start gap-4">
+            <div className="bg-white rounded-3xl p-5 border border-gray-100 flex items-start gap-4">
               <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center shrink-0 text-rose-500 border border-gray-100">
                 <MapPin size={22} />
               </div>
@@ -684,7 +685,7 @@ export default function TrackingPage() {
         </div>
 
         {/* SIDEBAR FOOTER ACTION */}
-        <div className="p-6 bg-white border-t border-gray-50 flex gap-3 shrink-0">
+        <div className="p-6 bg-[#F2F4F6] border-t border-gray-50 flex gap-3 shrink-0">
           <button onClick={() => window.location.reload()} className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold text-xs hover:bg-black transition-all shadow-xl shadow-gray-200 uppercase tracking-widest">
              LÀM MỚI
           </button>
@@ -698,6 +699,7 @@ export default function TrackingPage() {
           )}
         </div>
       </div>
+    </div>
       {/* CANCEL CONFIRMATION MODAL */}
       {showCancelModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 backdrop-blur-[2px] p-4">
