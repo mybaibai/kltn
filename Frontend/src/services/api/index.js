@@ -1,37 +1,40 @@
 import axios from "axios";
-import { auth } from "@/lib/firebase";
-
-const baseURL = import.meta.env.DEV
-  ? "/api"
-  : import.meta.env.VITE_API_URL || "http://localhost:3001/api";
+import { auth, waitForFirebaseAuth } from "@/lib/firebase";
 
 const api = axios.create({
-  baseURL,
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3001/api",
   headers: { "Content-Type": "application/json" },
   timeout: 10000,
-  withCredentials: true,
 });
 
 api.interceptors.request.use(async (config) => {
   config.headers = config.headers || {};
+  const url = config.url || "";
+  if (url.includes("/auth/firebase")) return config;
 
-  const skipStaffJwt = !!config.skipStaffJwt;
-  const staffToken =
-    localStorage.getItem("auth_token") || localStorage.getItem("staff_token");
-
-  // Ưu tiên staff token nếu có và request không yêu cầu bỏ qua staff JWT
-  if (!skipStaffJwt && staffToken) {
-    config.headers.Authorization = `Bearer ${staffToken}`;
+  if (config.skipStaffJwt) {
+    const user = await waitForFirebaseAuth();
+    if (user) {
+      const token = await user.getIdToken();
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   }
 
-  // Fallback cho luồng victim OTP/Firebase
-  const user = auth.currentUser;
-  if (user) {
-    const token = await user.getIdToken();
-    if (token) config.headers.Authorization = `Bearer ${token}`;
+  const jwt = typeof localStorage !== "undefined"
+    ? localStorage.getItem("auth_token")
+    : null;
+  if (jwt) {
+    config.headers.Authorization = `Bearer ${jwt}`;
+    return config;
   }
 
+  const user = await waitForFirebaseAuth();
+  if (user) {
+    const token = await user.getIdToken();
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   return config;
 });
+
 export default api;

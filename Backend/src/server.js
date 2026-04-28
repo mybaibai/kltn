@@ -13,6 +13,8 @@ import authRoutes from "./routes/authRoutes.js";
 import trackingRoutes from "./routes/trackingRoutes.js";
 import * as trackingService from "./services/trackingService.js";
 import cookieParser from "cookie-parser";
+import jwt from "jsonwebtoken";
+import { firebaseAdminAuth } from "./config/firebaseAdmin.js";
 
 dotenv.config();
 const app = express();
@@ -57,13 +59,51 @@ app.use("/api/tracking", trackingRoutes);
 app.get("/", (_, res) => res.json({ message: "✅ SOS API đang chạy" }));
 
 // ===== SOCKET.IO MIDDLEWARE =====
-io.use((socket, next) => {
+io.use(async (socket, next) => {
   const token = socket.handshake.auth.token;
-  // TODO: Verify JWT token nếu cần
-  if (!token) console.log("⚠️ Socket connected without token");
-  socket.userId = socket.handshake.auth.userId;
-  socket.userRole = socket.handshake.auth.userRole;
-  next();
+  const userId = socket.handshake.auth.userId;
+  const userRole = socket.handshake.auth.userRole;
+
+  if (!token) {
+    console.log("⚠️ Socket connected without token");
+    socket.userId = userId;
+    socket.userRole = userRole;
+    return next();
+  }
+
+  try {
+    // 1. Thử verify bằng Firebase
+    try {
+      const decodedToken = await firebaseAdminAuth.verifyIdToken(token);
+      // Ưu tiên dùng MongoDB _id từ handshake, fallback về Firebase UID
+      socket.userId = userId || decodedToken.uid;
+      socket.userRole = userRole || "VICTIM";
+      return next();
+    } catch (fbErr) {
+      // Không phải Firebase token, chuyển sang thử JWT
+    }
+
+    // 2. Thử verify bằng JWT nội bộ
+    const secret = process.env.JWT_SECRET;
+    if (secret) {
+      try {
+        const decoded = jwt.verify(token, secret);
+        socket.userId = decoded.sub || userId;
+        socket.userRole = decoded.role || userRole;
+        return next();
+      } catch (jwtErr) {
+        // Token không hợp lệ
+      }
+    }
+
+    // Fallback nếu verify thất bại nhưng vẫn cho kết nối (hoặc có thể block tùy security)
+    socket.userId = userId;
+    socket.userRole = userRole;
+    next();
+  } catch (err) {
+    console.error("❌ Socket auth middleware error:", err.message);
+    next();
+  }
 });
 
 // ===== SOCKET.IO EVENTS =====

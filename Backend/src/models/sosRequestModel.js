@@ -41,8 +41,11 @@ const sosRequestSchema = new mongoose.Schema(
     },
     status_history: { type: [statusHistorySchema], default: [] },
     ai_priority_score: { type: Number, default: null },
-    ai_category: { type: String, default: null },
-    ai_suggestion: { type: String, default: null },
+    ai_category:       { type: String, default: null },
+    // Hướng dẫn sơ cứu ngắn gọn hiển thị cho nạn nhân
+    ai_suggestion:     { type: String, default: null },
+    // Bản mô tả chi tiết tình huống dành cho đội cứu hộ đọc nhanh
+    ai_rescue_summary: { type: String, default: null },
     assigned_rescue_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
