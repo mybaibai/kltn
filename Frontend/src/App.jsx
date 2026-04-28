@@ -9,6 +9,7 @@ import StaffLoginPage from '@/page/StaffLoginPage';
 import ResponderPage from '@/page/ResponderPage';
 import ResponderTeamInfoPage from '@/page/ResponderTeamInfoPage';
 import ResponderTeamEditPage from '@/page/ResponderTeamEditPage';
+import RequesterProfile from '@/components/requester/RequesterProfile';
 import { StaffLoginGate, StaffRoleGuard, StaffHomeRedirect } from '@/components/auth/AuthGuards';
 import { STAFF_ROLE_ADMIN, STAFF_ROLE_RESCUE } from '@/services/auth/session';
 
@@ -18,9 +19,9 @@ export default function App() {
       <Routes>
         <Route path="/" element={<SosPage />} />
         <Route path="/sos" element={<SosPage />} />
-        <Route path="/SosPage" element={<Navigate to="/sos" replace />} />
+        <Route path="/profile" element={<RequesterProfile />} />
         <Route path="/sospage" element={<Navigate to="/sos" replace />} />
-        <Route path="/tracking/:sosId" element={<TrackingPage mode="victim" />} />
+        <Route path="/tracking/:sosId" element={<TrackingPage />} />
         <Route
           path="/staff-login"
           element={(
@@ -40,7 +41,7 @@ export default function App() {
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={<AdminPlaceholder title="Dashboard" />} />
           <Route path="incidents" element={<IncidentManagement />} />
-            <Route path="tracking/:sosId" element={<AdminTrackingPage />} />
+          <Route path="tracking/:sosId" element={<AdminTrackingPage />} />
           <Route path="users" element={<AdminPlaceholder title="Quản lý người dùng" />} />
           <Route path="history" element={<AdminPlaceholder title="Lịch sử" />} />
           <Route path="settings" element={<AdminPlaceholder title="Cài đặt" />} />
@@ -57,7 +58,7 @@ export default function App() {
           path="/responder/tracking/:sosId"
           element={(
             <StaffRoleGuard allowRoles={[STAFF_ROLE_RESCUE]}>
-              <TrackingPage mode="rescue" />
+              <TrackingPage />
             </StaffRoleGuard>
           )}
         />

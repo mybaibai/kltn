@@ -62,7 +62,7 @@ export const acceptMission = async (req, res) => {
     // 📢 Broadcast to VICTIM - Toast notification
     io.to(`victim-${sos.victim_id}`).emit("rescue_accepted", {
       rescue_name: rescue.full_name,
-      rescue_phone: rescue.phone,
+      // HIDE phone for victim privacy
       message: `${rescue.full_name} đã chấp nhận cứu hộ`,
       timestamp: new Date(),
     });
@@ -288,7 +288,7 @@ export const getCurrentTracking = async (req, res) => {
       });
     }
 
-    const result = await trackingService.getCurrentTracking(assignmentId);
+    const result = await trackingService.getCurrentTracking(assignmentId, isVictim);
     res.status(200).json(result);
   } catch (err) {
     console.error("❌ Error getting current tracking:", err.message);

@@ -13,7 +13,9 @@ function getJwtSecret() {
 }
 
 function toCanonicalRole(role) {
-  const value = String(role || "").trim().toLowerCase();
+  const value = String(role || "")
+    .trim()
+    .toLowerCase();
   if (value === "admin") return "Admin";
   if (value === "rescue") return "Rescue";
   if (value === "victim") return "Victim";
@@ -21,9 +23,12 @@ function toCanonicalRole(role) {
 }
 
 function toCanonicalStatus(status) {
-  const value = String(status || "").trim().toLowerCase();
+  const value = String(status || "")
+    .trim()
+    .toLowerCase();
   if (value === "active") return "Active";
-  if (value === "blocked" || value === "inactive" || value === "banned") return "Blocked";
+  if (value === "blocked" || value === "inactive" || value === "banned")
+    return "Blocked";
   return status;
 }
 
@@ -53,17 +58,26 @@ function signAccessToken(user) {
 router.post("/register-email", async (req, res) => {
   try {
     if (!getJwtSecret()) {
-      return res.status(500).json({ message: "Server chưa cấu hình JWT_SECRET" });
+      return res
+        .status(500)
+        .json({ message: "Server chưa cấu hình JWT_SECRET" });
     }
 
     const allowRescueSelfReg =
-      String(process.env.ALLOW_RESCUE_SELF_REGISTER || "").toLowerCase() === "true";
+      String(process.env.ALLOW_RESCUE_SELF_REGISTER || "").toLowerCase() ===
+      "true";
 
     const { email, password, full_name, role } = req.body || {};
-    const normalizedEmail = String(email || "").trim().toLowerCase();
+    const normalizedEmail = String(email || "")
+      .trim()
+      .toLowerCase();
     const canonicalRole = toCanonicalRole(role);
 
-    if (!normalizedEmail || !password || !["Admin", "Rescue"].includes(canonicalRole)) {
+    if (
+      !normalizedEmail ||
+      !password ||
+      !["Admin", "Rescue"].includes(canonicalRole)
+    ) {
       return res.status(400).json({
         message: "Thiếu email/mật khẩu hoặc role không hợp lệ (Rescue | Admin)",
       });
@@ -106,11 +120,16 @@ router.post("/register-email", async (req, res) => {
 router.post("/login-email", async (req, res) => {
   try {
     if (!getJwtSecret()) {
-      return res.status(500).json({ message: "Server chưa cấu hình JWT_SECRET" });
+      return res
+        .status(500)
+        .json({ message: "Server chưa cấu hình JWT_SECRET" });
     }
 
     const { email, password } = req.body || {};
-    const normalizedEmail = String(email || "").trim().toLowerCase();
+    
+    const normalizedEmail = String(email || "")
+      .trim()
+      .toLowerCase();
 
     if (!normalizedEmail || !password) {
       return res.status(400).json({ message: "Thiếu email hoặc mật khẩu" });
@@ -118,17 +137,26 @@ router.post("/login-email", async (req, res) => {
 
     const user = await User.findOne({ "auth.email": normalizedEmail });
     if (!user || user.auth?.type !== "Password") {
-      return res.status(401).json({ message: "Email hoặc mật khẩu không đúng" });
+      return res
+        .status(401)
+        .json({ message: "Email hoặc mật khẩu không đúng" });
     }
 
     const canonicalRole = toCanonicalRole(user.role);
     if (!["Admin", "Rescue"].includes(canonicalRole)) {
-      return res.status(403).json({ message: "Tài khoản không được phép đăng nhập kiểu này" });
+      return res
+        .status(403)
+        .json({ message: "Tài khoản không được phép đăng nhập kiểu này" });
     }
 
-    const validPassword = await bcrypt.compare(String(password), user.auth.password || "");
+    const validPassword = await bcrypt.compare(
+      String(password),
+      user.auth.password || ""
+    );
     if (!validPassword) {
-      return res.status(401).json({ message: "Email hoặc mật khẩu không đúng" });
+      return res
+        .status(401)
+        .json({ message: "Email hoặc mật khẩu không đúng" });
     }
 
     const canonicalStatus = toCanonicalStatus(user.status);
