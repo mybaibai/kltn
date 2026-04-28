@@ -73,6 +73,21 @@ export const create = async (req, res) => {
     // === KHÔNG auto-assign. SOS giữ trạng thái PENDING ===
 
     const fullSos = await sosService.getSosById(sos._id);
+    const incidentTypeName =
+      typeof fullSos?.incident_type === 'object' ? fullSos?.incident_type?.name || '' : '';
+    const victimName = fullSos?.victim_id?.full_name || '';
+    const victimPhone = fullSos?.victim_id?.phone || fullSos?.victim_id?.auth?.phone || '';
+    const rescueRealtimePayload = {
+      request_id: fullSos?._id,
+      status: 'PENDING',
+      address: fullSos?.address || '',
+      description: fullSos?.description || '',
+      created_at: fullSos?.created_at || new Date(),
+      victim_name: victimName,
+      victim_phone: victimPhone,
+      incident_type_name: incidentTypeName,
+      location: fullSos?.location,
+    };
 
     // 📢 Broadcast cho ADMIN
     io.to("admin-dashboard").emit("sos_created", {
@@ -83,18 +98,18 @@ export const create = async (req, res) => {
       created_at: fullSos?.created_at || new Date(),
     });
 
+    // 📢 Broadcast realtime cho tất cả đội cứu hộ để cập nhật danh sách ngay
+    io.to("rescue-all").emit("sos_created", {
+      ...rescueRealtimePayload,
+    });
+
     // === NOTIFY đội gần nhất ngay lập tức ===
     try {
       const nearRescues = await teamService.findNearestTeam(Number(resolvedLat), Number(resolvedLng));
       if (nearRescues.length > 0) {
         const nearestId = nearRescues[0]._id;
         io.to(`rescue-${nearestId}`).emit("sos_new_pending", {
-          request_id: fullSos?._id,
-          status: "PENDING",
-          address: fullSos?.address || '',
-          created_at: fullSos?.created_at || new Date(),
-          victim_name: fullSos?.victim_id?.full_name || '',
-          location: fullSos?.location,
+          ...rescueRealtimePayload,
           priority: true,
         });
         console.log(`📢 SOS ${sos._id} — notified nearest rescue: ${nearRescues[0].full_name}`);
@@ -106,12 +121,7 @@ export const create = async (req, res) => {
     // === SAU 60 GIÂY: broadcast cho TẤT CẢ đội rescue ===
     const broadcastTimer = setTimeout(() => {
       io.to("rescue-all").emit("sos_broadcast_all", {
-        request_id: fullSos?._id,
-        status: "PENDING",
-        address: fullSos?.address || '',
-        created_at: fullSos?.created_at || new Date(),
-        victim_name: fullSos?.victim_id?.full_name || '',
-        location: fullSos?.location,
+        ...rescueRealtimePayload,
       });
       console.log(`📢 SOS ${sos._id} — broadcast to all rescue teams (60s delay)`);
       pendingBroadcastTimers.delete(String(sos._id));

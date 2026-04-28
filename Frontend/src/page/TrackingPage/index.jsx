@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   MapContainer,
   TileLayer,
@@ -13,6 +13,7 @@ import "leaflet/dist/leaflet.css";
 import { getSosDetail, patchVictimSosLocation } from "@/services/api/apiSos";
 import {
   getCurrentTracking,
+  updateRescueStage,
   updateRescueLocation,
 } from "@/services/api/apiTracking";
 import {
@@ -20,12 +21,10 @@ import {
   reinitSocketForTrackingPersona,
 } from "@/services/socket";
 import {
-  haversineDistance,
-  calculateETA,
-  getNearestRescueTeams,
   getOSRMRoute,
 } from "@/services/api/apiRouting";
 import { auth } from "@/lib/firebase";
+import { AlertTriangle, Check, LocateFixed, MessageSquare, Phone, RotateCw } from "lucide-react";
 import "./tracking-page.css";
 
 const markerShadow =
@@ -54,6 +53,8 @@ const STAGE_VI = {
   CANCELLED: "Đã hủy",
 };
 
+const STAGE_STEPS = ["Đã gửi", "Đang di chuyển", "Đang hỗ trợ", "Hoàn thành"];
+
 function FitBounds({ points }) {
   const map = useMap();
   useEffect(() => {
@@ -76,7 +77,32 @@ function parseCoord(geo) {
   return { lat, lng };
 }
 
-export default function TrackingPage() {
+function getStageProgressIndex(stageKey) {
+  const key = String(stageKey || "").toUpperCase();
+  if (key === "CANCELLED") return 3;
+  if (key === "COMPLETED") return 3;
+  if (key === "RESCUING") return 2;
+  if (key === "ARRIVED" || key === "MOVING") return 1;
+  if (key === "ASSIGNED") return 0;
+  return 0;
+}
+
+function mapSeverity(raw) {
+  const normalized = String(raw || "").toLowerCase();
+  if (normalized.includes("high") || normalized.includes("cao") || normalized.includes("critical")) {
+    return { label: "Mức độ cao", className: "is-high" };
+  }
+  if (normalized.includes("medium") || normalized.includes("trung")) {
+    return { label: "Mức độ trung bình", className: "is-medium" };
+  }
+  if (normalized.includes("low") || normalized.includes("thấp")) {
+    return { label: "Mức độ thấp", className: "is-low" };
+  }
+  return { label: "Chưa xác định", className: "is-unknown" };
+}
+
+export default function TrackingPage({ mode = "rescue" }) {
+  const navigate = useNavigate();
   const { sosId } = useParams();
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -85,8 +111,9 @@ export default function TrackingPage() {
   const [persona, setPersona] = useState(null);
   const [tracking, setTracking] = useState(null);
   const [toast, setToast] = useState(null);
-  const [nearestRescues, setNearestRescues] = useState([]);
-  const [loadingNearestRescues, setLoadingNearestRescues] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [arriving, setArriving] = useState(false);
+  const [completing, setCompleting] = useState(false);
 
   const staffUser = useMemo(() => {
     try {
@@ -364,48 +391,86 @@ export default function TrackingPage() {
   }, [victimPt, rescuePt]);
 
   // Distance/ETA tốt nhất: ưu tiên OSRM > tracking API > null
-  const displayDistance = routeDistance ?? tracking?.distance_km;
-  const displayEta = routeEta ?? tracking?.eta_minutes;
+  const rawDistance = routeDistance ?? tracking?.distance_km;
+  const rawEta = routeEta ?? tracking?.eta_minutes;
+  const displayDistance = Number.isFinite(Number(rawDistance))
+    ? Number(rawDistance)
+    : null;
+  const displayEta = Number.isFinite(Number(rawEta))
+    ? Number(rawEta)
+    : (
+      displayDistance != null
+        ? Math.max(1, Math.ceil((displayDistance / 35) * 60))
+        : null
+    );
 
-  // Load nearest rescue teams when victim location is available
-  useEffect(() => {
-    if (!victimPt) {
-      setNearestRescues([]);
-      return;
-    }
-
-    let cancelled = false;
-    setLoadingNearestRescues(true);
-
-    (async () => {
-      try {
-        const teams = await getNearestRescueTeams(victimPt.lat, victimPt.lng, 15000);
-        if (!cancelled) {
-          setNearestRescues(
-            teams.map((team) => ({
-              ...team,
-              distance_km:
-                team.distance_km ||
-                haversineDistance(
-                  victimPt.lat,
-                  victimPt.lng,
-                  team.location?.coordinates?.[1],
-                  team.location?.coordinates?.[0]
-                ),
-            }))
-          );
-          setLoadingNearestRescues(false);
+  const handleRefresh = useCallback(async () => {
+    if (!sosId) return;
+    setRefreshing(true);
+    try {
+      const sosRes = preferVictimToken
+        ? await getSosDetail(sosId, { preferVictimToken: true })
+        : await getSosDetail(sosId);
+      const data = sosRes?.data?.data;
+      if (data) {
+        setSos(data);
+        const nextAssignmentId = data.assignment?._id;
+        if (nextAssignmentId) {
+          setAssignmentId(nextAssignmentId);
+          await loadTracking(nextAssignmentId, persona === "victim");
         }
-      } catch {
-        if (!cancelled) setLoadingNearestRescues(false);
       }
-    })();
+    } catch {
+      setToast("Không thể làm mới dữ liệu");
+      setTimeout(() => setToast(null), 3500);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [sosId, preferVictimToken, loadTracking, persona]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [victimPt]);
+  const handleCompleteMission = useCallback(async () => {
+    if (!assignmentId || completing) return;
+    setCompleting(true);
+    try {
+      await updateRescueStage(
+        assignmentId,
+        "COMPLETED",
+        "Đội cứu trợ xác nhận hoàn thành",
+      );
+      navigate("/responder", {
+        replace: true,
+        state: {
+          refreshedAt: Date.now(),
+          completedAssignmentId: String(assignmentId),
+        },
+      });
+    } catch (error) {
+      setToast(error?.response?.data?.message || "Không thể cập nhật trạng thái hoàn thành");
+      setTimeout(() => setToast(null), 3500);
+    } finally {
+      setCompleting(false);
+    }
+  }, [assignmentId, completing, navigate]);
 
+  const handleArrivedSupport = useCallback(async () => {
+    if (!assignmentId || arriving) return;
+    setArriving(true);
+    try {
+      await updateRescueStage(
+        assignmentId,
+        "RESCUING",
+        "Đã tới hiện trường và bắt đầu hỗ trợ",
+      );
+      await loadTracking(assignmentId, persona === "victim");
+      setToast("Đã chuyển sang bước Đang hỗ trợ");
+      setTimeout(() => setToast(null), 2500);
+    } catch (error) {
+      setToast(error?.response?.data?.message || "Không thể cập nhật trạng thái Đang hỗ trợ");
+      setTimeout(() => setToast(null), 3500);
+    } finally {
+      setArriving(false);
+    }
+  }, [assignmentId, arriving, loadTracking, persona]);
 
   const center = victimPt
     ? [victimPt.lat, victimPt.lng]
@@ -413,194 +478,348 @@ export default function TrackingPage() {
 
   if (loading) {
     return (
-      <div className="tracking-page-root" style={{ padding: 24 }}>
-        <p>Đang tải theo dõi…</p>
+      <div className="tracking-page-root">
+        <div className="tracking-feedback-wrap">
+          <p className="tracking-feedback">Đang tải theo dõi...</p>
+        </div>
       </div>
     );
   }
 
   if (err || !sos) {
     return (
-      <div className="tracking-page-root" style={{ padding: 24 }}>
-        <p style={{ color: "#f85149" }}>{err || "Không có dữ liệu"}</p>
-        <Link to="/sos" className="tracking-back-btn" style={{ marginTop: 16, display: "inline-block" }}>
-          Về trang SOS
-        </Link>
+      <div className="tracking-page-root">
+        <div className="tracking-feedback-wrap">
+          <p className="tracking-feedback tracking-feedback-error">{err || "Không có dữ liệu"}</p>
+          <Link to="/sos" className="tracking-secondary-btn">
+            Về trang SOS
+          </Link>
+        </div>
       </div>
     );
   }
 
-  const stageKey = tracking?.current_stage || "ASSIGNED";
+  const rawStageKey = tracking?.current_stage || "ASSIGNED";
+  const stageKey =
+    rawStageKey === "ASSIGNED" && tracking?.timestamps?.accepted_at
+      ? "MOVING"
+      : rawStageKey;
   const stageLabel = STAGE_VI[stageKey] || stageKey;
+  const stepIndex = getStageProgressIndex(stageKey);
+
+  const sosCode = `#SOS-${String(sosId || "").slice(-4).toUpperCase()}`;
+  const incidentName =
+    sos?.incident_type_id?.name ||
+    sos?.incident_type?.name ||
+    sos?.incident_type ||
+    "Thiên tai";
+  const severity = mapSeverity(sos?.urgency_level || sos?.level || "high");
+  const rescueName = tracking?.rescue_name || staffUser?.full_name || "Rescue";
+  const rescuePhone = tracking?.rescue_phone || staffUser?.phone || "—";
+  const victimPhone =
+    tracking?.victim_phone ||
+    sos?.victim_id?.phone ||
+    sos?.phone ||
+    sos?.contact_phone ||
+    "—";
+  const destination =
+    sos?.address ||
+    tracking?.target_address ||
+    sos?.victim_id?.profile?.address ||
+    "Chưa có địa chỉ";
+  const cancelPath = persona === "rescue" ? "/responder" : "/sos";
+  const useRescueLayout = mode === "rescue";
+
+  if (!useRescueLayout) {
+    return (
+      <div className="victim-tracking-page-root">
+        {toast ? <div className="tracking-toast">{toast}</div> : null}
+
+        <header className="victim-tracking-topbar">
+          <div>
+            <h1>Theo dõi yêu cầu SOS</h1>
+            <p>
+              Trạng thái hiện tại: <strong>{stageLabel}</strong>
+            </p>
+          </div>
+          <Link to="/sos" className="victim-tracking-back-btn">
+            Về SOS
+          </Link>
+        </header>
+
+        <div className="victim-tracking-workspace">
+          <section className="victim-tracking-map-wrap">
+            <MapContainer
+              center={center}
+              zoom={14}
+              style={{ width: "100%", height: "100%" }}
+              scrollWheelZoom
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <FitBounds
+                points={[
+                  ...(victimPt ? [[victimPt.lat, victimPt.lng]] : []),
+                  ...(rescuePt ? [[rescuePt.lat, rescuePt.lng]] : []),
+                ]}
+              />
+
+              {victimPt ? (
+                <Marker position={[victimPt.lat, victimPt.lng]} icon={victimIcon}>
+                  <Popup>Nạn nhân</Popup>
+                </Marker>
+              ) : null}
+
+              {rescuePt ? (
+                <Marker position={[rescuePt.lat, rescuePt.lng]} icon={rescueIcon}>
+                  <Popup>Đội cứu hộ · {tracking?.rescue_name || ""}</Popup>
+                </Marker>
+              ) : null}
+
+              {routeCoords.length >= 2 ? (
+                <Polyline
+                  positions={routeCoords}
+                  color="#2563eb"
+                  weight={4}
+                  opacity={0.85}
+                />
+              ) : null}
+            </MapContainer>
+          </section>
+
+          <aside className="victim-tracking-side">
+            {!assignmentId ? (
+              <p className="victim-waiting-note">
+                Đang chờ hệ thống phân công đội cứu hộ gần bạn...
+              </p>
+            ) : null}
+
+            <div className="victim-metric-grid">
+              <article>
+                <p>Khoảng cách</p>
+                <strong>{displayDistance != null ? `${Number(displayDistance).toFixed(2)} km` : "—"}</strong>
+              </article>
+              <article>
+                <p>Dự kiến đến</p>
+                <strong>{displayEta != null ? `${displayEta} phút` : "—"}</strong>
+              </article>
+              <article>
+                <p>Đội cứu hộ</p>
+                <strong>{rescueName}</strong>
+              </article>
+              <article>
+                <p>Địa điểm</p>
+                <strong>{destination}</strong>
+              </article>
+            </div>
+
+            <div className="victim-timeline">
+              <h3>Quá trình xử lý</h3>
+              {Array.isArray(tracking?.stage_history) && tracking.stage_history.length > 0 ? (
+                <ul>
+                  {tracking.stage_history.map((h, i) => (
+                    <li key={`${h.stage || "stage"}-${i}`}>
+                      <span className="victim-stage-label">{STAGE_VI[h.stage] || h.stage}</span>
+                      <span className="victim-stage-time">
+                        {h.started_at ? new Date(h.started_at).toLocaleString("vi-VN") : "—"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="victim-empty-stage">Chưa có cập nhật tiến trình</p>
+              )}
+            </div>
+
+            <button
+              type="button"
+              className="victim-refresh-btn"
+              onClick={handleRefresh}
+              disabled={refreshing}
+            >
+              {refreshing ? "Đang làm mới" : "Làm mới dữ liệu"}
+            </button>
+          </aside>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="tracking-page-root">
       {toast ? <div className="tracking-toast">{toast}</div> : null}
 
-      <header className="tracking-page-topbar">
-        <div>
-          <h1>Theo dõi cứu hộ</h1>
-          <div className="tracking-page-meta">
-            {persona === "victim" ? (
-              <span className="tracking-badge victim">Nạn nhân</span>
-            ) : null}
-            {persona === "rescue" ? (
-              <span className="tracking-badge rescue">Cứu hộ</span>
-            ) : null}
-            <span>
-              Giai đoạn: <strong style={{ color: "#58a6ff" }}>{stageLabel}</strong>
-            </span>
-            {displayDistance != null ? (
-              <span> · Còn ~{Number(displayDistance).toFixed(2)} km</span>
-            ) : null}
-            {displayEta != null ? (
-              <span> · ETA ~{displayEta} phút</span>
-            ) : null}
-          </div>
-        </div>
-        <Link to={persona === "rescue" ? "/responder" : "/sos"} className="tracking-back-btn">
-          {persona === "rescue" ? "Về bảng nhiệm vụ" : "Về SOS"}
-        </Link>
-      </header>
+      <div className="tracking-container">
+        <p className="tracking-context-title">
+          {persona === "rescue" ? "Đội cứu trợ - Đang hỗ trợ" : "Theo dõi cứu hộ"}
+        </p>
 
-      <div className="tracking-page-body" style={{ flex: 1, minHeight: 0 }}>
-        <div className="tracking-map-wrap">
-          <MapContainer
-            center={center}
-            zoom={14}
-            style={{ width: "100%", height: "100%" }}
-            scrollWheelZoom
-          >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            <FitBounds
-              points={[
-                ...(victimPt ? [[victimPt.lat, victimPt.lng]] : []),
-                ...(rescuePt ? [[rescuePt.lat, rescuePt.lng]] : []),
-              ]}
-            />
-
-            {victimPt ? (
-              <Marker position={[victimPt.lat, victimPt.lng]} icon={victimIcon}>
-                <Popup>Nạn nhân</Popup>
-              </Marker>
-            ) : null}
-
-            {rescuePt ? (
-              <Marker position={[rescuePt.lat, rescuePt.lng]} icon={rescueIcon}>
-                <Popup>Đội cứu hộ · {tracking?.rescue_name || ""}</Popup>
-              </Marker>
-            ) : null}
-
-            {routeCoords.length >= 2 ? (
-              <Polyline
-                positions={routeCoords}
-                color="#58a6ff"
-                weight={4}
-                opacity={0.85}
-                dashArray={null}
+        <div className="tracking-workspace">
+          <section className="tracking-map-wrap">
+            <MapContainer
+              center={center}
+              zoom={14}
+              style={{ width: "100%", height: "100%" }}
+              scrollWheelZoom
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-            ) : null}
-          </MapContainer>
-        </div>
+              <FitBounds
+                points={[
+                  ...(victimPt ? [[victimPt.lat, victimPt.lng]] : []),
+                  ...(rescuePt ? [[rescuePt.lat, rescuePt.lng]] : []),
+                ]}
+              />
 
-        <aside className="tracking-side-panel">
-          {!assignmentId ? (
-            <p style={{ margin: 0, color: "#8b949e" }}>
-              Đang chờ hệ thống phân công đội cứu hộ gần bạn…
-            </p>
-          ) : null}
+              {victimPt ? (
+                <Marker position={[victimPt.lat, victimPt.lng]} icon={victimIcon}>
+                  <Popup>Nạn nhân</Popup>
+                </Marker>
+              ) : null}
 
-          <div className="tracking-metrics">
-            <div className="tracking-metric">
-              <span>Khoảng cách</span>
-              <strong>
-                {displayDistance != null
-                  ? `${Number(displayDistance).toFixed(2)} km`
-                  : "—"}
-              </strong>
-            </div>
-            <div className="tracking-metric">
-              <span>ETA</span>
-              <strong>
-                {displayEta != null
-                  ? `${displayEta} phút`
-                  : "—"}
-              </strong>
-            </div>
-            <div className="tracking-metric">
-              <span>Đội cứu hộ</span>
-              <strong>{tracking?.rescue_name || "—"}</strong>
-            </div>
-            <div className="tracking-metric">
-              <span>Nạn nhân</span>
-              <strong>{tracking?.victim_name || "—"}</strong>
-            </div>
-          </div>
+              {rescuePt ? (
+                <Marker position={[rescuePt.lat, rescuePt.lng]} icon={rescueIcon}>
+                  <Popup>Đội cứu hộ · {tracking?.rescue_name || ""}</Popup>
+                </Marker>
+              ) : null}
 
-          {/* Nearest Rescue Teams Section */}
-          {nearestRescues.length > 0 && (
-            <div className="tracking-nearest-rescues">
-              <h3>Đội cứu hộ gần nhất</h3>
-              {loadingNearestRescues ? (
-                <p style={{ fontSize: 12, color: "#8b949e" }}>Đang tìm kiếm…</p>
-              ) : (
-                <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                  {nearestRescues.slice(0, 3).map((team, i) => (
-                    <li
-                      key={team._id || i}
-                      style={{
-                        padding: "8px 0",
-                        borderBottom: i < Math.min(2, nearestRescues.length - 1) ? "1px solid #30363d" : "none",
-                      }}
-                    >
-                      <div style={{ fontWeight: 600, fontSize: 13 }}>
-                        {team.full_name}
-                      </div>
-                      <div style={{ fontSize: 12, color: "#8b949e", marginTop: 2 }}>
-                        {team.profile?.address || team.address || "—"}
-                      </div>
-                      <div style={{ fontSize: 12, color: "#58a6ff", marginTop: 2 }}>
-                        Khoảng cách: {Number(team.distance_km).toFixed(2)} km
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
+              {rescuePt && victimPt ? (
+                <Polyline
+                  positions={[
+                    [rescuePt.lat, rescuePt.lng],
+                    [victimPt.lat, victimPt.lng],
+                  ]}
+                  color="#4f46e5"
+                  weight={3}
+                  opacity={0.7}
+                  dashArray="6,8"
+                />
+              ) : null}
 
-          <div className="tracking-timeline">
-            <h3>Quá trình</h3>
-            <ul>
-              {(tracking?.stage_history || []).map((h, i) => (
-                <li key={i}>
-                  <span
-                    className="tracking-dot"
-                    style={{ background: "#58a6ff" }}
-                  />
-                  <div>
-                    <div style={{ fontWeight: 700 }}>
-                      {STAGE_VI[h.stage] || h.stage}
-                    </div>
-                    {h.started_at ? (
-                      <div style={{ fontSize: 12, color: "#8b949e" }}>
-                        {new Date(h.started_at).toLocaleString("vi-VN")}
-                      </div>
-                    ) : null}
+              {routeCoords.length >= 2 ? (
+                <Polyline
+                  positions={routeCoords}
+                  color="#3847ff"
+                  weight={3.5}
+                  opacity={0.8}
+                />
+              ) : null}
+            </MapContainer>
+          </section>
+
+          <aside className="tracking-side-panel">
+            <div className="tracking-chip-row">
+              <span className="tracking-chip-code">{sosCode}</span>
+              <span className="tracking-chip-status">Đang thực hiện</span>
+            </div>
+
+            <h1 className="tracking-panel-title">Theo dõi cứu trợ</h1>
+            <p className="tracking-panel-subtitle">Thông tin cập nhật thời gian thực</p>
+
+            <div className="tracking-stepper" aria-label="Quy trình cứu hộ">
+              {STAGE_STEPS.map((step, index) => {
+                const done = index < stepIndex;
+                const active = index === stepIndex;
+                return (
+                  <div
+                    key={step}
+                    className={`tracking-step-item ${done ? "is-done" : ""} ${active ? "is-active" : ""}`}
+                  >
+                    <span className="tracking-step-dot">{done ? <Check size={11} /> : <span />}</span>
+                    <span>{step}</span>
                   </div>
-                </li>
-              ))}
-            </ul>
-          </div>
+                );
+              })}
+            </div>
 
-          <p style={{ fontSize: 12, color: "#6e7681", marginTop: 12 }}>
-            Bản đồ cập nhật theo vị trí GPS (nạn nhân và cứu hộ). Đường màu xanh
-            là tuyến đường đi ngắn nhất theo OSRM.
-          </p>
-        </aside>
+            <div className="tracking-kpi-grid">
+              <article className="tracking-kpi-card distance">
+                <p>Khoảng cách</p>
+                <strong>{displayDistance != null ? `${Number(displayDistance).toFixed(2)} km` : "—"}</strong>
+              </article>
+              <article className="tracking-kpi-card eta">
+                <p>Dự kiến đến</p>
+                <strong>{displayEta != null ? `${displayEta} phút` : "—"}</strong>
+              </article>
+            </div>
+
+            <article className="tracking-info-card">
+              <div className="tracking-info-head">
+                <LocateFixed size={14} />
+                <span>Địa điểm cứu trợ</span>
+              </div>
+              <p>{destination}</p>
+            </article>
+
+            <article className="tracking-info-card tracking-inline-row">
+              <div>
+                <p className="tracking-inline-label">Sự cố</p>
+                <strong>{incidentName}</strong>
+              </div>
+              <span className={`tracking-severity-pill ${severity.className}`}>{severity.label}</span>
+            </article>
+
+            <article className="tracking-contact-card">
+              <div>
+                <p>Đội cứu trợ</p>
+                <strong>{rescueName}</strong>
+              </div>
+              <a href={rescuePhone !== "—" ? `tel:${rescuePhone}` : undefined} className="tracking-icon-btn" aria-label="Gọi đội cứu trợ">
+                <Phone size={14} />
+              </a>
+            </article>
+
+            <article className="tracking-contact-card">
+              <div>
+                <p>Người gặp nạn</p>
+                <strong>{victimPhone}</strong>
+              </div>
+              <button type="button" className="tracking-icon-btn" aria-label="Nhắn tin người gặp nạn">
+                <MessageSquare size={14} />
+              </button>
+            </article>
+
+            <div className="tracking-action-row">
+              <button
+                type="button"
+                className="tracking-arrived-btn"
+                onClick={handleArrivedSupport}
+                disabled={
+                  arriving ||
+                  !assignmentId ||
+                  stageKey === "RESCUING" ||
+                  stageKey === "COMPLETED" ||
+                  stageKey === "CANCELLED"
+                }
+              >
+                {stageKey === "RESCUING" ? "Đang hỗ trợ" : (arriving ? "Đang cập nhật" : "Đã tới")}
+              </button>
+
+              <button
+                type="button"
+                className="tracking-primary-btn"
+                onClick={handleCompleteMission}
+                disabled={completing || !assignmentId || stageKey === "COMPLETED" || stageKey === "CANCELLED"}
+              >
+                <RotateCw size={14} className={completing ? "spinning" : ""} />
+                {stageKey === "COMPLETED" ? "Đã hoàn thành" : (completing ? "Đang cập nhật" : "Hoàn thành")}
+              </button>
+
+              <Link to={cancelPath} className="tracking-secondary-btn danger">
+                <AlertTriangle size={14} /> Hủy
+              </Link>
+            </div>
+
+            {!assignmentId ? (
+              <p className="tracking-panel-note">Đang chờ hệ thống phân công đội cứu hộ gần bạn...</p>
+            ) : null}
+            <p className="tracking-panel-note">Giai đoạn hiện tại: {stageLabel}</p>
+          </aside>
+        </div>
       </div>
     </div>
   );

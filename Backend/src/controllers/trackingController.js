@@ -18,12 +18,7 @@ export const acceptMission = async (req, res) => {
       });
     }
 
-    // Update assignment
-    const assignment = await RescueAssignment.findByIdAndUpdate(
-      assignment_id,
-      { accepted_at: new Date() },
-      { new: true },
-    );
+    const assignment = await RescueAssignment.findById(assignment_id);
 
     if (!assignment) {
       return res.status(404).json({
@@ -38,6 +33,26 @@ export const acceptMission = async (req, res) => {
         message: "Bạn không phải đội được phân công cho nhiệm vụ này",
       });
     }
+
+    if (!assignment.accepted_at) {
+      assignment.accepted_at = new Date();
+    }
+
+    // Khi rescue bấm nhận: chuyển ngay sang MOVING để UI không còn hiển thị "Chờ nhận".
+    if (assignment.stage === "ASSIGNED") {
+      assignment.stage = "MOVING";
+      assignment.stage_history = Array.isArray(assignment.stage_history)
+        ? assignment.stage_history
+        : [];
+      assignment.stage_history.push({
+        stage: "MOVING",
+        started_at: new Date(),
+        distance_at_stage_km: assignment.current_distance_km || 0,
+        eta_minutes: assignment.eta_minutes || 0,
+      });
+    }
+
+    await assignment.save();
 
     // Get rescue info
     const rescue = await User.findById(rescue_id).select("full_name phone");

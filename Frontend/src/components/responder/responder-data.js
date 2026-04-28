@@ -4,37 +4,40 @@ export const REQUESTS = [
     level: "high",
     distanceKm: 0.5,
     receivedAt: "14:22",
-    title: "Yeu cau cuu tro",
-    description: "Can doi cuu tro tiep can nhanh",
+    title: "Yêu cầu cứu trợ",
+    victimName: "Nguyễn Văn An",
+    victimPhone: "+84 901 234 567",
+    incidentType: "Sức khỏe",
+    description: "Người dùng bị đau ngực và khó thở, cần hỗ trợ y tế khẩn cấp.",
     address: "69 Tran Duc Thong, TP Da Nang",
     etaMinutes: 4,
     coords: "10.7769° N, 106.7009° E",
-    recentAgo: "2 phut truoc",
+    recentAgo: "2 phút trước",
   },
 ];
 
 export const LEVEL_META = {
   high: { label: "CAO", className: "is-high", leftBorder: "#c7161f" },
-  medium: { label: "TRUNG BINH", className: "is-medium", leftBorder: "#916111" },
-  low: { label: "THAP", className: "is-low", leftBorder: "#0b8f70" },
+  medium: { label: "TRUNG BÌNH", className: "is-medium", leftBorder: "#916111" },
+  low: { label: "THẤP", className: "is-low", leftBorder: "#0b8f70" },
 };
 
 export const FLOATING_ALERTS = [
   {
     level: "high",
     tag: "CAO",
-    ago: "2 phut truoc",
-    title: "Can tiep can nhanh",
+    ago: "2 phút trước",
+    title: "Cần tiếp cận nhanh",
     description: "Khu vuc Son Tra • 1.5km",
-    actionLabel: "NHAN NGAY",
+    actionLabel: "NHẬN NGAY",
   },
   {
     level: "medium",
-    tag: "TRUNG BINH",
-    ago: "53 giay truoc",
-    title: "Ho tro giao thong",
+    tag: "TRUNG BÌNH",
+    ago: "53 giây trước",
+    title: "Hỗ trợ giao thông",
     description: "Hai Chau • 2.2km",
-    actionLabel: "NHAN NGAY",
+    actionLabel: "NHẬN NGAY",
   },
 ];
 
@@ -62,11 +65,21 @@ function extractAddressFromDescription(text) {
 
 function cleanDescription(text) {
   if (!text) return "";
-  return text
+  const cleaned = text
     .replace(/\[\s*dia\s*chi\s*:\s*[^\]]+\]/gi, "")
     .replace(/\[\s*Địa\s*chỉ\s*:\s*[^\]]+\]/gi, "")
     .replace(/\s+/g, " ")
     .trim();
+
+  // Realtime fallback text from socket payload is not a true cause description.
+  if (/^nạn nhân\s*:\s*\+?\d+/i.test(cleaned)) return "";
+  return cleaned;
+}
+
+function isPhoneLike(value) {
+  if (!value) return false;
+  const compact = String(value).replace(/\s+/g, "").trim();
+  return /^\+?\d{9,15}$/.test(compact) || /^nạnnhân:\+?\d{9,15}$/i.test(compact.toLowerCase());
 }
 
 function titleFromDescription(description, index) {
@@ -75,7 +88,7 @@ function titleFromDescription(description, index) {
     .map((x) => x.trim())
     .find(Boolean);
   if (firstSentence) return firstSentence.slice(0, 64);
-  return `Yeu cau cuu tro #${index + 1}`;
+  return `Yêu cầu cứu trợ #${index + 1}`;
 }
 
 function levelFromStatus(status) {
@@ -100,11 +113,11 @@ function formatReceivedAt(createdAt) {
 function formatRecentAgo(createdAt) {
   const time = createdAt ? new Date(createdAt).getTime() : Date.now();
   const diffSec = Math.max(1, Math.floor((Date.now() - time) / 1000));
-  if (diffSec < 60) return `${diffSec} giay truoc`;
+  if (diffSec < 60) return `${diffSec} giây trước`;
   const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin} phut truoc`;
+  if (diffMin < 60) return `${diffMin} phút trước`;
   const diffHour = Math.floor(diffMin / 60);
-  return `${diffHour} gio truoc`;
+  return `${diffHour} giờ trước`;
 }
 
 export function mapSosToResponderRequests(sosList, gps) {
@@ -122,31 +135,47 @@ export function mapSosToResponderRequests(sosList, gps) {
     const gpsLng = safeNumber(gps?.lng);
 
     const rawDescription = String(sos?.description || "").trim();
-    const address = sos?.address || extractAddressFromDescription(rawDescription) || "Chua co dia chi";
-    const description = cleanDescription(rawDescription) || "Can doi cuu tro den ho tro";
+    const address = sos?.address || extractAddressFromDescription(rawDescription) || "Chưa có địa chỉ";
+    const description = cleanDescription(rawDescription) || "Chưa có mô tả nguyên nhân";
+    const requestId = sos?._id ? String(sos._id) : `sos-${index}`;
+    const hasCoords = lat !== null && lng !== null;
+    const victim = sos?.victim_id;
+    const rawVictimName =
+      (typeof victim === "object" ? victim?.full_name : "") ||
+      sos?.victim_name ||
+      "";
+    const victimPhone =
+      (typeof victim === "object" ? victim?.phone : "") ||
+      (typeof victim === "object" ? victim?.auth?.phone : "") ||
+      sos?.victim_phone ||
+      "Chưa có số điện thoại";
+    const victimName = isPhoneLike(rawVictimName) ? "Người dùng SOS" : (rawVictimName || "Chưa rõ người dùng");
+    const incidentType =
+      (typeof sos?.incident_type === "object" ? sos?.incident_type?.name : "") ||
+      sos?.incident_type_name ||
+      "Khác";
 
     const distanceKm =
       lat !== null && lng !== null && gpsLat !== null && gpsLng !== null
         ? Number(haversineKm(gpsLat, gpsLng, lat, lng).toFixed(1))
-        : 0;
+        : null;
 
     const latText = lat !== null ? `${Math.abs(lat).toFixed(4)}° ${lat >= 0 ? "N" : "S"}` : "-";
     const lngText = lng !== null ? `${Math.abs(lng).toFixed(4)}° ${lng >= 0 ? "E" : "W"}` : "-";
-    
-    // Yêu cầu: "Nếu chưa ai nhận, không show chi tiết rescue name/location/distance/eta."
-    const status = String(sos?.status || "").toLowerCase();
-    const isPending = status === "pending";
 
     return {
-      id: sos?._id || `sos-${index}`,
+      id: requestId,
       level: levelFromStatus(sos?.status),
-      distanceKm: isPending ? null : distanceKm,
+      distanceKm,
       receivedAt: formatReceivedAt(sos?.created_at || sos?.createdAt),
-      title: isPending ? "Yêu cầu cứu hộ" : titleFromDescription(description, index),
-      description: isPending ? "Chi tiết nhiệm vụ sẽ được hiển thị sau khi nhận." : description,
-      address: isPending ? "Đang chờ cứu hộ tiếp nhận" : address,
-      etaMinutes: isPending ? null : etaFromDistance(distanceKm),
-      coords: isPending ? "Vị trí đang chờ..." : `${latText}, ${lngText}`,
+      title: "Yêu cầu cứu hộ",
+      victimName,
+      victimPhone,
+      incidentType,
+      description,
+      address,
+      etaMinutes: Number.isFinite(distanceKm) ? etaFromDistance(distanceKm) : null,
+      coords: hasCoords ? `${latText}, ${lngText}` : "Chưa có tọa độ mục tiêu",
       recentAgo: formatRecentAgo(sos?.created_at || sos?.createdAt),
       source: sos,
     };

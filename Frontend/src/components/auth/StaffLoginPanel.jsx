@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ShieldCheck, Mail, LockKeyhole, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { Mail, LockKeyhole, Eye, EyeOff, ArrowRight } from "lucide-react";
+import staffLogo from "@/assets/logorescue.svg";
 import "./staff-login.css";
 
 export default function StaffLoginPanel({ onSubmit, loading, errorMessage }) {
@@ -20,16 +21,13 @@ export default function StaffLoginPanel({ onSubmit, loading, errorMessage }) {
       <div className="staff-auth-shell">
         <section className="staff-auth-card">
           <div className="staff-brand">
-            <div className="staff-brand-icon">
-              <ShieldCheck size={24} strokeWidth={2.2} />
-            </div>
-            <h1>He thong cuu tro</h1>
+            <img className="staff-brand-logo" src={staffLogo} alt="Logo hệ thống cứu trợ" />
           </div>
 
-          <h2 className="staff-auth-title">Dang nhap he thong</h2>
-          <p className="staff-auth-subtitle">Bang dieu khien danh cho Quan tri vien - Doi cuu tro -</p>
+          <h2 className="staff-auth-title">Đăng nhập hệ thống</h2>
+          <p className="staff-auth-subtitle">Bảng điều khiển dành cho Quản trị viên và Đội cứu trợ.</p>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} className="staff-auth-form">
             <label className="staff-auth-label" htmlFor="staff-login-email">Email</label>
             <div className="staff-auth-field">
               <Mail size={18} />
@@ -44,7 +42,7 @@ export default function StaffLoginPanel({ onSubmit, loading, errorMessage }) {
               />
             </div>
 
-            <label className="staff-auth-label" htmlFor="staff-login-password">Mat khau</label>
+            <label className="staff-auth-label" htmlFor="staff-login-password">Mật khẩu</label>
             <div className="staff-auth-field">
               <LockKeyhole size={18} />
               <input
@@ -54,13 +52,13 @@ export default function StaffLoginPanel({ onSubmit, loading, errorMessage }) {
                 required
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder="Nhap mat khau"
+                placeholder="Nhập mật khẩu"
               />
               <button
                 className="staff-toggle-password"
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
-                aria-label={showPassword ? "An mat khau" : "Hien thi mat khau"}
+                aria-label={showPassword ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"}
               >
                 {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
               </button>
@@ -74,33 +72,33 @@ export default function StaffLoginPanel({ onSubmit, loading, errorMessage }) {
                   checked={remember}
                   onChange={(event) => setRemember(event.target.checked)}
                 />
-                Ghi nho mat khau
+                Ghi nhớ mật khẩu
               </label>
               <button className="staff-forgot-link" type="button">
-                Quen mat khau?
+                Quên mật khẩu?
               </button>
             </div>
 
             {errorMessage ? <p className="staff-auth-error">{errorMessage}</p> : null}
 
             <button className="staff-auth-submit" type="submit" disabled={loading}>
-              {loading ? "Dang xu ly..." : (
+              {loading ? "Đang xử lý..." : (
                 <span className="staff-submit-inner">
-                  Dang nhap <ArrowRight size={24} style={{ verticalAlign: "-3px" }} />
+                  Đăng nhập <ArrowRight size={20} />
                 </span>
               )}
             </button>
           </form>
 
           <div className="staff-auth-divider" />
-          <p style={{ margin: "0 0 12px", fontSize: 13, textAlign: "center" }}>
-            <Link to="/sos" style={{ color: "#2563eb", fontWeight: 600 }}>
+          <p className="staff-auth-sos-link">
+            <Link to="/sos">
               ← Trang SOS (nạn nhân)
             </Link>
           </p>
           <div className="staff-auth-footer">
-            <div>Ban gap van de khi truy cap?</div>
-            <button type="button">Lien he ky thuat he thong</button>
+            <div>Bạn gặp vấn đề khi truy cập?</div>
+            <button type="button">Liên hệ kỹ thuật hệ thống</button>
           </div>
         </section>
       </div>

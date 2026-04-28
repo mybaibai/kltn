@@ -7,6 +7,8 @@ import AdminTrackingPage from '@/page/AdminPage/AdminTrackingPage';
 import AdminPlaceholder from '@/page/AdminPage/AdminPlaceholder';
 import StaffLoginPage from '@/page/StaffLoginPage';
 import ResponderPage from '@/page/ResponderPage';
+import ResponderTeamInfoPage from '@/page/ResponderTeamInfoPage';
+import ResponderTeamEditPage from '@/page/ResponderTeamEditPage';
 import { StaffLoginGate, StaffRoleGuard, StaffHomeRedirect } from '@/components/auth/AuthGuards';
 import { STAFF_ROLE_ADMIN, STAFF_ROLE_RESCUE } from '@/services/auth/session';
 
@@ -18,7 +20,7 @@ export default function App() {
         <Route path="/sos" element={<SosPage />} />
         <Route path="/SosPage" element={<Navigate to="/sos" replace />} />
         <Route path="/sospage" element={<Navigate to="/sos" replace />} />
-        <Route path="/tracking/:sosId" element={<TrackingPage />} />
+        <Route path="/tracking/:sosId" element={<TrackingPage mode="victim" />} />
         <Route
           path="/staff-login"
           element={(
@@ -48,6 +50,30 @@ export default function App() {
           element={(
             <StaffRoleGuard allowRoles={[STAFF_ROLE_RESCUE]}>
               <ResponderPage />
+            </StaffRoleGuard>
+          )}
+        />
+        <Route
+          path="/responder/tracking/:sosId"
+          element={(
+            <StaffRoleGuard allowRoles={[STAFF_ROLE_RESCUE]}>
+              <TrackingPage mode="rescue" />
+            </StaffRoleGuard>
+          )}
+        />
+        <Route
+          path="/responder/team-info"
+          element={(
+            <StaffRoleGuard allowRoles={[STAFF_ROLE_RESCUE]}>
+              <ResponderTeamInfoPage />
+            </StaffRoleGuard>
+          )}
+        />
+        <Route
+          path="/responder/team-info/edit"
+          element={(
+            <StaffRoleGuard allowRoles={[STAFF_ROLE_RESCUE]}>
+              <ResponderTeamEditPage />
             </StaffRoleGuard>
           )}
         />
