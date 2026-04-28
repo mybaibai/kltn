@@ -186,6 +186,7 @@ function ReportRow({ title, date, size, onDownload }) {
 export default function DashboardPage() {
   const [allSos, setAllSos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [trendWindow, setTrendWindow] = useState('this_week');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -361,21 +362,32 @@ export default function DashboardPage() {
     setDonutHover(null);
   }, []);
 
-  const trendData = useMemo(() => {
+  const trendSeries = useMemo(() => {
     const dayLabels = ['THỨ 2', 'THỨ 3', 'THỨ 4', 'THỨ 5', 'THỨ 6', 'THỨ 7', 'CHỦ NHẬT'];
-    const counts = Array(7).fill(0);
+    const thisWeekCounts = Array(7).fill(0);
+    const prevWeekCounts = Array(7).fill(0);
     const now = new Date();
     allSos.forEach((s) => {
       if (!s.created_at) return;
       const diff = now - new Date(s.created_at);
-      if (diff < 0 || diff > 7 * 24 * 60 * 60 * 1000) return;
+      if (diff < 0 || diff > 14 * 24 * 60 * 60 * 1000) return;
       const daysAgo = Math.floor(diff / (24 * 60 * 60 * 1000));
-      const idx = 6 - daysAgo;
-      if (idx >= 0 && idx < 7) counts[idx] += 1;
+      if (daysAgo <= 6) {
+        const idxThisWeek = 6 - daysAgo;
+        if (idxThisWeek >= 0 && idxThisWeek < 7) thisWeekCounts[idxThisWeek] += 1;
+      } else {
+        const idxPrevWeek = 13 - daysAgo;
+        if (idxPrevWeek >= 0 && idxPrevWeek < 7) prevWeekCounts[idxPrevWeek] += 1;
+      }
     });
-    const max = Math.max(...counts, 1);
-    return counts.map((c, i) => ({ label: dayLabels[i], count: c, height: (c / max) * 100 }));
+    const max = Math.max(...thisWeekCounts, ...prevWeekCounts, 1);
+    return {
+      this_week: thisWeekCounts.map((c, i) => ({ label: dayLabels[i], count: c, height: (c / max) * 100 })),
+      prev_week: prevWeekCounts.map((c, i) => ({ label: dayLabels[i], count: c, height: (c / max) * 100 })),
+    };
   }, [allSos]);
+
+  const activeTrendData = trendWindow === 'prev_week' ? trendSeries.prev_week : trendSeries.this_week;
 
   const recentReports = useMemo(() => {
     const now = new Date();
@@ -414,7 +426,7 @@ export default function DashboardPage() {
         />
         <StatCard
           icon={<AlertTriangle className="size-6" />}
-          title="Đang hoạt động"
+          title="Sự cố đang hoạt động"
           value={loading ? '—' : stats.active.toLocaleString('vi-VN')}
           trend={stats.trendPercent > 0 ? `+${stats.trendPercent}% so với tuần trước` : stats.trendPercent < 0 ? `${stats.trendPercent}% so với tuần trước` : null}
           color="yellow"
@@ -439,31 +451,41 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Xu hướng sự cố theo thời gian */}
         <div className="rounded-2xl border border-[#E8E8EC] bg-white p-6 shadow-sm lg:col-span-2">
-          <div className="mb-5 flex items-center justify-between">
+          <div className="mb-5">
             <div>
               <h2 className="text-lg font-bold text-gray-900">Xu hướng sự cố theo thời gian</h2>
-              <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
-                <span className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-full bg-blue-600" />
-                  Tuần nay
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-full bg-gray-300" />
-                  Tuần trước
-                </span>
+              <div className="mt-2 flex items-center gap-5 text-xs text-gray-600">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="radio"
+                    name="trend-window"
+                    checked={trendWindow === 'this_week'}
+                    onChange={() => setTrendWindow('this_week')}
+                    className="size-3.5 accent-blue-600"
+                  />
+                  <span className="gap-1.5">
+                    
+                    Tuần này
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="radio"
+                    name="trend-window"
+                    checked={trendWindow === 'prev_week'}
+                    onChange={() => setTrendWindow('prev_week')}
+                    className="size-3.5 accent-blue-600"
+                  />
+                  <span className="gap-1.5">
+                    
+                    Tuần trước
+                  </span>
+                </label>
               </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className="rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:bg-gray-50"
-              >
-                7 ngày qua
-              </button>
             </div>
           </div>
           <div className="flex h-48 items-end justify-between gap-2">
-            {trendData.map((d, i) => (
+            {activeTrendData.map((d, i) => (
               <div key={i} className="flex flex-1 flex-col items-center gap-2">
                 <div className="relative w-full">
                   <div
