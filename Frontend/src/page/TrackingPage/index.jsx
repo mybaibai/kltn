@@ -37,25 +37,28 @@ import {
 } from "@/services/api/apiRouting";
 import { auth } from "@/lib/firebase";
 
+import Fire from '../../assets/fire.svg?react';
+import Compass from '../../assets/lost.svg?react';
+import Car from '../../assets/car.svg?react';    
+import PlusCircle from '../../assets/medical.svg?react';
+import Waves from '../../assets/wave.svg?react';
+import MoreHorizontal from '../../assets/more.svg?react'; 
 // Custom Icon Renderer using divIcon for premium look
-const createCustomIcon = (bgColor, iconColor, pulse = false) => {
+const createCustomIcon = () => {
   return L.divIcon({
-    className: 'custom-div-icon',
+    className: 'victim-marker-icon', 
     html: `
-      <div class="marker-container ${pulse ? 'pulse-animation' : ''}" style="background-color: ${bgColor};">
-        <div class="marker-inner" style="color: ${iconColor};">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
-          </svg>
-        </div>
+      <div class="victim-wrapper">
+        <div class="ripple ripple-1"></div>
+        <div class="ripple ripple-2"></div>
+        <div class="ripple ripple-3"></div>
+        <div class="victim-dot"></div>
       </div>
     `,
-    iconSize: [44, 44],
-    iconAnchor: [22, 44],
-    popupAnchor: [0, -40],
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
   });
 };
-
 const victimIcon = createCustomIcon('#ff4d4f', '#ffffff', true); // Red + Pulse
 const rescueIcon = createCustomIcon('#2f54eb', '#ffffff', false); // Blue
 
@@ -140,24 +143,6 @@ function SmoothMarker({ position, icon, children }) {
 
 // Custom Style for smooth transitions and premium markers
 const mapStyles = `
-  .marker-container {
-    width: 44px;
-    height: 44px;
-    border-radius: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 8px 15px rgba(0,0,0,0.2);
-    border: 3px solid white;
-    transform: rotate(-45deg);
-    border-bottom-left-radius: 2px;
-  }
-  .marker-inner {
-    transform: rotate(45deg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
   .pulse-animation::after {
     content: '';
     position: absolute;
@@ -210,13 +195,13 @@ const PRIORITY_CONFIG = {
   LOW:    { label: 'Thấp',            color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' },
 };
 
-const INCIDENT_LABEL = {
-  vehicle: 'Sự cố phương tiện',
-  fire:    'Cháy nổ',
-  medical: 'Sức khỏe khẩn cấp',
-  natural: 'Thiên tai',
-  lost:    'Lạc đường',
-  other:   'Khác',
+const INCIDENT_META = {
+  vehicle: { label: 'Sự cố phương tiện', icon: Car },
+  fire:    { label: 'Cháy nổ', icon: Fire },
+  medical: { label: 'Sức khỏe', icon: PlusCircle },
+  natural: { label: 'Thiên tai', icon: Waves },
+  lost:    { label: 'Lạc đường', icon: Compass },
+  other:   { label: 'Khác', icon: MoreHorizontal },
 };
 
 // --- Helpers ---
@@ -291,6 +276,7 @@ function StepIcon({ state }) {
 
 // --- Main Components ---
 export default function TrackingPage() {
+  const [showCancelModal, setShowCancelModal] = useState(false);
   const { sosId } = useParams();
   const navigate = useNavigate();
 
@@ -331,11 +317,16 @@ export default function TrackingPage() {
     return !!(victimUser);
   }, [victimUser, staffUser]);
 
-  const incidentLabel = useMemo(() => {
-    const it = sos?.incident_type;
-    if (typeof it === 'object' && it?.name) return it.name;
-    return INCIDENT_LABEL[it] || it || 'CHƯA PHÂN LOẠI';
-  }, [sos]);
+  const getKeyFromLabel = (label) => {
+    return Object.keys(INCIDENT_META).find(
+      (k) => INCIDENT_META[k].label.toLowerCase() === label?.toLowerCase()
+    );
+  };
+  
+  const it = sos?.incident_type;
+  const name = typeof it === "object" ? it?.name : it;
+  const key = getKeyFromLabel(name) || "other";
+  const Icon = INCIDENT_META[key].icon;
 
   // Actions
   const loadTracking = useCallback(async (aid, victimMode) => {
@@ -347,16 +338,15 @@ export default function TrackingPage() {
   }, []);
 
   const handleCancelRequest = async () => {
-    if (window.confirm("Bạn có chắc chắn muốn huỷ yêu cầu cứu trợ này?")) {
-       navigate('/');
-    }
-  };
+    setShowCancelModal(false);
+    navigate('/');
+  };  
 
   // Effects: Initial Load
   useEffect(() => {
     if (!sosId) return;
     let active = true;
-
+  
     async function fetchData() {
       try {
         const res = await getSosDetail(sosId, { preferVictimToken });
@@ -370,16 +360,26 @@ export default function TrackingPage() {
         setSos(data);
         const aid = data.assignment?._id;
         if (aid) setAssignmentId(aid);
-
-        // Detect Persona
+  
         const vid = data.victim_id?._id || data.victim_id;
         const rid = data.assignment?.rescue_id;
-        if (victimUser && vid && String(victimUser._id) === String(vid)) setPersona("victim");
-        else if (staffUser && (String(staffUser._id) === String(rid) || String(staffUser._id) === String(data.assigned_rescue_id))) setPersona("rescue");
-
-        if (aid) {
-          await loadTracking(aid, persona === "victim");
+  
+        let detectedPersona = "observer";
+        if (victimUser && vid && String(victimUser._id) === String(vid)) {
+          detectedPersona = "victim";
+        } else if (staffUser && (
+          String(staffUser._id) === String(rid) ||
+          String(staffUser._id) === String(data.assigned_rescue_id)
+        )) {
+          detectedPersona = "rescue";
         }
+        setPersona(detectedPersona);
+  
+        if (aid) {
+          await loadTracking(aid, detectedPersona === "victim");
+        }
+  
+        if (!active) return; // check lần 2 sau await
         setLoading(false);
       } catch (e) {
         if (!active) return;
@@ -387,10 +387,13 @@ export default function TrackingPage() {
         setLoading(false);
       }
     }
+  
     fetchData();
     const poll = setInterval(fetchData, 8000);
     return () => { active = false; clearInterval(poll); };
-  }, [sosId, preferVictimToken, victimUser, staffUser, persona, loadTracking]);
+  
+    // ❌ Bỏ persona khỏi đây — persona được set BÊN TRONG effect, không phải input
+  }, [sosId, preferVictimToken, victimUser, staffUser, loadTracking]);
 
   // Socket Tracking
   useEffect(() => {
@@ -544,7 +547,7 @@ export default function TrackingPage() {
           <div className="absolute bottom-6 left-6 z-[1000] flex flex-col gap-3">
              <button 
                 onClick={() => setIsMocking(!isMocking)}
-                className={`flex items-center gap-3 px-5 py-3 rounded-2xl text-xs font-black shadow-2xl backdrop-blur-xl transition-all border border-white/20 ${isMocking ? 'bg-indigo-600 text-white' : 'bg-white/95 text-gray-900'}`}
+                className={`flex items-center gap-3 px-5 py-3 rounded-2xl text-xs font-bold shadow-2xl backdrop-blur-xl transition-all border border-white/20 ${isMocking ? 'bg-indigo-600 text-white' : 'bg-white/95 text-gray-900'}`}
              >
                 <div className={`w-2 h-2 rounded-full ${isMocking ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`} />
                 {isMocking ? 'MOCKING ACTIVE' : 'SIMULATE POSITION'}
@@ -557,7 +560,7 @@ export default function TrackingPage() {
                         else { await startSimulation(assignmentId, 70); setBotRunning(true); }
                      } catch (e) { alert(e.message); }
                   }}
-                  className={`flex items-center gap-3 px-5 py-3 rounded-2xl text-xs font-black shadow-2xl transition-all ${botRunning ? 'bg-rose-600 text-white animate-pulse' : 'bg-emerald-600 text-white'}`}
+                  className={`flex items-center gap-3 px-5 py-3 rounded-2xl text-xs font-bold shadow-2xl transition-all ${botRunning ? 'bg-rose-600 text-white animate-pulse' : 'bg-emerald-600 text-white'}`}
                >
                   {botRunning ? <Loader2 size={16} className="animate-spin" /> : '🤖'}
                   {botRunning ? 'BOT IS RUNNING (70KM/H)' : 'RUN BOT (70KM/H)'}
@@ -573,19 +576,19 @@ export default function TrackingPage() {
         {/* SIDEBAR HEADER */}
         <div className="p-6 bg-gradient-to-br from-gray-900 to-gray-800 text-white shrink-0">
           <div className="flex justify-between items-start mb-6">
-            <div className="px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-xl border border-white/10 text-[10px] font-black tracking-widest uppercase">
+            <div className="px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-xl border border-white/10 text-[10px] font-bold tracking-wider uppercase">
               {requestCode}
             </div>
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${isCancelled ? 'bg-gray-500/20 text-gray-300' : isResolved ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400 animate-pulse'}`}>
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider ${isCancelled ? 'bg-gray-500/20 text-gray-300' : isResolved ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400 animate-pulse'}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${isCancelled ? 'bg-gray-400' : isResolved ? 'bg-emerald-400' : 'bg-amber-400'}`} />
               {isCancelled ? 'Đã huỷ' : isResolved ? 'Hoàn thành' : 'Đang thực hiện'}
             </div>
           </div>
           
-          <h1 className="text-2xl font-black leading-tight tracking-tight mb-2">
+          <h1 className="text-2xl font-bold leading-tight mb-2">
             Theo dõi cứu trợ
           </h1>
-          <p className="text-white/60 text-xs font-medium uppercase tracking-wider">
+          <p className="text-white/60 text-[11px] font-medium uppercase tracking-widest">
             {isResolved ? 'Nhiệm vụ đã kết thúc' : 'Thông tin cập nhật thời gian thực'}
           </p>
         </div>
@@ -602,7 +605,7 @@ export default function TrackingPage() {
               {STEPS.map((step, idx) => (
                 <div key={step.key} className="flex flex-col items-center gap-3 z-10">
                   <StepIcon state={idx < currentStep ? 'done' : idx === currentStep ? 'active' : 'inactive'} />
-                  <span className={`text-[10px] font-black text-center max-w-[64px] uppercase tracking-tighter ${idx <= currentStep ? 'text-gray-900' : 'text-gray-300'}`}>
+                  <span className={`text-[10px] font-bold text-center max-w-[64px] uppercase tracking-normal leading-tight ${idx <= currentStep ? 'text-slate-900' : 'text-slate-300'}`}>
                     {step.label}
                   </span>
                 </div>
@@ -615,18 +618,18 @@ export default function TrackingPage() {
             <div className="p-6 grid grid-cols-2 gap-4">
               <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-3xl p-5 text-white shadow-xl shadow-indigo-100 relative overflow-hidden group">
                 <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700" />
-                <p className="text-[10px] font-black opacity-70 uppercase tracking-widest mb-1">Khoảng cách</p>
+                <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest mb-1">Khoảng cách</p>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-black">{tracking?.distance_km ? Number(tracking.distance_km).toFixed(2) : '—'}</span>
-                  <span className="text-xs font-black opacity-70">KM</span>
+                  <span className="text-3xl font-extrabold">{tracking?.distance_km ? Number(tracking.distance_km).toFixed(2) : '—'}</span>
+                  <span className="text-xs font-bold opacity-70">KM</span>
                 </div>
               </div>
               <div className="bg-gradient-to-br from-fuchsia-500 to-fuchsia-600 rounded-3xl p-5 text-white shadow-xl shadow-fuchsia-100 relative overflow-hidden group">
                 <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700" />
-                <p className="text-[10px] font-black opacity-70 uppercase tracking-widest mb-1">Dự kiến (ETA)</p>
+                <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest mb-1">Dự kiến (ETA)</p>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-black">{tracking?.eta_minutes || '—'}</span>
-                  <span className="text-xs font-black opacity-70">PHÚT</span>
+                  <span className="text-3xl font-extrabold">{tracking?.eta_minutes || '—'}</span>
+                  <span className="text-xs font-bold opacity-70">PHÚT</span>
                 </div>
               </div>
             </div>
@@ -639,25 +642,28 @@ export default function TrackingPage() {
                 <MapPin size={22} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Địa điểm cứu trợ</p>
-                <p className="text-sm text-gray-800 font-bold leading-snug line-clamp-3 italic">"{sos.address || 'Đang xác định vị trí...'}"</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Địa điểm cứu trợ</p>
+                <p className="text-sm text-slate-800 font-semibold leading-relaxed">
+                  {sos.address || 'Đang xác định vị trí...'}
+                </p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white border border-gray-100 rounded-3xl p-5 flex flex-col items-center text-center group hover:bg-amber-50/30 transition-colors">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Sự cố</p>
-                <div className="px-4 py-2 bg-amber-50 text-amber-600 rounded-2xl text-[11px] font-black uppercase border border-amber-100">
-                  {incidentLabel}
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Sự cố</p>
+                <div className="flex items-center gap-1.5 px-4 py-2 bg-amber-50 text-amber-600 rounded-2xl text-[11px] font-bold uppercase border border-amber-100">
+                  <Icon className="w-3 h-3" />  
+                  {INCIDENT_META[key].label}
                 </div>
               </div>
               <div className="bg-white border border-gray-100 rounded-3xl p-5 flex flex-col items-center text-center group hover:bg-blue-50/30 transition-colors">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Đội cứu trợ</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Đội cứu trợ</p>
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs shadow-lg shadow-blue-100">
                     <Ambulance size={14} />
                   </div>
-                  <span className="text-xs font-black text-gray-800 truncate max-w-[80px]">
+                  <span className="text-xs font-bold text-slate-800 truncate max-w-[80px]">
                     {tracking?.rescue_name || 'ĐANG TÌM...'}
                   </span>
                 </div>
@@ -670,8 +676,8 @@ export default function TrackingPage() {
                   <img src={sos.victim_id?.profile?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${sos.victim_id?._id}`} className="w-full h-full object-cover" />
                </div>
                <div>
-                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-0.5">Người gặp nạn</p>
-                  <p className="text-sm font-black text-emerald-900">{sos.victim_id?.full_name}</p>
+                  <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-0.5">Người gặp nạn</p>
+                  <p className="text-sm font-bold text-emerald-900">{sos.victim_id?.full_name}</p>
                </div>
             </div>
           </div>
@@ -679,16 +685,71 @@ export default function TrackingPage() {
 
         {/* SIDEBAR FOOTER ACTION */}
         <div className="p-6 bg-white border-t border-gray-50 flex gap-3 shrink-0">
-          <button onClick={() => window.location.reload()} className="flex-1 py-4 bg-gray-900 text-white rounded-2xl font-black text-xs hover:bg-black transition-all shadow-xl shadow-gray-200">
+          <button onClick={() => window.location.reload()} className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold text-xs hover:bg-black transition-all shadow-xl shadow-gray-200 uppercase tracking-widest">
              LÀM MỚI
           </button>
           {!isResolved && !isCancelled && (
-            <button onClick={handleCancelRequest} className="px-6 py-4 border-2 border-rose-500 text-rose-600 rounded-2xl font-black text-xs hover:bg-rose-50 transition-all">
-               HUỶ
-            </button>
+            <button
+            onClick={() => setShowCancelModal(true)}
+            className="px-8 py-4 border-2 border-rose-500 text-rose-600 rounded-2xl font-bold text-xs hover:bg-rose-50 transition-all uppercase tracking-widest"
+          >
+            HUỶ
+          </button>
           )}
         </div>
       </div>
+      {/* CANCEL CONFIRMATION MODAL */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 backdrop-blur-[2px] p-4">
+          <div className="relative z-50 bg-white w-full max-w-[340px] rounded-[30px] p-6 shadow-2xl">
+            {/* Nút X đóng ở góc - Làm nhỏ lại */}
+            <button 
+              onClick={() => setShowCancelModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+        
+            {/* Icon Cảnh báo - Thu nhỏ từ w-20 xuống w-16 */}
+            <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center">
+              <svg className="w-8 h-8 text-rose-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+        
+            {/* Title - Giảm margin bottom */}
+            <h2 className="text-center text-[20px] font-bold text-slate-900 leading-tight mb-2 px-4">
+              Bạn có chắc muốn huỷ yêu cầu?
+            </h2>
+        
+            {/* Content - Giảm margin bottom từ mb-10 xuống mb-6 */}
+            <div className="text-center text-[14px] text-gray-500 leading-normal mb-7">
+              <p>Hành động này sẽ dừng quá trình cứu trợ.</p>
+              <p>Bạn có thể gửi lại yêu cầu sau.</p>
+            </div>
+        
+            {/* Actions - Giảm padding nút từ py-4 xuống py-3.5 */}
+            <div className="flex flex-col gap-2.5">
+              <button
+                onClick={handleCancelRequest}
+                className="w-full py-3.5 rounded-2xl bg-[#d93025] text-white font-bold text-[15px] flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-sm"
+              >
+                <span className="border-2 border-white/80 rounded-full w-4 h-4 flex items-center justify-center text-[8px] font-black">✕</span>
+                Huỷ yêu cầu
+              </button>
+        
+              <button
+                onClick={() => setShowCancelModal(false)}
+                className="w-full py-3.5 rounded-2xl bg-[#e8f1f8] text-slate-900 font-bold text-[15px] active:scale-[0.98] transition"
+              >
+                Quay lại
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

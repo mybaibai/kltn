@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, connectAuthEmulator } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -43,4 +44,22 @@ const disableForTesting =
   "true";
 if (devTesting || disableForTesting) {
   setAppVerificationDisabledForTesting();
+}
+
+let _authReady = false;
+let _authReadyPromise = null;
+
+export function waitForFirebaseAuth() {
+  if (_authReady) return Promise.resolve(auth.currentUser);
+  if (_authReadyPromise) return _authReadyPromise;
+
+  _authReadyPromise = new Promise((resolve) => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      _authReady = true;
+      unsub();
+      resolve(user);
+    });
+  });
+
+  return _authReadyPromise;
 }
