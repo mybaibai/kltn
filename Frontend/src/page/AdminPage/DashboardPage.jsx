@@ -367,17 +367,39 @@ export default function DashboardPage() {
     const thisWeekCounts = Array(7).fill(0);
     const prevWeekCounts = Array(7).fill(0);
     const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dayOfWeek = startOfToday.getDay(); // 0: CN, 1: T2 ... 6: T7
+    const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const startOfThisWeek = new Date(startOfToday);
+    startOfThisWeek.setDate(startOfThisWeek.getDate() - diffToMonday);
+    const startOfNextWeek = new Date(startOfThisWeek);
+    startOfNextWeek.setDate(startOfNextWeek.getDate() + 7);
+    const startOfPrevWeek = new Date(startOfThisWeek);
+    startOfPrevWeek.setDate(startOfPrevWeek.getDate() - 7);
+
+    const mapDateToWeekIndex = (dateObj) => {
+      const d = dateObj.getDay();
+      return d === 0 ? 6 : d - 1; // T2..CN => 0..6
+    };
+
     allSos.forEach((s) => {
       if (!s.created_at) return;
-      const diff = now - new Date(s.created_at);
-      if (diff < 0 || diff > 14 * 24 * 60 * 60 * 1000) return;
-      const daysAgo = Math.floor(diff / (24 * 60 * 60 * 1000));
-      if (daysAgo <= 6) {
-        const idxThisWeek = 6 - daysAgo;
-        if (idxThisWeek >= 0 && idxThisWeek < 7) thisWeekCounts[idxThisWeek] += 1;
-      } else {
-        const idxPrevWeek = 13 - daysAgo;
-        if (idxPrevWeek >= 0 && idxPrevWeek < 7) prevWeekCounts[idxPrevWeek] += 1;
+      const createdAt = new Date(s.created_at);
+      if (Number.isNaN(createdAt.getTime())) return;
+      const createdDay = new Date(
+        createdAt.getFullYear(),
+        createdAt.getMonth(),
+        createdAt.getDate(),
+      );
+
+      if (createdDay >= startOfThisWeek && createdDay < startOfNextWeek) {
+        const idx = mapDateToWeekIndex(createdDay);
+        thisWeekCounts[idx] += 1;
+        return;
+      }
+      if (createdDay >= startOfPrevWeek && createdDay < startOfThisWeek) {
+        const idx = mapDateToWeekIndex(createdDay);
+        prevWeekCounts[idx] += 1;
       }
     });
     const max = Math.max(...thisWeekCounts, ...prevWeekCounts, 1);
@@ -487,7 +509,10 @@ export default function DashboardPage() {
           <div className="flex h-48 items-end justify-between gap-2">
             {activeTrendData.map((d, i) => (
               <div key={i} className="flex flex-1 flex-col items-center gap-2">
-                <div className="relative w-full">
+                <div className="group relative w-full">
+                  <div className="pointer-events-none absolute -top-8 left-1/2 z-10 -translate-x-1/2 rounded-md bg-gray-900 px-2 py-1 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">
+                    {d.count} sự cố
+                  </div>
                   <div
                     className="w-full rounded-t-lg bg-blue-600 transition-all"
                     style={{ height: `${Math.max(d.height, 4)}px` }}
