@@ -363,14 +363,15 @@ export default function TrackingPage() {
         if (aid) setAssignmentId(aid);
   
         const vid = data.victim_id?._id || data.victim_id;
-        const rid = data.assignment?.rescue_id;
+        const rid = data.assignment?.rescue_id?._id || data.assignment?.rescue_id;
+        const assignedRid = data.assigned_rescue_id?._id || data.assigned_rescue_id;
   
         let detectedPersona = "observer";
         if (victimUser && vid && String(victimUser._id) === String(vid)) {
           detectedPersona = "victim";
         } else if (staffUser && (
           String(staffUser._id) === String(rid) ||
-          String(staffUser._id) === String(data.assigned_rescue_id)
+          String(staffUser._id) === String(assignedRid)
         )) {
           detectedPersona = "rescue";
         }
