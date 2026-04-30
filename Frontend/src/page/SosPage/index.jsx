@@ -542,7 +542,7 @@ export default function SosPage() {
           </div>
         {/* TOAST */}
         {toast && (
-          <div className="fixed top-50 left-1/2 -translate-x-1/2 z-[999999]">
+          <div className="fixed bottom-6 right-6 z-[999999]">
             <div className="bg-yellow-500 text-white px-4 py-3 rounded-xl shadow-xl animate-slide-in">
               {toast.msg}
             </div>

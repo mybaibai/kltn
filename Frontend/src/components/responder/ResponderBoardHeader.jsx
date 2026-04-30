@@ -23,7 +23,7 @@ export default function ResponderBoardHeader({
   const [openMenu, setOpenMenu] = useState(null);
   const topbarRef = useRef(null);
 
-  const notificationItems = [
+  const [notifications, setNotifications] = useState([
     {
       id: "n1",
       title: "Nhiệm vụ mới gần bạn",
@@ -45,8 +45,8 @@ export default function ResponderBoardHeader({
       time: "12 phút trước",
       unread: false,
     },
-  ];
-  const unreadCount = notificationItems.filter((item) => item.unread).length;
+  ]);
+  const unreadCount = notifications.filter((item) => item.unread).length;
 
   const proximityLabelMap = {
     nearest: "Gần nhất",
@@ -84,6 +84,16 @@ export default function ResponderBoardHeader({
 
   function toggleMenu(menuName) {
     setOpenMenu((prev) => (prev === menuName ? null : menuName));
+  }
+
+  function handleToggleNotifications() {
+    setOpenMenu((prev) => {
+      const next = prev === "notifications" ? null : "notifications";
+      if (next === "notifications") {
+        setNotifications((items) => items.map((item) => ({ ...item, unread: false })));
+      }
+      return next;
+    });
   }
 
   async function handleLogout() {
@@ -241,7 +251,7 @@ export default function ResponderBoardHeader({
             type="button"
             className="responder-bell-btn"
             aria-label="Thông báo"
-            onClick={() => toggleMenu("notifications")}
+            onClick={handleToggleNotifications}
             aria-expanded={openMenu === "notifications"}
             aria-haspopup="menu"
           >
@@ -251,7 +261,7 @@ export default function ResponderBoardHeader({
 
           {openMenu === "notifications" ? (
             <ul className="responder-notification-menu" role="menu" aria-label="Thông báo mới">
-              {notificationItems.map((item) => (
+              {notifications.map((item) => (
                 <li key={item.id} className={`responder-notification-item ${item.unread ? "is-unread" : ""}`}>
                   <div className="responder-notification-head">
                     <strong>{item.title}</strong>

@@ -7,7 +7,12 @@ import {
 } from "@/services/api/apiTeam";
 import { getAllSos, getSosDetail, assignTeam } from "@/services/api/apiSos";
 import { acceptMission } from "@/services/api/apiTracking";
-import { getSocket, initSocketFromSession } from "@/services/socket";
+import {
+  getSocket,
+  initSocket,
+  initSocketFromSession,
+  reinitSocketForTrackingPersona,
+} from "@/services/socket";
 import ResponderBoardHeader from "./ResponderBoardHeader";
 import ResponderRequestList from "./ResponderRequestList";
 import ResponderDetailPanel from "./ResponderDetailPanel";
@@ -37,6 +42,13 @@ export default function ResponderMissionBoard({ user }) {
   const knownRequestIdsRef = useRef(new Set());
   const hasHydratedRequestsRef = useRef(false);
   const toastTimersRef = useRef(new Map());
+
+  function normalizeSocketRole(role) {
+    const value = String(role || "").trim().toUpperCase();
+    if (!value) return "RESCUE";
+    if (value === "RESPONDER") return "RESCUE";
+    return value;
+  }
 
   function hideLowLevelRequests(items) {
     if (!Array.isArray(items)) return [];
@@ -350,6 +362,13 @@ export default function ResponderMissionBoard({ user }) {
   }, [userId]);
 
   useEffect(() => {
+    if (!userId) return;
+    const role = normalizeSocketRole(user?.role || user?.user?.role);
+    if (role !== "RESCUE") return;
+    reinitSocketForTrackingPersona("rescue");
+  }, [userId, user]);
+
+  useEffect(() => {
     if (!gps?.lat || !gps?.lng) return;
 
     let cancelled = false;
@@ -377,7 +396,13 @@ export default function ResponderMissionBoard({ user }) {
 
   // ===== SOCKET.IO: Listen for realtime tracking updates =====
   useEffect(() => {
-    const socket = getSocket() || initSocketFromSession();
+    let socket = getSocket() || initSocketFromSession();
+    if (!socket && userId) {
+      const token = typeof localStorage !== "undefined"
+        ? localStorage.getItem("auth_token") || ""
+        : "";
+      socket = initSocket(token, userId, normalizeSocketRole(user?.role || user?.user?.role));
+    }
     if (!socket) return;
 
     // Listen: Mission location confirmed (realtime distance, ETA)

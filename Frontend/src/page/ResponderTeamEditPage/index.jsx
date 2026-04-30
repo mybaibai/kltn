@@ -215,7 +215,7 @@ export default function ResponderTeamEditPage() {
         : "Chưa có dữ liệu";
   const updatedSummary = formatLastUpdated(team?.updated_at || team?.updatedAt);
   const securitySummary = team?.auth?.email || authUser?.auth?.email || "Mã hóa chuẩn quốc tế";
-  const notifications = [
+  const [notifications, setNotifications] = useState([
     {
       id: "te-1",
       title: "Có nhiệm vụ mới",
@@ -237,8 +237,18 @@ export default function ResponderTeamEditPage() {
       time: "18 phút trước",
       unread: false,
     },
-  ];
+  ]);
   const unreadCount = notifications.filter((item) => item.unread).length;
+
+  function handleToggleNotifications() {
+    setShowNotifications((prev) => {
+      const next = !prev;
+      if (next) {
+        setNotifications((items) => items.map((item) => ({ ...item, unread: false })));
+      }
+      return next;
+    });
+  }
 
   return (
     <div className="team-edit-page">
@@ -260,7 +270,7 @@ export default function ResponderTeamEditPage() {
                 type="button"
                 className="team-edit-bell-btn"
                 aria-label="Thông báo"
-                onClick={() => setShowNotifications((prev) => !prev)}
+                onClick={handleToggleNotifications}
                 aria-expanded={showNotifications}
                 aria-haspopup="menu"
               >

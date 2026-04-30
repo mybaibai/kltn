@@ -189,7 +189,7 @@ export default function ResponderTeamInfoPage() {
   const liveBadge = activeNow ? "Online" : "Offline";
 
   const teamIdText = team?._id ? `#RS-${String(team._id).slice(-4).toUpperCase()}` : "#RS-—";
-  const notifications = [
+  const [notifications, setNotifications] = useState([
     {
       id: "ti-1",
       title: "Đội của bạn đã sẵn sàng",
@@ -211,8 +211,18 @@ export default function ResponderTeamInfoPage() {
       time: "15 phút trước",
       unread: false,
     },
-  ];
+  ]);
   const unreadCount = notifications.filter((item) => item.unread).length;
+
+  function handleToggleNotifications() {
+    setShowNotifications((prev) => {
+      const next = !prev;
+      if (next) {
+        setNotifications((items) => items.map((item) => ({ ...item, unread: false })));
+      }
+      return next;
+    });
+  }
 
   return (
     <div className="team-info-page">
@@ -234,7 +244,7 @@ export default function ResponderTeamInfoPage() {
                 type="button"
                 className="team-info-bell-btn"
                 aria-label="Thông báo"
-                onClick={() => setShowNotifications((prev) => !prev)}
+                onClick={handleToggleNotifications}
                 aria-expanded={showNotifications}
                 aria-haspopup="menu"
               >

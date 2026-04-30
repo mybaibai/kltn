@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   MapContainer,
   TileLayer,
@@ -11,9 +11,17 @@ import {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
-  CheckCircle2, Clock, Loader2, ShieldCheck,
-  MapPin, User, Phone, AlertTriangle,
-  Ambulance, Search, X, RefreshCw
+  Bell,
+  CheckCircle2,
+  Clock,
+  Loader2,
+  ShieldCheck,
+  MapPin,
+  MessageSquare,
+  Phone,
+  AlertTriangle,
+  Ambulance,
+  X,
 } from 'lucide-react';
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -43,6 +51,7 @@ import Car from '../../assets/car.svg?react';
 import PlusCircle from '../../assets/medical.svg?react';
 import Waves from '../../assets/wave.svg?react';
 import MoreHorizontal from '../../assets/more.svg?react'; 
+import logoMark from "@/assets/screen-Photoroom.png";
 // Custom Icon Renderer using divIcon for premium look
 const createCustomIcon = () => {
   return L.divIcon({
@@ -171,22 +180,22 @@ const mapStyles = `
 `;
 
 const STEPS = [
-  { key: 'SENT',        label: 'Đã gửi yêu cầu' },
-  { key: 'PENDING',     label: 'Đang chờ tiếp nhận' },
-  { key: 'IN_PROGRESS', label: 'Đang hỗ trợ' },
-  { key: 'RESOLVED',    label: 'Hoàn thành' },
+  { key: 'ASSIGNED', label: 'Đã nhận' },
+  { key: 'MOVING', label: 'Đang đến' },
+  { key: 'RESCUING', label: 'Đang hỗ trợ' },
+  { key: 'COMPLETED', label: 'Hoàn thành' },
 ];
 
 const STAGE_TO_STEP = {
   SENT: 0,
-  PENDING: 1,
-  ASSIGNED: 1,
-  MOVING: 2,
-  ARRIVED: 2,
+  PENDING: 0,
+  ASSIGNED: 0,
+  MOVING: 1,
+  ARRIVED: 1,
   RESCUING: 2,
   COMPLETED: 3,
   RESOLVED: 3,
-  CANCELLED: 1,
+  CANCELLED: 0,
 };
 
 const PRIORITY_CONFIG = {
@@ -231,6 +240,14 @@ function formatTime(iso) {
   return `${pad(d.getHours())}:${pad(d.getMinutes())} - ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
+function initialsFromName(name) {
+  if (!name) return "RT";
+  const chunks = String(name).trim().split(/\s+/).filter(Boolean);
+  if (!chunks.length) return "RT";
+  if (chunks.length === 1) return chunks[0].slice(0, 2).toUpperCase();
+  return `${chunks[0][0] || ""}${chunks[chunks.length - 1][0] || ""}`.toUpperCase();
+}
+
 // Custom Toast Component
 function Toast({ message, type, onClose }) {
   return (
@@ -258,18 +275,18 @@ function Toast({ message, type, onClose }) {
 
 function StepIcon({ state }) {
   if (state === 'done') return (
-    <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center ring-4 ring-green-100">
-      <CheckCircle2 size={20} className="text-white" />
+    <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center ring-4 ring-green-100">
+      <CheckCircle2 size={16} className="text-white" />
     </div>
   );
   if (state === 'active') return (
-    <div className="w-10 h-10 rounded-full bg-amber-400 flex items-center justify-center ring-4 ring-amber-100 animate-pulse">
-      <Loader2 size={20} className="text-white animate-spin" />
+    <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center ring-4 ring-indigo-100 animate-pulse">
+      <Loader2 size={16} className="text-white animate-spin" />
     </div>
   );
   return (
-    <div className="w-10 h-10 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center">
-      <Clock size={18} className="text-gray-300" />
+    <div className="w-8 h-8 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center">
+      <Clock size={14} className="text-gray-300" />
     </div>
   );
 }
@@ -288,6 +305,34 @@ export default function TrackingPage() {
   const [persona, setPersona] = useState("observer");
   const [assignmentId, setAssignmentId] = useState(null);
   const [toaster, setToaster] = useState(null);
+  const [arriving, setArriving] = useState(false);
+  const [completing, setCompleting] = useState(false);
+
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([
+    {
+      id: "tr-1",
+      title: "Nhiệm vụ mới gần bạn",
+      description: "Có một yêu cầu SOS vừa được gửi trong khu vực bạn phụ trách.",
+      time: "Vừa xong",
+      unread: true,
+    },
+    {
+      id: "tr-2",
+      title: "Đồng bộ vị trí",
+      description: "Hệ thống đã cập nhật vị trí đội cứu trợ của bạn.",
+      time: "4 phút trước",
+      unread: true,
+    },
+    {
+      id: "tr-3",
+      title: "Báo cáo nhiệm vụ",
+      description: "Bạn có thể đánh dấu hoàn thành khi kết thúc hỗ trợ.",
+      time: "15 phút trước",
+      unread: false,
+    },
+  ]);
+  const notificationRef = useRef(null);
   
   // Simulation States
   const [isMocking, setIsMocking] = useState(false);
@@ -316,6 +361,39 @@ export default function TrackingPage() {
     if (isStaff) return false;
     return !!(victimUser);
   }, [victimUser, staffUser]);
+
+  const unreadCount = notifications.filter((item) => item.unread).length;
+
+  const handleToggleNotifications = () => {
+    setShowNotifications((prev) => {
+      const next = !prev;
+      if (next) {
+        setNotifications((items) => items.map((item) => ({ ...item, unread: false })));
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    function handleOutside(event) {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    }
+
+    function handleEscape(event) {
+      if (event.key === "Escape") {
+        setShowNotifications(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
 
   const getKeyFromLabel = (label) => {
     return Object.keys(INCIDENT_META).find(
@@ -512,21 +590,115 @@ export default function TrackingPage() {
   const currentStep = STAGE_TO_STEP[stage] ?? 0;
   const isCancelled = stage === 'CANCELLED' || sos.status === 'CANCELLED';
   const isResolved = stage === 'COMPLETED' || stage === 'RESOLVED' || sos.status === 'RESOLVED';
+  const isRescue = persona === "rescue";
 
   const priority = sos.priority || 'HIGH';
   const pConfig = PRIORITY_CONFIG[priority] || PRIORITY_CONFIG.HIGH;
   const requestCode = sos._id ? `#SOS-${String(sos._id).slice(-4).toUpperCase()}` : '#SOS-????';
+  const rescueLabel = tracking?.rescue_name || staffUser?.full_name || "Rescue";
+  const avatarLabel = initialsFromName(rescueLabel);
+  const rescuePhone = tracking?.rescue_phone || staffUser?.phone || "—";
+  const victimPhone =
+    sos?.victim_id?.phone ||
+    sos?.victim_id?.auth?.phone ||
+    sos?.phone ||
+    sos?.contact_phone ||
+    "—";
+
+  const handleArrived = async () => {
+    if (!assignmentId || arriving || isResolved || isCancelled) return;
+    setArriving(true);
+    try {
+      await updateRescueStage(assignmentId, "RESCUING", "Đội cứu trợ đã tới hiện trường");
+      setTracking((prev) => (prev ? { ...prev, current_stage: "RESCUING" } : prev));
+      setToaster({ message: "Đã cập nhật: Đang hỗ trợ", type: "info" });
+    } catch (e) {
+      setToaster({
+        message: e?.response?.data?.message || "Không thể cập nhật trạng thái Đã tới",
+        type: "info",
+      });
+    } finally {
+      setArriving(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    if (!assignmentId || completing || isResolved || isCancelled) return;
+    setCompleting(true);
+    try {
+      await updateRescueStage(assignmentId, "COMPLETED", "Đội cứu trợ xác nhận hoàn thành");
+      setTracking((prev) => (prev ? { ...prev, current_stage: "COMPLETED" } : prev));
+      setToaster({ message: "Đã hoàn thành nhiệm vụ cứu hộ", type: "success" });
+      navigate("/responder", { replace: true });
+    } catch (e) {
+      setToaster({
+        message: e?.response?.data?.message || "Không thể cập nhật trạng thái Hoàn thành",
+        type: "info",
+      });
+    } finally {
+      setCompleting(false);
+    }
+  };
 
   return (
-    <div className="h-screen w-full bg-gray-50 flex flex-col lg:flex-row overflow-hidden font-sans">
+    <div className="min-h-screen w-full bg-gray-100 font-sans">
       <style>{mapStyles}</style>
 
       <AnimatePresence>
         {toaster && <Toast {...toaster} onClose={() => setToaster(null)} />}
       </AnimatePresence>
-      
-      {/* LEFT: MAP SECTION */}
-      <div className="flex-1 h-[45vh] lg:h-full relative shadow-inner">
+
+      <div className="px-6 pt-4 text-[11px] font-semibold text-gray-500">
+        {isRescue ? "Đội cứu trợ - Đang hỗ trợ" : "Theo dõi cứu hộ"}
+      </div>
+
+      <div className="mx-4 mt-2 bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+        <header className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+          <div className="flex items-center gap-2">
+            <img src={logoMark} alt="SOSGo" className="h-8 w-8 object-contain" />
+            <span className="text-red-600 text-lg font-black tracking-tight">SOSGo</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <div ref={notificationRef} className="relative">
+              <button
+                type="button"
+                className="relative w-8 h-8 rounded-full border border-gray-200 bg-white text-gray-600 flex items-center justify-center"
+                onClick={handleToggleNotifications}
+                aria-label="Thông báo"
+                aria-expanded={showNotifications}
+                aria-haspopup="menu"
+              >
+                <Bell size={16} />
+                {unreadCount > 0 ? (
+                  <span className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                ) : null}
+              </button>
+
+              {showNotifications ? (
+                <ul className="absolute right-0 mt-2 w-[300px] rounded-xl border border-gray-200 bg-white shadow-lg p-2 z-50" role="menu">
+                  {notifications.map((item) => (
+                    <li key={item.id} className={`rounded-lg px-3 py-2 ${item.unread ? "bg-blue-50" : ""}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <strong className="text-[12px] text-gray-900">{item.title}</strong>
+                        <span className="text-[10px] text-gray-400 whitespace-nowrap">{item.time}</span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-gray-500">{item.description}</p>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+            <div className="h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-bold">
+              {avatarLabel}
+            </div>
+          </div>
+        </header>
+
+        <div className="flex flex-col lg:flex-row h-[calc(100vh-140px)]">
+          {/* LEFT: MAP SECTION */}
+          <div className="flex-1 h-[45vh] lg:h-full relative shadow-inner">
         <MapContainer center={victimPt ? [victimPt.lat, victimPt.lng] : [16.0544, 108.2022]} zoom={15} style={{ height: '100%', width: '100%' }} zoomControl={false}>
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           <FitBounds points={[victimPt && [victimPt.lat, victimPt.lng], rescuePt && [rescuePt.lat, rescuePt.lng]].filter(Boolean)} />
@@ -574,21 +746,21 @@ export default function TrackingPage() {
       <div className="w-full lg:w-[450px] bg-white h-[55vh] lg:h-full flex flex-col shadow-2xl z-10 border-l border-gray-100 overflow-hidden">
         
         {/* SIDEBAR HEADER */}
-        <div className="p-6 bg-gradient-to-br from-gray-900 to-gray-800 text-white shrink-0">
-          <div className="flex justify-between items-start mb-6">
-            <div className="px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-xl border border-white/10 text-[10px] font-bold tracking-wider uppercase">
+        <div className="p-6 bg-white border-b border-gray-100 shrink-0">
+          <div className="flex justify-between items-start mb-4">
+            <div className="px-3 py-1.5 bg-gray-100 rounded-xl border border-gray-200 text-[10px] font-bold tracking-wider uppercase text-gray-600">
               {requestCode}
             </div>
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider ${isCancelled ? 'bg-gray-500/20 text-gray-300' : isResolved ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400 animate-pulse'}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${isCancelled ? 'bg-gray-400' : isResolved ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isCancelled ? 'bg-gray-100 text-gray-500' : isResolved ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isCancelled ? 'bg-gray-400' : isResolved ? 'bg-emerald-500' : 'bg-amber-500'}`} />
               {isCancelled ? 'Đã huỷ' : isResolved ? 'Hoàn thành' : 'Đang thực hiện'}
             </div>
           </div>
           
-          <h1 className="text-2xl font-bold leading-tight mb-2">
+          <h1 className="text-lg font-bold leading-tight text-gray-900">
             Theo dõi cứu trợ
           </h1>
-          <p className="text-white/60 text-[11px] font-medium uppercase tracking-widest">
+          <p className="text-gray-500 text-[11px] font-medium">
             {isResolved ? 'Nhiệm vụ đã kết thúc' : 'Thông tin cập nhật thời gian thực'}
           </p>
         </div>
@@ -649,57 +821,94 @@ export default function TrackingPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white border border-gray-100 rounded-3xl p-5 flex flex-col items-center text-center group hover:bg-amber-50/30 transition-colors">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Sự cố</p>
-                <div className="flex items-center gap-1.5 px-4 py-2 bg-amber-50 text-amber-600 rounded-2xl text-[11px] font-bold uppercase border border-amber-100">
-                  <Icon className="w-3 h-3" />  
-                  {INCIDENT_META[key].label}
-                </div>
-              </div>
-              <div className="bg-white border border-gray-100 rounded-3xl p-5 flex flex-col items-center text-center group hover:bg-blue-50/30 transition-colors">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Đội cứu trợ</p>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs shadow-lg shadow-blue-100">
-                    <Ambulance size={14} />
+            <div className="space-y-3">
+              <div className="bg-white border border-gray-100 rounded-3xl p-5 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Sự cố</p>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs font-bold text-slate-800">{INCIDENT_META[key].label}</span>
                   </div>
-                  <span className="text-xs font-bold text-slate-800 truncate max-w-[80px]">
-                    {tracking?.rescue_name || 'ĐANG TÌM...'}
-                  </span>
                 </div>
+                <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${pConfig.bg} ${pConfig.color} border ${pConfig.border}`}>
+                  {pConfig.label}
+                </span>
               </div>
-            </div>
 
-            {/* Victim Info Card */}
-            <div className="bg-emerald-50 rounded-3xl p-5 border border-emerald-100 flex items-center gap-4">
-               <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-md">
-                  <img src={sos.victim_id?.profile?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${sos.victim_id?._id}`} className="w-full h-full object-cover" />
-               </div>
-               <div>
-                  <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-0.5">Người gặp nạn</p>
-                  <p className="text-sm font-bold text-emerald-900">{sos.victim_id?.full_name}</p>
-               </div>
+              <div className="bg-white border border-gray-100 rounded-3xl p-5 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Đội cứu trợ</p>
+                  <p className="text-sm font-bold text-slate-800">{rescueLabel}</p>
+                </div>
+                <a
+                  href={rescuePhone !== "—" ? `tel:${rescuePhone}` : undefined}
+                  className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-blue-600"
+                  aria-label="Gọi đội cứu trợ"
+                >
+                  <Phone size={16} />
+                </a>
+              </div>
+
+              <div className="bg-white border border-gray-100 rounded-3xl p-5 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Người gặp nạn</p>
+                  <p className="text-sm font-bold text-slate-800">{victimPhone}</p>
+                </div>
+                <button
+                  type="button"
+                  className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-indigo-600"
+                  aria-label="Nhắn tin người gặp nạn"
+                >
+                  <MessageSquare size={16} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
         {/* SIDEBAR FOOTER ACTION */}
-        <div className="p-6 bg-white border-t border-gray-50 flex gap-3 shrink-0">
-          <button onClick={() => window.location.reload()} className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold text-xs hover:bg-black transition-all shadow-xl shadow-gray-200 uppercase tracking-widest">
-             LÀM MỚI
-          </button>
-          {!isResolved && !isCancelled && (
+        <div className="p-6 bg-white border-t border-gray-50 flex flex-col gap-3 shrink-0">
+          {isRescue ? (
+            <>
+              <button
+                onClick={handleArrived}
+                disabled={arriving || !assignmentId || isResolved || isCancelled}
+                className="w-full py-4 bg-white border-2 border-blue-600 text-blue-700 rounded-2xl font-bold text-xs hover:bg-blue-50 transition-all uppercase tracking-widest disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {arriving ? "ĐANG CẬP NHẬT" : "ĐÃ TỚI"}
+              </button>
+              <button
+                onClick={handleComplete}
+                disabled={completing || !assignmentId || isResolved || isCancelled}
+                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-xs hover:bg-black transition-all shadow-xl shadow-gray-200 uppercase tracking-widest disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {completing ? "ĐANG CẬP NHẬT" : "HOÀN THÀNH"}
+              </button>
+            </>
+          ) : (
             <button
-            onClick={() => setShowCancelModal(true)}
-            className="px-8 py-4 border-2 border-rose-500 text-rose-600 rounded-2xl font-bold text-xs hover:bg-rose-50 transition-all uppercase tracking-widest"
-          >
-            HUỶ
-          </button>
+              onClick={() => window.location.reload()}
+              className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-xs hover:bg-black transition-all shadow-xl shadow-gray-200 uppercase tracking-widest"
+            >
+              LÀM MỚI
+            </button>
           )}
+          {!isResolved && !isCancelled && !isRescue ? (
+            <button
+              onClick={() => setShowCancelModal(true)}
+              className="w-full py-4 border-2 border-rose-500 text-rose-600 rounded-2xl font-bold text-xs hover:bg-rose-50 transition-all uppercase tracking-widest"
+            >
+              HUỶ
+            </button>
+          ) : null}
         </div>
       </div>
-      {/* CANCEL CONFIRMATION MODAL */}
-      {showCancelModal && (
+    </div>
+  </div>
+    {/* CANCEL CONFIRMATION MODAL */}
+    {showCancelModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 backdrop-blur-[2px] p-4">
           <div className="relative z-50 bg-white w-full max-w-[340px] rounded-[30px] p-6 shadow-2xl">
             {/* Nút X đóng ở góc - Làm nhỏ lại */}
