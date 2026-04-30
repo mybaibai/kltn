@@ -207,6 +207,22 @@ export async function updateRescueStage(
       assignment.rescuing_started_at = new Date();
     } else if (newStage === "COMPLETED") {
       assignment.completed_at = new Date();
+
+      // Đồng bộ trạng thái SOS để dashboard responder có thể ẩn nhiệm vụ đã xong.
+      const sos = await SosRequest.findById(assignment.request_id);
+      if (sos) {
+        sos.status = "RESOLVED";
+        sos.status_history = Array.isArray(sos.status_history)
+          ? sos.status_history
+          : [];
+        sos.status_history.push({
+          status: "RESOLVED",
+          updated_by: assignment.rescue_id || actorId || null,
+          updated_at: new Date(),
+          note: reason || "Nhiệm vụ đã hoàn thành",
+        });
+        await sos.save();
+      }
     }
 
     await assignment.save();

@@ -1,28 +1,99 @@
+import { useEffect, useMemo, useState } from "react";
+import { getIncidentTypeDisplay } from "@/constants/incidentMeta";
+
+const PAGE_SIZE = 5;
+
+function buildPageItems(totalPages, currentPage) {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, "ellipsis-right", totalPages];
+  }
+
+  if (currentPage >= totalPages - 3) {
+    return [
+      1,
+      "ellipsis-left",
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ];
+  }
+
+  return [1, "ellipsis-left", currentPage - 1, currentPage, currentPage + 1, "ellipsis-right", totalPages];
+}
+
+const PAGE_STORAGE_KEY = "responder_request_page";
+
+function readStoredPage() {
+  if (typeof sessionStorage === "undefined") return 1;
+  const raw = sessionStorage.getItem(PAGE_STORAGE_KEY);
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 1) return 1;
+  return Math.floor(value);
+}
+
 export default function ResponderRequestList({
   requests,
   selectedRequestId,
   levelMeta,
   apiMessage,
+  emptyMessage,
   onSelectRequest,
   onAcceptRequest,
   acceptLoading,
 }) {
+  const [currentPage, setCurrentPage] = useState(() => readStoredPage());
+
+  const totalPages = Math.max(1, Math.ceil(requests.length / PAGE_SIZE));
+
+  const pagedRequests = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return requests.slice(start, start + PAGE_SIZE);
+  }, [requests, currentPage]);
+
+  const pageItems = useMemo(
+    () => buildPageItems(totalPages, currentPage),
+    [totalPages, currentPage],
+  );
+
+  useEffect(() => {
+    if (!requests.length) return;
+    const stored = readStoredPage();
+    const next = Math.min(stored, totalPages);
+    if (next !== currentPage) {
+      setCurrentPage(next);
+      return;
+    }
+    setCurrentPage((prev) => Math.min(prev, totalPages));
+  }, [requests.length, totalPages]);
+
+  useEffect(() => {
+    if (typeof sessionStorage === "undefined") return;
+    sessionStorage.setItem(PAGE_STORAGE_KEY, String(currentPage));
+  }, [currentPage]);
+
   return (
     <div className="responder-list-col">
       <div className="responder-list-heading">
-        <h1>NHAN YEU CAU CUU TRO</h1>
+        <h1>NHẬN YÊU CẦU CỨU TRỢ</h1>
         <p>
-          <span className="live-dot" /> Dang giam sat thoi gian thuc
+          <span className="live-dot" /> Đang giám sát thời gian thực
         </p>
         {apiMessage ? <p className="responder-api-note">{apiMessage}</p> : null}
       </div>
 
       <div className="responder-request-list">
         {!requests.length ? (
-          <article className="responder-request-empty">Chua co yeu cau SOS de hien thi</article>
-        ) : requests.map((item) => {
+          <article className="responder-request-empty">{emptyMessage || "Chưa có yêu cầu SOS để hiển thị"}</article>
+        ) : pagedRequests.map((item) => {
           const meta = levelMeta[item.level] || levelMeta.high;
-          const selected = item.id === selectedRequestId;
+          const incidentDisplay = getIncidentTypeDisplay(item.incidentType);
+          const selected = String(item.id) === String(selectedRequestId);
           return (
             <article
               key={item.id}
@@ -34,16 +105,27 @@ export default function ResponderRequestList({
                   <span className={`responder-level-badge ${meta.className}`}>{meta.label}</span>
                   <span className="responder-distance">{item.distanceKm != null ? `${item.distanceKm}km` : "—"}</span>
                 </div>
-                <span className="responder-time">{item.receivedAt}</span>
+                <div className="responder-time-stack">
+                  <span className="responder-time">{item.receivedAt}</span>
+                  <span className="responder-incident-icon" aria-label={incidentDisplay.label}>
+                    {incidentDisplay.emoji ? (
+                      <span aria-hidden="true">{incidentDisplay.emoji}</span>
+                    ) : (
+                      <incidentDisplay.Icon size={16} aria-hidden="true" />
+                    )}
+                  </span>
+                </div>
               </div>
 
-              <h3>{item.title}</h3>
-              <p className="responder-description">{item.description}</p>
+              <h3>{item.victimName || item.title}</h3>
+              <p className="responder-meta-line">Số điện thoại: {item.victimPhone || "Chưa có số điện thoại"}</p>
+              <p className="responder-meta-line">Loại sự cố: {item.incidentType || "Khác"}</p>
+              <p className="responder-description">Mô tả nguyên nhân: {item.description}</p>
               <p className="responder-address">{item.address}</p>
 
               <div className="responder-card-footer">
-                <button type="button" onClick={() => onSelectRequest(item.id)}>
-                  Xem chi tiet
+                <button type="button" onClick={() => onSelectRequest?.(String(item.id))}>
+                  Xem chi tiết
                 </button>
                 <button
                   type="button"
@@ -51,13 +133,59 @@ export default function ResponderRequestList({
                   disabled={!onAcceptRequest || acceptLoading}
                   onClick={() => onAcceptRequest?.(item)}
                 >
-                  {acceptLoading ? "DANG XU LY..." : "Nhan"}
+                  {acceptLoading ? "ĐANG XỬ LÝ..." : "Nhận"}
                 </button>
               </div>
             </article>
           );
         })}
       </div>
+
+      {requests.length > PAGE_SIZE ? (
+        <nav className="responder-pagination" aria-label="Phân trang yêu cầu">
+          <p className="responder-pagination-info">Trang {currentPage}/{totalPages}</p>
+
+          <div className="responder-pagination-controls">
+            <button
+              type="button"
+              className="responder-page-nav"
+              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+            >
+              Trước
+            </button>
+
+            <div className="responder-page-numbers">
+              {pageItems.map((item, index) => (
+                typeof item === "number" ? (
+                  <button
+                    key={item}
+                    type="button"
+                    className={`responder-page-btn ${item === currentPage ? "is-active" : ""}`}
+                    onClick={() => setCurrentPage(item)}
+                    aria-current={item === currentPage ? "page" : undefined}
+                  >
+                    {item}
+                  </button>
+                ) : (
+                  <span key={`${item}-${index}`} className="responder-page-ellipsis" aria-hidden="true">
+                    ...
+                  </span>
+                )
+              ))}
+            </div>
+
+            <button
+              type="button"
+              className="responder-page-nav"
+              onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Sau
+            </button>
+          </div>
+        </nav>
+      ) : null}
     </div>
   );
 }

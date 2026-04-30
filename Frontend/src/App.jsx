@@ -7,6 +7,8 @@ import AdminTrackingPage from '@/page/AdminPage/AdminTrackingPage';
 import AdminPlaceholder from '@/page/AdminPage/AdminPlaceholder';
 import StaffLoginPage from '@/page/StaffLoginPage';
 import ResponderPage from '@/page/ResponderPage';
+import ResponderTeamInfoPage from '@/page/ResponderTeamInfoPage';
+import ResponderTeamEditPage from '@/page/ResponderTeamEditPage';
 import RequesterProfile from '@/components/requester/RequesterProfile';
 import { StaffLoginGate, StaffRoleGuard, StaffHomeRedirect } from '@/components/auth/AuthGuards';
 import { STAFF_ROLE_ADMIN, STAFF_ROLE_RESCUE } from '@/services/auth/session';
@@ -40,7 +42,7 @@ export default function App() {
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={<AdminPlaceholder title="Dashboard" />} />
           <Route path="incidents" element={<IncidentManagement />} />
-            <Route path="tracking/:sosId" element={<AdminTrackingPage />} />
+          <Route path="tracking/:sosId" element={<AdminTrackingPage />} />
           <Route path="users" element={<AdminPlaceholder title="Quản lý người dùng" />} />
           <Route path="history" element={<AdminPlaceholder title="Lịch sử" />} />
           <Route path="settings" element={<AdminPlaceholder title="Cài đặt" />} />
@@ -50,6 +52,30 @@ export default function App() {
           element={(
             <StaffRoleGuard allowRoles={[STAFF_ROLE_RESCUE]}>
               <ResponderPage />
+            </StaffRoleGuard>
+          )}
+        />
+        <Route
+          path="/responder/tracking/:sosId"
+          element={(
+            <StaffRoleGuard allowRoles={[STAFF_ROLE_RESCUE]}>
+              <TrackingPage />
+            </StaffRoleGuard>
+          )}
+        />
+        <Route
+          path="/responder/team-info"
+          element={(
+            <StaffRoleGuard allowRoles={[STAFF_ROLE_RESCUE]}>
+              <ResponderTeamInfoPage />
+            </StaffRoleGuard>
+          )}
+        />
+        <Route
+          path="/responder/team-info/edit"
+          element={(
+            <StaffRoleGuard allowRoles={[STAFF_ROLE_RESCUE]}>
+              <ResponderTeamEditPage />
             </StaffRoleGuard>
           )}
         />

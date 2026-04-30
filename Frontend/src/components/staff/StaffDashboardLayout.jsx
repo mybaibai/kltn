@@ -85,7 +85,7 @@ export default function StaffDashboardLayout({ title, description, user, childre
                 padding: "8px 12px",
               }}
             >
-              <UserCircle2 size={16} /> {user?.full_name || "Chua cap nhat ten"}
+              <UserCircle2 size={16} /> {user?.full_name || "Chưa cập nhật tên"}
             </span>
             <span
               style={{
@@ -98,7 +98,7 @@ export default function StaffDashboardLayout({ title, description, user, childre
                 padding: "8px 12px",
               }}
             >
-              {user?.auth?.email || "Khong co email"}
+              {user?.auth?.email || "Không có email"}
             </span>
             <span
               style={{
@@ -147,7 +147,7 @@ export default function StaffDashboardLayout({ title, description, user, childre
               fontSize: 14,
             }}
           >
-            <MapPin size={16} /> Ve trang SOS
+            <MapPin size={16} /> Về trang SOS
           </Link>
           <button
             type="button"
@@ -165,7 +165,7 @@ export default function StaffDashboardLayout({ title, description, user, childre
               fontSize: 14,
             }}
           >
-            <LogOut size={16} /> Dang xuat
+            <LogOut size={16} /> Đăng xuất
           </button>
         </div>
       </div>
