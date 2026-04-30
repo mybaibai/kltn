@@ -5,6 +5,17 @@ const profileSchema = new mongoose.Schema(
     avatar_url: { type: String, default: '' },
     address: { type: String, default: '' },
     emergency_contact: { type: String, default: '' },
+    // Medical information for Victims
+    blood_type: { 
+      type: String, 
+      enum: ['O', 'A', 'B', 'AB'], 
+      default: '',
+      uppercase: true 
+    },
+    height: { type: Number, default: null }, // cm
+    weight: { type: Number, default: null }, // kg
+    allergies: { type: String, default: '' },
+    medical_history: { type: [String], default: [] }, // e.g., ["Tiểu đường", "Cao huyết áp"]
   },
   { _id: false }
 );

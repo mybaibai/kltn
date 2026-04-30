@@ -42,6 +42,7 @@ app.use(cookieParser());
 connectDB();
 
 app.use("/api/users", userRoutes);
+app.use("/api/user", userRoutes);
 app.use("/api/teams", teamRoutes);
 app.use("/api/sos", sosRoutes);
 app.use("/api/auth", authRoutes);
