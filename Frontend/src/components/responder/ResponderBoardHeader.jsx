@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, ChevronDown, LogOut } from "lucide-react";
-import rescueLogo from "@/assets/logorescue.svg";
+import rescueLogo from "@/assets/logo.svg";
 import { clearAllAuth } from "@/services/auth/session";
 
 function initialsFromName(name) {

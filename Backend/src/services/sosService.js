@@ -75,7 +75,7 @@ export const getLatestAssignmentForRequest = (requestId) =>
 
 export const getSosByRequester = async (requesterId) => {
   const sosList = await SosRequest.find({ victim_id: requesterId })
-    .populate('victim_id', 'full_name phone auth.phone')
+    .populate('victim_id', 'full_name phone')
     .populate('assigned_rescue_id', 'full_name phone')
     .populate('incident_type', 'name icon color_code')
     .sort({ created_at: -1 })

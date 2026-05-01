@@ -1,11 +1,10 @@
-//Backend/src/controllers/sosController.js
+// Backend/src/controllers/sosController.js
 import mongoose from 'mongoose';
 import * as sosService from '../services/sosService.js';
 import * as teamService from '../services/teamService.js';
 import IncidentType from '../models/incidentTypeModel.js';
 import { io } from '../server.js';
 
-/** Slug từ SOSform → tên loại trong DB (IncidentType) */
 const INCIDENT_SLUG_TO_NAME = {
   natural: 'Thiên tai',
   fire: 'Cháy nổ',
@@ -28,15 +27,18 @@ async function resolveIncidentTypeId(raw) {
   return doc._id;
 }
 
-// Map lưu timer để hủy nếu cần (key = sosId)
 const pendingBroadcastTimers = new Map();
 
-// POST /api/sos  — Requester gửi SOS
+// POST /api/sos — Victim gửi SOS
 export const create = async (req, res) => {
   try {
-    const { requester_id, victim_id, latitude, longitude, lng, lat, address, description, incident_type_id, incident_type } = req.body;
+    const {
+      requester_id, victim_id,
+      latitude, longitude, lng, lat,
+      address, description,
+      incident_type_id, incident_type,
+    } = req.body;
 
-    // Validate tối thiểu
     const resolvedVictimId = victim_id || requester_id;
     const resolvedLat = typeof latitude !== 'undefined' ? latitude : lat;
     const resolvedLng = typeof longitude !== 'undefined' ? longitude : lng;
@@ -45,10 +47,8 @@ export const create = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Thiếu victim_id/requester_id hoặc lat/lng' });
     }
 
-    let desc = typeof description === 'string' ? description : (description?.description || '');
-    if (address) {
-      desc = [desc, `[Địa chỉ: ${address}]`].filter(Boolean).join('\n').trim();
-    }
+    // Lưu description thuần — KHÔNG ghép address vào
+    const desc = typeof description === 'string' ? description.trim() : (description?.description || '');
 
     const resolvedIncidentType = await resolveIncidentTypeId(incident_type || incident_type_id);
 
@@ -60,55 +60,63 @@ export const create = async (req, res) => {
       location: { type: 'Point', coordinates: [Number(resolvedLng), Number(resolvedLat)] },
     });
 
-    // === KHÔNG auto-assign. SOS giữ trạng thái PENDING ===
-
     const fullSos = await sosService.getSosById(sos._id);
 
-    // 📢 Broadcast cho ADMIN
-    io.to("admin-dashboard").emit("sos_created", {
+    // Broadcast cho ADMIN
+    io.to('admin-dashboard').emit('sos_created', {
       request_id: fullSos?._id,
       status: fullSos?.status,
-      victim_id:
-        typeof fullSos?.victim_id === "object" ? fullSos?.victim_id?._id : fullSos?.victim_id,
+      victim_id: typeof fullSos?.victim_id === 'object' ? fullSos?.victim_id?._id : fullSos?.victim_id,
       created_at: fullSos?.created_at || new Date(),
     });
 
-    // === NOTIFY đội gần nhất ngay lập tức ===
+    // Notify đội gần nhất ngay lập tức
     try {
       const nearRescues = await teamService.findNearestTeam(Number(resolvedLat), Number(resolvedLng));
       if (nearRescues.length > 0) {
-        const nearestId = nearRescues[0]._id;
-        io.to(`rescue-${nearestId}`).emit("sos_new_pending", {
-          request_id: fullSos?._id,
-          status: "PENDING",
-          address: fullSos?.address || '',
-          created_at: fullSos?.created_at || new Date(),
-          victim_name: fullSos?.victim_id?.full_name || '',
-          location: fullSos?.location,
-          priority: true,
+        io.to(`rescue-${nearRescues[0]._id}`).emit('sos_new_pending', {
+          request_id:   fullSos?._id,
+          status:       'PENDING',
+          address:      fullSos?.address || '',
+          created_at:   fullSos?.created_at || new Date(),
+          victim_name:  fullSos?.victim_id?.full_name || '',
+          location:     fullSos?.location,
+          priority:     true,
         });
         console.log(`📢 SOS ${sos._id} — notified nearest rescue: ${nearRescues[0].full_name}`);
       }
     } catch (e) {
-      console.warn("⚠️ Could not find nearest rescue teams:", e.message);
+      console.warn('⚠️ Could not find nearest rescue teams:', e.message);
     }
 
-    // === SAU 60 GIÂY: broadcast cho TẤT CẢ đội rescue ===
+    // Sau 60 giây: broadcast cho TẤT CẢ rescue
     const broadcastTimer = setTimeout(() => {
-      io.to("rescue-all").emit("sos_broadcast_all", {
-        request_id: fullSos?._id,
-        status: "PENDING",
-        address: fullSos?.address || '',
-        created_at: fullSos?.created_at || new Date(),
+      io.to('rescue-all').emit('sos_broadcast_all', {
+        request_id:  fullSos?._id,
+        status:      'PENDING',
+        address:     fullSos?.address || '',
+        created_at:  fullSos?.created_at || new Date(),
         victim_name: fullSos?.victim_id?.full_name || '',
-        location: fullSos?.location,
+        location:    fullSos?.location,
       });
-      console.log(`📢 SOS ${sos._id} — broadcast to all rescue teams (60s delay)`);
+      console.log(`📢 SOS ${sos._id} — broadcast to all rescue teams (60s)`);
       pendingBroadcastTimers.delete(String(sos._id));
     }, 60_000);
     pendingBroadcastTimers.set(String(sos._id), broadcastTimer);
 
+    // Trả response cho victim NGAY — không chờ AI
     res.status(201).json({ success: true, data: fullSos });
+
+    // AI ANALYSIS — chạy background sau khi đã trả response
+    // Không await — lỗi AI không ảnh hưởng đến luồng SOS chính
+    sosService.processAiAnalysis({
+      sosId:           sos._id,
+      description:     desc,
+      incidentTypeId:  resolvedIncidentType,
+      victimId:        resolvedVictimId,
+      io,
+    });
+
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -139,7 +147,7 @@ export const getDetail = async (req, res) => {
   }
 };
 
-/** PATCH /api/sos/:id/victim-location — nạn nhân cập nhật vị trí khi di chuyển */
+// PATCH /api/sos/:id/victim-location
 export const patchVictimLocation = async (req, res) => {
   try {
     const { latitude, longitude, lat, lng } = req.body;
@@ -155,6 +163,23 @@ export const patchVictimLocation = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Không có quyền cập nhật vị trí' });
     }
     const updated = await sosService.updateSosVictimLocation(req.params.id, Number(la), Number(ln));
+
+    // Broadcast vị trí victim mới
+    const assignment = await sosService.getLatestAssignmentForRequest(req.params.id);
+    if (assignment?.rescue_id) {
+      const rescueId = assignment.rescue_id?._id || assignment.rescue_id;
+      io.to(`rescue-${rescueId}`).emit('victim_location_updated', {
+        request_id: req.params.id,
+        location: updated.location,
+        timestamp: new Date(),
+      });
+    }
+    io.to('admin-dashboard').emit('victim_location_updated', {
+      request_id: req.params.id,
+      location: updated.location,
+      timestamp: new Date(),
+    });
+
     res.status(200).json({ success: true, data: updated });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -199,38 +224,46 @@ export const updateStatus = async (req, res) => {
 // PATCH /api/sos/:id/assign
 export const assign = async (req, res) => {
   try {
-    const sos = await sosService.assignTeam(req.params.id, req.body.team_id || req.body.rescue_id);
+    const sos = await sosService.assignTeam(
+      req.params.id,
+      req.body.team_id || req.body.rescue_id
+    );
 
     if (sos) {
       const rescueId = sos.assigned_rescue_id?._id || sos.assigned_rescue_id;
       const victimId = sos.victim_id?._id || sos.victim_id;
 
-      // Broadcast to update other rescue dashboards
-      io.to("rescue-all").emit("sos_assigned", {
+      // Hủy broadcast timer 60s nếu SOS đã được nhận
+      const timer = pendingBroadcastTimers.get(String(req.params.id));
+      if (timer) {
+        clearTimeout(timer);
+        pendingBroadcastTimers.delete(String(req.params.id));
+      }
+
+      io.to('rescue-all').emit('sos_assigned', {
         request_id: sos._id,
         rescue_id: rescueId,
-        status: sos.status
+        status: sos.status,
       });
 
-      // Notify the victim
       if (victimId) {
-        io.to(`victim-${victimId}`).emit("rescue_accepted", {
-          message: "Một đội cứu hộ đã tiếp nhận yêu cầu của bạn",
-          rescue_name: sos.assigned_rescue_id?.full_name || "Đội cứu hộ",
-          request_id: sos._id
+        io.to(`victim-${victimId}`).emit('rescue_accepted', {
+          message: 'Một đội cứu hộ đã tiếp nhận yêu cầu của bạn',
+          rescue_name: sos.assigned_rescue_id?.full_name || 'Đội cứu hộ',
+          request_id: sos._id,
         });
       }
-      
-      // Notify Admin
-      io.to("admin-dashboard").emit("sos_assigned", {
+
+      io.to('admin-dashboard').emit('sos_assigned', {
         request_id: sos._id,
         rescue_id: rescueId,
-        rescue_name: sos.assigned_rescue_id?.full_name || "Đội cứu hộ",
+        rescue_name: sos.assigned_rescue_id?.full_name || 'Đội cứu hộ',
       });
     }
 
     res.status(200).json({ success: true, data: sos });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    const status = err.message.includes('đã được phân công') ? 409 : 500;
+    res.status(status).json({ success: false, message: err.message });
   }
 };

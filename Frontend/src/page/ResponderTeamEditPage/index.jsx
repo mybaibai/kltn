@@ -12,7 +12,7 @@ import {
   Shield,
   UploadCloud,
 } from "lucide-react";
-import rescueLogo from "@/assets/logorescue.svg";
+import rescueLogo from "@/assets/logo.svg";
 import { getAllTeams, getTeamDetail, updateTeam } from "@/services/api/apiTeam";
 import { getAuthUser } from "@/services/auth/session";
 import "./team-edit-page.css";

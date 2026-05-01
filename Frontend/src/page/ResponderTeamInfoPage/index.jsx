@@ -9,7 +9,7 @@ import {
   MapPin,
   Plus,
 } from "lucide-react";
-import rescueLogo from "@/assets/logorescue.svg";
+import rescueLogo from "@/assets/logo.svg";
 import { getAuthUser } from "@/services/auth/session";
 import { getAllTeams, getTeamDetail } from "@/services/api/apiTeam";
 import { getSosByTeam } from "@/services/api/apiSos";
