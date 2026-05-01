@@ -138,6 +138,7 @@ export default function ResponderMissionBoard({ user }) {
 
     const current = requestsRef.current;
     const index = current.findIndex((item) => String(item.id) === String(incoming.id));
+    const isNew = index < 0;
 
     if (String(incoming?.level || "").toLowerCase() === "low") {
       if (index < 0) return;
@@ -162,7 +163,11 @@ export default function ResponderMissionBoard({ user }) {
       next = [incoming, ...current];
     }
 
-    syncRequests(next, { notifyNew });
+    if (notifyNew && isNew) {
+      pushToastFromRequest(incoming);
+    }
+
+    syncRequests(next, { notifyNew: false });
     syncStatsFromRequests(next);
     setApiMessage("");
   }
@@ -461,31 +466,31 @@ export default function ResponderMissionBoard({ user }) {
       const requestId = data.request_id ? String(data.request_id) : "";
       if (!requestId) return;
 
+      const fallbackPayload = {
+        _id: requestId,
+        status: data.status || "PENDING",
+        address: data.address || "",
+        description: data.description || "",
+        victim_name: data.victim_name || "",
+        victim_phone: data.victim_phone || "",
+        incident_type_name: data.incident_type_name || "",
+        location: data.location,
+        created_at: data.created_at || new Date().toISOString(),
+      };
+
+      // Update list + toast immediately from socket payload
+      upsertRealtimeSos(fallbackPayload, { notifyNew: true });
+
       try {
         const detailRes = await getSosDetail(requestId);
         const fullSos = detailRes?.data?.data;
         if (fullSos?._id) {
-          upsertRealtimeSos(fullSos, { notifyNew: true });
+          upsertRealtimeSos(fullSos, { notifyNew: false });
           return;
         }
       } catch {
         // Keep socket payload fallback below if detail endpoint is temporarily unavailable.
       }
-
-      upsertRealtimeSos(
-        {
-          _id: requestId,
-          status: data.status || "PENDING",
-          address: data.address || "",
-          description: data.description || "",
-          victim_name: data.victim_name || "",
-          victim_phone: data.victim_phone || "",
-          incident_type_name: data.incident_type_name || "",
-          location: data.location,
-          created_at: data.created_at || new Date().toISOString(),
-        },
-        { notifyNew: true },
-      );
     }
 
     function handleSosAssigned(data = {}) {

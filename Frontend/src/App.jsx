@@ -21,7 +21,7 @@ export default function App() {
         <Route path="/sos" element={<SosPage />} />
         <Route path="/profile" element={<RequesterProfile />} />
         <Route path="/sospage" element={<Navigate to="/sos" replace />} />
-        <Route path="/tracking/:sosId" element={<TrackingPage />} />
+        <Route path="/tracking/:sosId" element={<TrackingPage mode="victim" />} />
         <Route
           path="/staff-login"
           element={(
@@ -58,7 +58,7 @@ export default function App() {
           path="/responder/tracking/:sosId"
           element={(
             <StaffRoleGuard allowRoles={[STAFF_ROLE_RESCUE]}>
-              <TrackingPage />
+              <TrackingPage mode="rescue" />
             </StaffRoleGuard>
           )}
         />
