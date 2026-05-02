@@ -111,7 +111,9 @@ export default function TrackingPage({ mode = "rescue" }) {
   const [assignmentId, setAssignmentId] = useState(null);
   const [persona, setPersona] = useState(null);
   const [tracking, setTracking] = useState(null);
-  const [toast, setToast] = useState(null);
+  const [toastAlerts, setToastAlerts] = useState([]);
+  const toastTimersRef = useRef(new Map());
+  const knownToastIdsRef = useRef(new Set());
   const [refreshing, setRefreshing] = useState(false);
   const [arriving, setArriving] = useState(false);
   const [completing, setCompleting] = useState(false);
@@ -131,6 +133,37 @@ export default function TrackingPage({ mode = "rescue" }) {
     },
   ]);
   const notificationRef = useRef(null);
+
+  // Toast management
+  const dismissToast = (popupId) => {
+    setToastAlerts((prev) => prev.filter((item) => item.popupId !== popupId));
+    const activeTimer = toastTimersRef.current.get(popupId);
+    if (activeTimer) {
+      window.clearTimeout(activeTimer);
+      toastTimersRef.current.delete(popupId);
+    }
+  };
+
+  const pushToast = (msg, type = 'info', detail = '') => {
+    const popupId = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    
+    if (knownToastIdsRef.current.has(msg)) {
+      return;
+    }
+    knownToastIdsRef.current.add(msg);
+    setTimeout(() => knownToastIdsRef.current.delete(msg), 2000);
+
+    const bgColor = type === 'success' ? 'bg-green-500' : type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500';
+    const icon = type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
+
+    setToastAlerts((prev) => [{ popupId, msg, type, bgColor, icon, detail }, ...prev].slice(0, 3));
+
+    const timer = window.setTimeout(() => {
+      dismissToast(popupId);
+    }, 4000);
+
+    toastTimersRef.current.set(popupId, timer);
+  };
 
   const staffUser = useMemo(() => {
     try {
@@ -263,6 +296,15 @@ export default function TrackingPage({ mode = "rescue" }) {
     return () => clearInterval(t);
   }, [assignmentId, persona, loadTracking]);
 
+  const dismissToast = (popupId) => {
+    setToastAlerts((prev) => prev.filter((item) => item.popupId !== popupId));
+    const activeTimer = toastTimersRef.current.get(popupId);
+    if (activeTimer) {
+      window.clearTimeout(activeTimer);
+      toastTimersRef.current.delete(popupId);
+    }
+  };
+
   useEffect(() => {
     if (!persona || persona === "observer") return;
     reinitSocketForTrackingPersona(persona === "victim" ? "victim" : "rescue");
@@ -270,8 +312,11 @@ export default function TrackingPage({ mode = "rescue" }) {
     if (!socket) return;
 
     const onAccepted = (payload) => {
-      setToast(payload?.message || "Đội cứu hộ đã nhận nhiệm vụ");
-      setTimeout(() => setToast(null), 6000);
+      pushToast(
+        payload?.message || "Đội cứu hộ đã nhận nhiệm vụ",
+        'success',
+        'Bạn sẽ được cập nhật tình trạng thực time'
+      );
     };
     const onVictimUpdate = () => {
       if (assignmentId)
@@ -573,7 +618,27 @@ export default function TrackingPage({ mode = "rescue" }) {
   if (!useRescueLayout) {
     return (
       <div className="victim-tracking-page-root">
-        {toast ? <div className="tracking-toast">{toast}</div> : null}
+        {/* TOAST NOTIFICATIONS - BOTTOM RIGHT */}
+        <div className="fixed bottom-6 right-6 z-[999999] flex flex-col gap-2 max-w-sm">
+          {toastAlerts.map((alert) => (
+            <div
+              key={alert.popupId}
+              className={`${alert.bgColor} text-white px-4 py-3 rounded-xl shadow-xl flex items-start gap-3 border border-opacity-20 border-white animate-slide-in`}
+            >
+              <span className="text-lg mt-0.5">{alert.icon}</span>
+              <div className="flex-1">
+                <p className="font-semibold text-sm">{alert.msg}</p>
+                {alert.detail && <p className="text-xs opacity-90 mt-0.5">{alert.detail}</p>}
+              </div>
+              <button
+                onClick={() => dismissToast(alert.popupId)}
+                className="ml-2 text-white hover:opacity-80 font-bold text-lg flex-shrink-0"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
 
         <div className="victim-tracking-shell">
           <header className="victim-tracking-topbar">
@@ -774,7 +839,27 @@ export default function TrackingPage({ mode = "rescue" }) {
 
   return (
     <div className="tracking-page-root">
-      {toast ? <div className="tracking-toast">{toast}</div> : null}
+      {/* TOAST NOTIFICATIONS - BOTTOM RIGHT */}
+      <div className="fixed bottom-6 right-6 z-[999999] flex flex-col gap-2 max-w-sm">
+        {toastAlerts.map((alert) => (
+          <div
+            key={alert.popupId}
+            className={`${alert.bgColor} text-white px-4 py-3 rounded-xl shadow-xl flex items-start gap-3 border border-opacity-20 border-white animate-slide-in`}
+          >
+            <span className="text-lg mt-0.5">{alert.icon}</span>
+            <div className="flex-1">
+              <p className="font-semibold text-sm">{alert.msg}</p>
+              {alert.detail && <p className="text-xs opacity-90 mt-0.5">{alert.detail}</p>}
+            </div>
+            <button
+              onClick={() => dismissToast(alert.popupId)}
+              className="ml-2 text-white hover:opacity-80 font-bold text-lg flex-shrink-0"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
 
       <div className="tracking-container">
         <p className="tracking-context-title">Theo dõi cứu hộ</p>
