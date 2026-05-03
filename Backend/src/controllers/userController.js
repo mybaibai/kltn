@@ -43,3 +43,30 @@ export const remove = async (req, res) => {
     res.status(200).json({ success: true, message: 'Đã xóa user' });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
+
+export const getMe = async (req, res) => {
+  try {
+    const user = await userService.getUserById(req.user._id);
+    if (!user) return res.status(404).json({ success: false, message: 'Không tìm thấy user' });
+    res.status(200).json({ success: true, data: user });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+};
+
+export const updateProfile = async (req, res) => {
+  try {
+    const { full_name, profile } = req.body;
+    // We update only allowed fields or merge profile
+    const updateData = {};
+    if (full_name !== undefined) updateData.full_name = full_name;
+    
+    // Merge profile fields if provided
+    if (profile) {
+      const user = await userService.getUserById(req.user._id);
+      const newProfile = { ...(user.profile || {}), ...profile };
+      updateData.profile = newProfile;
+    }
+
+    const updatedUser = await userService.updateUser(req.user._id, updateData);
+    res.status(200).json({ success: true, data: updatedUser });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+};

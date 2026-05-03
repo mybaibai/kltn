@@ -282,7 +282,15 @@ export default function ResponderBoardHeader({
             aria-expanded={openMenu === "avatar"}
             aria-haspopup="menu"
           >
-            {initialsFromName(user?.full_name)}
+            {user?.profile?.avatar_url ? (
+              <img
+                src={user.profile.avatar_url}
+                alt={user?.full_name || "Avatar đội cứu trợ"}
+                className="responder-avatar-img"
+              />
+            ) : (
+              initialsFromName(user?.full_name)
+            )}
           </button>
 
           {openMenu === "avatar" ? (

@@ -9,6 +9,8 @@ import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png';
 import { sendSos } from '@/services/api/apiSos';
 import LoginRequester from './LoginRequester';
 import SOSForm from './SOSform';  
+import { getSocket, initSocketFromSession } from '@/services/socket';
+import { ShieldCheck, X } from 'lucide-react';
 import {
   subscribeAuthState,
   logoutVictimFirebase,

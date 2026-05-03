@@ -369,7 +369,12 @@ export default function ResponderMissionBoard({ user }) {
   useEffect(() => {
     if (!userId) return;
     const role = normalizeSocketRole(user?.role || user?.user?.role);
-    if (role !== "RESCUE") return;
+    console.log(`🔐 User role for socket: "${user?.role}" → normalized: "${role}", userId: ${userId}`);
+    if (role !== "RESCUE") {
+      console.warn(`⚠️ Role is not RESCUE, skipping socket reinit`);
+      return;
+    }
+    console.log(`🔄 Reinitializing socket for "rescue" persona...`);
     reinitSocketForTrackingPersona("rescue");
   }, [userId, user]);
 
@@ -399,15 +404,161 @@ export default function ResponderMissionBoard({ user }) {
     };
   }, [gps, userId]);
 
+  // ===== SOCKET.IO: Setup socket listeners (one-time, wait for connect) =====
+  useEffect(() => {
+    if (!userId) {
+      console.warn("⚠️ No userId, skipping socket setup");
+      return;
+    }
+
+    console.log("🔄 ResponderMissionBoard socket effect rerun", {
+      userId,
+      role: user?.role,
+      socketExists: !!getSocket(),
+    });
+
+    let socket = getSocket();
+    if (!socket) {
+      console.log("📍 Socket not ready yet, initializing from session...");
+      socket = initSocketFromSession();
+    }
+
+    if (!socket) {
+      console.warn("⚠️ Could not initialize socket, will retry on next mount");
+      return;
+    }
+
+    console.log("🔌 Socket instance obtained:", socket.id || "connecting...");
+
+    async function refreshRealtimeSosList() {
+      try {
+        const res = await getAllSos();
+        const rawList = res?.data?.data || [];
+        const sosList = rawList;
+        const mapped = hideLowLevelRequests(mapSosToResponderRequests(sosList, gps));
+        syncRequests(mapped, { notifyNew: true });
+        syncStatsFromRequests(mapped);
+      } catch {
+        // keep current UI state if refresh fails
+      }
+    }
+
+    async function handleSosCreated(data = {}) {
+      console.log("🆕 Socket: sos_created event received:", data);
+      const requestId = data.request_id ? String(data.request_id) : "";
+      if (!requestId) return;
+
+      const alreadyExists = requestsRef.current.some((item) => String(item.id) === requestId);
+      const fallbackPayload = {
+        _id: requestId,
+        status: data.status || "PENDING",
+        address: data.address || "",
+        description: data.description || "",
+        victim_name: data.victim_name || "",
+        victim_phone: data.victim_phone || "",
+        incident_type_name: data.incident_type_name || "",
+        location: data.location,
+        created_at: data.created_at || new Date().toISOString(),
+      };
+
+      upsertRealtimeSos(fallbackPayload, { notifyNew: !alreadyExists });
+
+      try {
+        const detailRes = await getSosDetail(requestId);
+        const fullSos = detailRes?.data?.data;
+        if (fullSos?._id) {
+          upsertRealtimeSos(fullSos, { notifyNew: false });
+          if (!alreadyExists) {
+            await refreshRealtimeSosList();
+          }
+          return;
+        }
+      } catch {
+        // Keep socket payload fallback below if detail endpoint is temporarily unavailable.
+      }
+
+      await refreshRealtimeSosList();
+    }
+
+    async function handleSosAssigned(data = {}) {
+      console.log("✅ Socket: sos_assigned event received:", data);
+      const requestId = data.request_id ? String(data.request_id) : "";
+      if (!requestId) return;
+
+      const existing = requestsRef.current.find((item) => String(item.id) === requestId);
+      if (!existing) {
+        await refreshRealtimeSosList();
+        return;
+      }
+
+      upsertRealtimeSos(
+        {
+          ...(existing.source || {}),
+          _id: requestId,
+          status: data.status || "ASSIGNED",
+        },
+        { notifyNew: false },
+      );
+    }
+
+    function setupListeners() {
+      console.log("📡 Registering SOS socket listeners");
+      socket.off("sos_created", handleSosCreated);
+      socket.off("sos_new_pending", handleSosCreated);
+      socket.off("sos_broadcast_all", handleSosCreated);
+      socket.off("sos_assigned", handleSosAssigned);
+
+      socket.on("sos_created", handleSosCreated);
+      socket.on("sos_new_pending", handleSosCreated);
+      socket.on("sos_broadcast_all", handleSosCreated);
+      socket.on("sos_assigned", handleSosAssigned);
+    }
+
+    // If socket is already connected, setup immediately
+    if (socket.connected) {
+      console.log("✅ Socket already connected, setting up listeners now");
+      setupListeners();
+    } else {
+      // Otherwise wait for connect event
+      const onConnect = () => {
+        console.log("✅ Socket connected! Setting up listeners");
+        setupListeners();
+      };
+      socket.on("connect", onConnect);
+
+      // Cleanup this temporary listener on unmount
+      return () => {
+        socket.off("connect", onConnect);
+        socket.off("sos_created", handleSosCreated);
+        socket.off("sos_new_pending", handleSosCreated);
+        socket.off("sos_broadcast_all", handleSosCreated);
+        socket.off("sos_assigned", handleSosAssigned);
+      };
+    }
+
+    // Re-setup listeners on reconnect
+    const onReconnect = () => {
+      console.log("🔄 Socket reconnected, re-setting up listeners");
+      socket.off("sos_created", handleSosCreated);
+      socket.off("sos_new_pending", handleSosCreated);
+      socket.off("sos_broadcast_all", handleSosCreated);
+      socket.off("sos_assigned", handleSosAssigned);
+      setupListeners();
+    };
+    socket.on("reconnect", onReconnect);
+
+    return () => {
+      socket.off("sos_created", handleSosCreated);
+      socket.off("sos_new_pending", handleSosCreated);
+      socket.off("sos_broadcast_all", handleSosCreated);
+      socket.off("sos_assigned", handleSosAssigned);
+      socket.off("reconnect", onReconnect);
+    };
+  }, [userId, user?.role, gps]);
+
   // ===== SOCKET.IO: Listen for realtime tracking updates =====
   useEffect(() => {
-    let socket = getSocket() || initSocketFromSession();
-    if (!socket && userId) {
-      const token = typeof localStorage !== "undefined"
-        ? localStorage.getItem("auth_token") || ""
-        : "";
-      socket = initSocket(token, userId, normalizeSocketRole(user?.role || user?.user?.role));
-    }
+    let socket = getSocket();
     if (!socket) return;
 
     // Listen: Mission location confirmed (realtime distance, ETA)
@@ -449,85 +600,12 @@ export default function ResponderMissionBoard({ user }) {
       );
     });
 
-    async function refreshRealtimeSosList() {
-      try {
-        const res = await getAllSos();
-        const rawList = res?.data?.data || [];
-        const sosList = rawList;
-        const mapped = hideLowLevelRequests(mapSosToResponderRequests(sosList, gps));
-        syncRequests(mapped, { notifyNew: true });
-        syncStatsFromRequests(mapped);
-      } catch {
-        // keep current UI state if refresh fails
-      }
-    }
-
-    async function handleSosCreated(data = {}) {
-      const requestId = data.request_id ? String(data.request_id) : "";
-      if (!requestId) return;
-
-      const fallbackPayload = {
-        _id: requestId,
-        status: data.status || "PENDING",
-        address: data.address || "",
-        description: data.description || "",
-        victim_name: data.victim_name || "",
-        victim_phone: data.victim_phone || "",
-        incident_type_name: data.incident_type_name || "",
-        location: data.location,
-        created_at: data.created_at || new Date().toISOString(),
-      };
-
-      // Update list + toast immediately from socket payload
-      upsertRealtimeSos(fallbackPayload, { notifyNew: true });
-
-      try {
-        const detailRes = await getSosDetail(requestId);
-        const fullSos = detailRes?.data?.data;
-        if (fullSos?._id) {
-          upsertRealtimeSos(fullSos, { notifyNew: false });
-          return;
-        }
-      } catch {
-        // Keep socket payload fallback below if detail endpoint is temporarily unavailable.
-      }
-    }
-
-    function handleSosAssigned(data = {}) {
-      const requestId = data.request_id ? String(data.request_id) : "";
-      if (!requestId) return;
-
-      const existing = requestsRef.current.find((item) => String(item.id) === requestId);
-      if (!existing) {
-        refreshRealtimeSosList();
-        return;
-      }
-
-      upsertRealtimeSos(
-        {
-          ...(existing.source || {}),
-          _id: requestId,
-          status: data.status || "ASSIGNED",
-        },
-        { notifyNew: false },
-      );
-    }
-
-    // Listen: SOS updates from backend
-    socket.on("sos_created", handleSosCreated);
-    socket.on("sos_new_pending", handleSosCreated);
-    socket.on("sos_broadcast_all", handleSosCreated);
-    socket.on("sos_assigned", handleSosAssigned);
-
     return () => {
       socket.off("mission_location_confirmed");
       socket.off("mission_stage_update");
-      socket.off("sos_created", handleSosCreated);
-      socket.off("sos_new_pending", handleSosCreated);
-      socket.off("sos_broadcast_all", handleSosCreated);
-      socket.off("sos_assigned", handleSosAssigned);
     };
-  }, [gps, selectedRequest?.id, userId]);
+  }, [selectedRequest?.id]);
+
 
   async function handleAcceptMission(selectedRequest) {
     if (!selectedRequest?.id || !userId) return;

@@ -16,6 +16,16 @@ import cookieParser from "cookie-parser";
 import jwt from "jsonwebtoken";
 import { firebaseAdminAuth } from "./config/firebaseAdmin.js";
 
+function normalizeSocketRole(role) {
+  const value = String(role || "").trim().toUpperCase();
+  if (!value) return null;
+  if (value === "RESPONDER" || value === "RESCUE") return "RESCUE";
+  if (value === "VICTIM") return "VICTIM";
+  if (value === "ADMIN") return "ADMIN";
+  if (value === "STAFF") return "STAFF";
+  return value;
+}
+
 dotenv.config();
 const app = express();
 const httpServer = createServer(app);
@@ -36,12 +46,14 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
 connectDB();
 
 app.use("/api/users", userRoutes);
+app.use("/api/user", userRoutes);
 app.use("/api/teams", teamRoutes);
 app.use("/api/sos", sosRoutes);
 app.use("/api/auth", authRoutes);
@@ -55,10 +67,13 @@ io.use(async (socket, next) => {
   const userId = socket.handshake.auth.userId;
   const userRole = socket.handshake.auth.userRole;
 
+  console.log(`🔐 Socket auth middleware - userId: ${userId}, userRole: ${userRole}, hasToken: ${!!token}`);
+
   if (!token) {
     console.log("⚠️ Socket connected without token");
     socket.userId = userId;
     socket.userRole = userRole;
+    console.log(`📝 Socket set to - userId: ${socket.userId}, role: ${socket.userRole}`);
     return next();
   }
 
@@ -68,7 +83,8 @@ io.use(async (socket, next) => {
       const decodedToken = await firebaseAdminAuth.verifyIdToken(token);
       // Ưu tiên dùng MongoDB _id từ handshake, fallback về Firebase UID
       socket.userId = userId || decodedToken.uid;
-      socket.userRole = userRole || "VICTIM";
+      socket.userRole = normalizeSocketRole(userRole || "VICTIM");
+      console.log(`✅ Firebase verified - userId: ${socket.userId}, role: ${socket.userRole}`);
       return next();
     } catch (fbErr) {
       // Không phải Firebase token, chuyển sang thử JWT
@@ -80,7 +96,8 @@ io.use(async (socket, next) => {
       try {
         const decoded = jwt.verify(token, secret);
         socket.userId = decoded.sub || userId;
-        socket.userRole = decoded.role || userRole;
+        socket.userRole = normalizeSocketRole(decoded.role || userRole);
+        console.log(`✅ JWT verified - userId: ${socket.userId}, role: ${socket.userRole}`);
         return next();
       } catch (jwtErr) {
         // Token không hợp lệ
@@ -89,7 +106,8 @@ io.use(async (socket, next) => {
 
     // Fallback nếu verify thất bại nhưng vẫn cho kết nối (hoặc có thể block tùy security)
     socket.userId = userId;
-    socket.userRole = userRole;
+    socket.userRole = normalizeSocketRole(userRole);
+    console.log(`⚠️ Fallback - userId: ${socket.userId}, role: ${socket.userRole}`);
     next();
   } catch (err) {
     console.error("❌ Socket auth middleware error:", err.message);
@@ -99,7 +117,8 @@ io.use(async (socket, next) => {
 
 // ===== SOCKET.IO EVENTS =====
 io.on("connection", (socket) => {
-  console.log(`✅ Socket connected: ${socket.id} (User: ${socket.userId})`);
+  socket.userRole = normalizeSocketRole(socket.userRole);
+  console.log(`✅ Socket connected: ${socket.id} (User: ${socket.userId}, Role: ${socket.userRole})`);
 
   // === Join rooms by role ===
   if (socket.userRole === "VICTIM") {
@@ -109,12 +128,13 @@ io.on("connection", (socket) => {
     );
   }
 
-  if (socket.userRole === "RESCUE" || socket.userRole === "RESPONDER") {
+  if (socket.userRole === "RESCUE") {
     socket.join(`rescue-${socket.userId}`);
     socket.join("rescue-all");
     console.log(
-      `🚑 Rescue ${socket.userId} joined room rescue-${socket.userId} + rescue-all`,
+      `🚑 Rescue ${socket.userId} joined room rescue-${socket.userId} + rescue-all (Role: ${socket.userRole})`,
     );
+    console.log(`📊 Sockets in rescue-all room:`, io.sockets.adapter.rooms.get("rescue-all")?.size || 0);
   }
 
   if (socket.userRole === "ADMIN" || socket.userRole === "STAFF") {

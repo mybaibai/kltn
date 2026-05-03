@@ -86,9 +86,16 @@ export const create = async (req, res) => {
     });
 
     // Broadcast realtime cho tất cả đội cứu hộ để cập nhật danh sách ngay
+    console.log(`📢 Broadcasting sos_created to rescue-all room. Payload:`, {
+      request_id: fullSos?._id,
+      status: 'PENDING',
+      victim_name: victimName,
+      address: fullSos?.address,
+    });
     io.to('rescue-all').emit('sos_created', {
       ...rescueRealtimePayload,
     });
+    console.log(`✅ sos_created emitted to rescue-all`);
 
     // Notify đội gần nhất ngay lập tức
     try {
@@ -256,6 +263,7 @@ export const assign = async (req, res) => {
         rescue_id: rescueId,
         status: sos.status,
       });
+      console.log('📡 Emitted sos_assigned to rescue-all:', { request_id: sos._id, rescue_id: rescueId });
 
       if (victimId) {
         io.to(`victim-${victimId}`).emit('rescue_accepted', {

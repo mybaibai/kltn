@@ -60,6 +60,7 @@ export default function ResponderTeamEditPage() {
   const [submitMessage, setSubmitMessage] = useState("");
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -68,6 +69,7 @@ export default function ResponderTeamEditPage() {
     email: "",
     address: "",
     emergencyContact: "",
+    avatarUrl: "",
   });
 
   useEffect(() => {
@@ -122,6 +124,7 @@ export default function ResponderTeamEditPage() {
             email: resolvedTeam?.auth?.email || "",
             address: resolvedTeam?.profile?.address || resolvedTeam?.address || "",
             emergencyContact: resolvedTeam?.profile?.emergency_contact || "",
+            avatarUrl: resolvedTeam?.profile?.avatar_url || "",
           });
         }
       } catch (error) {
@@ -167,6 +170,29 @@ export default function ResponderTeamEditPage() {
     if (submitMessage) setSubmitMessage("");
   }
 
+  function handleAvatarSelect(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const maxSize = 3 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setSubmitMessage("Ảnh quá lớn. Vui lòng chọn file dưới 3MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = String(reader.result || "");
+      setForm((prev) => ({ ...prev, avatarUrl: url }));
+      if (submitMessage) setSubmitMessage("");
+    };
+    reader.readAsDataURL(file);
+  }
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
   async function handleSubmit(event) {
     event.preventDefault();
     if (!team?._id || saving) return;
@@ -178,11 +204,18 @@ export default function ResponderTeamEditPage() {
         ...(team?.profile || {}),
         address: form.address,
         emergency_contact: form.emergencyContact,
+        avatar_url: form.avatarUrl,
+      };
+
+      const nextAuth = {
+        ...(team?.auth || {}),
+        email: form.email,
       };
 
       const payload = {
         full_name: form.name,
         phone: form.phone,
+        auth: nextAuth,
         profile: nextProfile,
       };
 
@@ -205,6 +238,7 @@ export default function ResponderTeamEditPage() {
     }
   }
 
+  const avatarUrl = form.avatarUrl || team?.profile?.avatar_url || "";
   const teamName = form.name || "Đội cứu hộ";
   const normalizedStatus = String(team?.status || "").trim().toLowerCase();
   const statusSummary =
@@ -296,7 +330,13 @@ export default function ResponderTeamEditPage() {
               <p>{team?.auth?.email || authUser?.auth?.email || "Sentinel Admin"}</p>
               <span>Đang trực</span>
             </div>
-            <div className="team-edit-avatar">{initialsFromName(teamName)}</div>
+            <div className="team-edit-avatar">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={teamName} className="team-edit-avatar-img" />
+              ) : (
+                initialsFromName(teamName)
+              )}
+            </div>
           </div>
         </header>
 
@@ -314,12 +354,28 @@ export default function ResponderTeamEditPage() {
 
             <div className="team-edit-card-head">
               <div className="team-badge-avatar">
-                <Shield size={38} />
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={teamName} className="team-badge-avatar-img" />
+                ) : (
+                  <Shield size={38} />
+                )}
               </div>
 
-              <button type="button" className="team-avatar-edit" aria-label="Đổi ảnh đại diện">
+              <button
+                type="button"
+                className="team-avatar-edit"
+                aria-label="Đổi ảnh đại diện"
+                onClick={handleAvatarClick}
+              >
                 <Pencil size={12} />
               </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleAvatarSelect}
+              />
 
               <div className="team-head-meta">
                 <h2>{teamName}</h2>
@@ -349,9 +405,14 @@ export default function ResponderTeamEditPage() {
 
                 <label className="team-field">
                   <span>Email liên hệ</span>
-                  <div className="field-with-icon is-readonly">
-                    <input type="text" value={form.email} readOnly />
+                  <div className="field-with-icon">
                     <Mail size={13} />
+                    <input
+                      type="email"
+                      value={form.email}
+                      onChange={(event) => updateField("email", event.target.value)}
+                      placeholder="email@team.com"
+                    />
                   </div>
                 </label>
 
@@ -396,11 +457,11 @@ export default function ResponderTeamEditPage() {
 
                 <div className="team-field">
                   <span>Ảnh đại diện mới</span>
-                  <button type="button" className="upload-box-btn">
+                  <button type="button" className="upload-box-btn" onClick={handleAvatarClick}>
                     <UploadCloud size={16} />
                     <div>
                       <strong>Tải lên ảnh mới</strong>
-                      <p>PNG, JPG tối đa 5MB</p>
+                      <p>{avatarUrl ? "Ảnh đã chọn sẵn sàng lưu" : "PNG, JPG tối đa 5MB"}</p>
                     </div>
                   </button>
                 </div>
