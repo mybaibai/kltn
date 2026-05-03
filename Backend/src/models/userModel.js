@@ -1,21 +1,25 @@
 import mongoose from 'mongoose';
+const emergencyContactSchema = new mongoose.Schema(
+  {
+    name: { type: String, default: '' },
+    phone: { type: String, default: '' },
+    relation: { type: String, default: '' },
+  },
+  { _id: false }
+);
 
 const profileSchema = new mongoose.Schema(
   {
     avatar_url: { type: String, default: '' },
+    date_of_birth: { type: Date, default: null },
+    gender: { type: String, default: '' },
     address: { type: String, default: '' },
-    emergency_contact: { type: String, default: '' },
-    // Medical information for Victims
-    blood_type: { 
-      type: String, 
-      enum: ['O', 'A', 'B', 'AB'], 
-      default: '',
-      uppercase: true 
-    },
-    height: { type: Number, default: null }, // cm
-    weight: { type: Number, default: null }, // kg
+    emergency_contacts: { type: [emergencyContactSchema], default: [] }, 
+    blood_type: { type: String, enum: ['O', 'A', 'B', 'AB', ''], default: '', uppercase: true },
+    height: { type: Number, default: null },
+    weight: { type: Number, default: null },
     allergies: { type: String, default: '' },
-    medical_history: { type: [String], default: [] }, // e.g., ["Tiểu đường", "Cao huyết áp"]
+    medical_history: { type: [String], default: [] },
   },
   { _id: false }
 );
@@ -35,6 +39,9 @@ const authSchema = new mongoose.Schema(
 const userSchema = new mongoose.Schema(
   {
     full_name: { type: String, required: true, default: '', trim: true },
+
+    date_of_birth: { type: Date, default: null },   
+    gender: { type: String, default: '' },  
     phone: {
       type: String,
       sparse: true,

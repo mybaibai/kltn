@@ -1,4 +1,3 @@
-//Backend/src/services/userService.js
 import User from '../models/userModel.js';
 
 export const getAllUsers = (filter = {}) => User.find(filter);
@@ -9,8 +8,20 @@ export const getUserByPhone = (phone) => User.findOne({ phone });
 
 export const createUser = (data) => User.create(data);
 
-export const updateUser = (id, data) => User.findByIdAndUpdate(id, data, { new: true });
-
+export const updateUser = async (id, data) => {
+  return await User.findByIdAndUpdate(
+    id,
+    { $set: data },
+    { new: true, runValidators: true }
+  );
+};
+export const addEmergencyContact = async (id, contact) => {
+  return await User.findByIdAndUpdate(
+    id,
+    { $push: { "profile.emergency_contacts": contact } },
+    { new: true }
+  );
+};
 export const toggleUserActive = async (id, is_active) => {
   if (typeof is_active === 'boolean') {
     return User.findByIdAndUpdate(id, { status: is_active ? 'Active' : 'Blocked' }, { new: true });
