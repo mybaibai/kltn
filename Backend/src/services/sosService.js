@@ -146,7 +146,9 @@ export const updateSosAiAnalysis = (sosId, aiResult) =>
     sosId,
     {
       ai_priority_score: aiResult.priority_score,
+      ai_priority_label: aiResult.priority_label,
       ai_category:       aiResult.category,
+      ai_situation_summary: aiResult.situation_summary,
       ai_suggestion:     aiResult.victim_advice,
       ai_rescue_summary: aiResult.rescue_summary,
     },
@@ -167,7 +169,6 @@ export const updateSosAiAnalysis = (sosId, aiResult) =>
  */
 export async function processAiAnalysis({ sosId, description, incidentTypeId, victimId, io }) {
   try {
-    // Resolve tên loại sự cố từ ID — nằm trong service để tránh crash controller
     let incidentTypeName = '';
     if (incidentTypeId) {
       const typeDoc = await IncidentType.findById(incidentTypeId).select('name').lean();
@@ -175,34 +176,64 @@ export async function processAiAnalysis({ sosId, description, incidentTypeId, vi
     }
 
     const aiResult = await analyzeSOS(description, incidentTypeName);
-    if (!aiResult) return; // API chưa config hoặc AI lỗi — bỏ qua
+
+    if (!aiResult) {
+      const fallbackPayload = {
+        request_id:        String(sosId),
+        ai_priority:       5,
+        ai_priority_label: 'Trung bình',
+        ai_category:       incidentTypeName || 'Khác',
+        rescue_summary:    'Hệ thống đang bận. Đội cứu hộ hãy chuẩn bị thiết bị sơ cứu cơ bản và giữ liên lạc với nạn nhân.',
+        victim_advice:     'Hãy giữ bình tĩnh, ở nơi an toàn và chờ đội cứu hộ đang trên đường đến. Tránh di chuyển nếu có thương tích.',
+      };
+
+      await Promise.all([
+        updateSosAiAnalysis(sosId, {
+          priority_score: fallbackPayload.ai_priority,
+          priority_label: fallbackPayload.ai_priority_label,
+          category:       fallbackPayload.ai_category,
+          victim_advice:  fallbackPayload.victim_advice,
+          rescue_summary: fallbackPayload.rescue_summary,
+        }),
+        Promise.resolve(io.to('rescue-all').emit('sos_ai_analyzed', fallbackPayload)),
+        Promise.resolve(io.to('admin-dashboard').emit('sos_ai_analyzed', fallbackPayload)),
+        victimId
+          ? Promise.resolve(io.to(`victim-${victimId}`).emit('sos_ai_advice', fallbackPayload))
+          : Promise.resolve(),
+      ]);
+      return;
+    }
 
     await updateSosAiAnalysis(sosId, aiResult);
     console.log(`🤖 AI SOS ${sosId} — priority: ${aiResult.priority_score}, category: ${aiResult.category}`);
 
-    const payload = {
-      request_id:     String(sosId),
-      ai_priority:    aiResult.priority_score,
-      ai_category:    aiResult.category,
-      rescue_summary: aiResult.rescue_summary,
-      victim_advice:  aiResult.victim_advice,
+    const rescuePayload = {
+      request_id:        String(sosId),
+      ai_priority:       aiResult.priority_score,
+      ai_priority_label: aiResult.priority_label,
+      ai_category:       aiResult.category,
+      situation_summary: aiResult.situation_summary,
+      rescue_summary:    aiResult.rescue_summary,
+      victim_advice:     aiResult.victim_advice,
     };
 
-    // Thông báo cho rescue và admin
-    io.to('rescue-all').emit('sos_ai_analyzed', payload);
-    io.to('admin-dashboard').emit('sos_ai_analyzed', payload);
+    const victimPayload = {
+      request_id:        String(sosId),
+      ai_priority_label: aiResult.priority_label,
+      victim_advice:     aiResult.victim_advice,
+    };
 
-    // ★ Thông báo cho NẠN NHÂN — hướng dẫn sơ cứu hiển thị dưới ô mô tả
-    if (victimId) {
-      io.to(`victim-${victimId}`).emit('sos_ai_advice', {
-        request_id:    String(sosId),
-        victim_advice: aiResult.victim_advice,
-        ai_category:   aiResult.category,
-        ai_priority:   aiResult.priority_score,
-      });
-    }
+    await Promise.all([
+      Promise.resolve(io.to('rescue-all').emit('sos_ai_analyzed', rescuePayload)),
+      Promise.resolve(io.to('admin-dashboard').emit('sos_ai_analyzed', rescuePayload)),
+      victimId
+        ? Promise.resolve(io.to(`victim-${victimId}`).emit('sos_ai_advice', victimPayload))
+        : Promise.resolve(),
+    ]);
+
+    console.log(`📢 AI broadcast xong — victim: ${victimId}, rescue-all + admin`);
+
   } catch (err) {
-    // Log lỗi nhẹ nhàng — KHÔNG throw ra ngoài
     console.error(`❌ processAiAnalysis error for SOS ${sosId}:`, err.message);
   }
 }
