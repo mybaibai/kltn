@@ -1,9 +1,9 @@
-import { useState, useCallback } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
-import AdminSidebar from '@/components/admin/AdminSidebar';
-import AdminTopBar from '@/components/admin/AdminTopBar';
-import SOSForm from '@/page/SosPage/SOSform';
-import { sendSos } from '@/services/api/apiSos';
+import { useState, useCallback } from "react";
+import { Outlet, useNavigate } from "react-router-dom";
+import AdminSidebar from "@/components/admin/AdminSidebar";
+import AdminTopBar from "@/components/admin/AdminTopBar";
+import SOSForm from "@/page/Requester/SOSform";
+import { sendSos } from "@/services/api/apiSos";
 
 export default function AdminLayout() {
   const navigate = useNavigate();
@@ -14,7 +14,7 @@ export default function AdminLayout() {
 
   const handleReportClick = useCallback(() => {
     if (!navigator.geolocation) {
-      alert('Trình duyệt không hỗ trợ GPS');
+      alert("Trình duyệt không hỗ trợ GPS");
       return;
     }
     setGpsLoading(true);
@@ -26,49 +26,62 @@ export default function AdminLayout() {
         try {
           const res = await fetch(
             `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
-            { headers: { 'Accept-Language': 'vi' } },
+            { headers: { "Accept-Language": "vi" } }
           );
           const data = await res.json();
           if (data.display_name) address = data.display_name;
-        } catch { /* keep coords */ }
+        } catch {
+          /* keep coords */
+        }
         setPosition({ lat, lng, address });
         setGpsLoading(false);
         setShowSos(true);
       },
       () => {
-        alert('Không lấy được vị trí. Hãy cho phép GPS.');
+        alert("Không lấy được vị trí. Hãy cho phép GPS.");
         setGpsLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 10_000 },
+      { enableHighAccuracy: true, timeout: 10_000 }
     );
   }, []);
 
-  const handleConfirmSos = useCallback(async (payload) => {
-    const description = typeof payload === 'string' ? payload : (payload?.description ?? '');
-    const incidentType = typeof payload === 'object' && payload?.type != null ? payload.type : null;
+  const handleConfirmSos = useCallback(
+    async (payload) => {
+      const description =
+        typeof payload === "string" ? payload : payload?.description ?? "";
+      const incidentType =
+        typeof payload === "object" && payload?.type != null
+          ? payload.type
+          : null;
 
-    let staffUser = null;
-    try { staffUser = JSON.parse(localStorage.getItem('auth_user')); } catch { /* ignore */ }
+      let staffUser = null;
+      try {
+        staffUser = JSON.parse(localStorage.getItem("auth_user"));
+      } catch {
+        /* ignore */
+      }
 
-    setSending(true);
-    try {
-      const res = await sendSos({
-        requester_id: staffUser?._id,
-        latitude: position?.lat,
-        longitude: position?.lng,
-        address: position?.address,
-        description,
-        incident_type: incidentType,
-      });
-      const sosId = res.data.data._id;
-      setShowSos(false);
-      setSending(false);
-      navigate(`/admin/tracking/${sosId}`);
-    } catch (err) {
-      alert(`Gửi thất bại: ${err?.response?.data?.message || err?.message}`);
-      setSending(false);
-    }
-  }, [position, navigate]);
+      setSending(true);
+      try {
+        const res = await sendSos({
+          requester_id: staffUser?._id,
+          latitude: position?.lat,
+          longitude: position?.lng,
+          address: position?.address,
+          description,
+          incident_type: incidentType,
+        });
+        const sosId = res.data.data._id;
+        setShowSos(false);
+        setSending(false);
+        navigate(`/admin/tracking/${sosId}`);
+      } catch (err) {
+        alert(`Gửi thất bại: ${err?.response?.data?.message || err?.message}`);
+        setSending(false);
+      }
+    },
+    [position, navigate]
+  );
 
   return (
     <div className="flex min-h-dvh bg-brand-gray-bg">

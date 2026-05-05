@@ -1,14 +1,14 @@
-import { auth, waitForFirebaseAuth } from '@/lib/firebase';
-import axios from "axios";
+import { waitForFirebaseAuth } from '@/lib/firebase';
+import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3001/api",
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
 });
 
 api.interceptors.request.use(async (config) => {
   config.headers = config.headers || {};
-  const url = config.url || "";
-  if (url.includes("/auth/firebase")) return config;
+  const url = config.url || '';
+  if (url.includes('/auth/firebase')) return config;
 
   if (config.skipStaffJwt) {
     const user = await waitForFirebaseAuth();
@@ -19,8 +19,8 @@ api.interceptors.request.use(async (config) => {
     return config;
   }
 
-  const jwt = typeof localStorage !== "undefined"
-    ? localStorage.getItem("auth_token")
+  const jwt = typeof localStorage !== 'undefined'
+    ? localStorage.getItem('auth_token')
     : null;
   if (jwt) {
     config.headers.Authorization = `Bearer ${jwt}`;
@@ -38,9 +38,9 @@ api.interceptors.request.use(async (config) => {
 async function withVictimAuthHeader(config = {}) {
   const headers = { ...(config.headers || {}) };
   try {
-    const fbUser = auth.currentUser;
-    if (fbUser) {
-      const idToken = await fbUser.getIdToken();
+    const user = await waitForFirebaseAuth();
+    if (user) {
+      const idToken = await user.getIdToken();
       if (idToken) headers.Authorization = `Bearer ${idToken}`;
     }
   } catch {

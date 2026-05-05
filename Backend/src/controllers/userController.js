@@ -95,3 +95,42 @@ export const addEmergencyContact = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+export const removeEmergencyContact = async (req, res) => {
+  try {
+    console.log("=== REMOVE API HIT ===");
+    console.log("params:", req.params);
+    console.log("req.user:", req.user); 
+
+    const index = parseInt(req.params.index);
+
+    if (isNaN(index)) {
+      return res.status(400).json({ success: false, message: "Index không hợp lệ" });
+    }
+
+    const user = await userService.getUserById(req.user._id);
+    
+    if (!user || !user.profile || !user.profile.emergency_contacts) {
+      return res.status(400).json({
+        success: false,
+        message: "Không có dữ liệu liên hệ khẩn cấp"
+      });
+    }
+
+    if (index < 0 || index >= user.profile.emergency_contacts.length) {
+      return res.status(400).json({
+        success: false,
+        message: "Index vượt phạm vi"
+      });
+    }
+
+    user.profile.emergency_contacts.splice(index, 1);
+
+    await user.save();
+
+    res.status(200).json({ success: true, data: user });
+  } catch (err) {
+    console.error("Remove error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};

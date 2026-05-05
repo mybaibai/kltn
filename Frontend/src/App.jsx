@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import SosPage from '@/page/SosPage';
+import SosPage from '@/page/Requester';
+import TrackingPage from '@/page/TrackingPage';
 import AdminLayout from '@/layouts/AdminLayout';
 import IncidentManagement from '@/page/AdminPage/IncidentManagement';
 import AdminTrackingPage from '@/page/AdminPage/AdminTrackingPage';
@@ -7,14 +8,19 @@ import DashboardPage from '@/page/AdminPage/DashboardPage';
 import AdminPlaceholder from '@/page/AdminPage/AdminPlaceholder';
 import StaffLoginPage from '@/page/StaffLoginPage';
 import ResponderPage from '@/page/ResponderPage';
-import { StaffLoginGate, StaffRoleGuard, StaffHomeRedirect } from '@/components/auth/AuthGuards';
+import ResponderTeamInfoPage from '@/page/ResponderTeamInfoPage';
+import ResponderTeamEditPage from '@/page/ResponderTeamEditPage';
+import RequesterProfile from '@/components/requester/RequesterProfile';
+import {
+  StaffLoginGate,
+  StaffRoleGuard,
+  StaffHomeRedirect,
+} from '@/components/auth/AuthGuards';
 import { STAFF_ROLE_ADMIN, STAFF_ROLE_RESCUE } from '@/services/auth/session';
 import UsersPage from '@/page/AdminPage/UsersPage';
 import HistoryPage from '@/page/AdminPage/HistoryPage';
 import { Toaster } from 'react-hot-toast';
-import TrackingView from './page/SosPage/TrackingView';
 import RescueTrackingView from './components/responder/RescueTracking';
-import TrackingPage from '@/page/TrackingPage';
 
 export default function App() {
   return (
@@ -39,19 +45,19 @@ export default function App() {
         <Route path="/rescue/tracking/:sosId" element={<RescueTrackingView />} />
         <Route
           path="/staff-login"
-          element={(
+          element={
             <StaffLoginGate>
               <StaffLoginPage />
             </StaffLoginGate>
-          )}
+          }
         />
         <Route
           path="/admin"
-          element={(
+          element={
             <StaffRoleGuard allowRoles={[STAFF_ROLE_ADMIN]}>
               <AdminLayout />
             </StaffRoleGuard>
-          )}
+          }
         >
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
@@ -63,11 +69,35 @@ export default function App() {
         </Route>
         <Route
           path="/responder"
-          element={(
+          element={
             <StaffRoleGuard allowRoles={[STAFF_ROLE_RESCUE]}>
               <ResponderPage />
             </StaffRoleGuard>
-          )}
+          }
+        />
+        <Route
+          path="/responder/tracking/:sosId"
+          element={
+            <StaffRoleGuard allowRoles={[STAFF_ROLE_RESCUE]}>
+              <TrackingPage />
+            </StaffRoleGuard>
+          }
+        />
+        <Route
+          path="/responder/team-info"
+          element={
+            <StaffRoleGuard allowRoles={[STAFF_ROLE_RESCUE]}>
+              <ResponderTeamInfoPage />
+            </StaffRoleGuard>
+          }
+        />
+        <Route
+          path="/responder/team-info/edit"
+          element={
+            <StaffRoleGuard allowRoles={[STAFF_ROLE_RESCUE]}>
+              <ResponderTeamEditPage />
+            </StaffRoleGuard>
+          }
         />
         <Route path="/staff" element={<StaffHomeRedirect />} />
       </Routes>

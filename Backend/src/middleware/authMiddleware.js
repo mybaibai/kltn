@@ -67,7 +67,6 @@ export async function attachAuthUser(req, res, next) {
       };
       return next();
     }
-
     if (req.authKind === "firebase" && req.firebaseUser) {
       const phone = req.firebaseUser.phone_number;
       if (!phone) {
