@@ -14,6 +14,7 @@ import HistoryPage from '@/page/AdminPage/HistoryPage';
 import { Toaster } from 'react-hot-toast';
 import TrackingView from './page/SosPage/TrackingView';
 import RescueTrackingView from './components/responder/RescueTracking';
+import TrackingPage from '@/page/TrackingPage';
 
 export default function App() {
   return (
@@ -34,7 +35,7 @@ export default function App() {
         <Route path="/sos" element={<SosPage />} />
         <Route path="/SosPage" element={<Navigate to="/sos" replace />} />
         <Route path="/sospage" element={<Navigate to="/sos" replace />} />
-        <Route path="/tracking/:sosId" element={<TrackingView />} />
+        <Route path="/tracking/:sosId" element={<TrackingPage />} />
         <Route path="/rescue/tracking/:sosId" element={<RescueTrackingView />} />
         <Route
           path="/staff-login"

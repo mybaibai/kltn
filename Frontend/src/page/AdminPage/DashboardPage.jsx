@@ -8,6 +8,8 @@ import {
   XCircle,
   FileText,
   Download,
+  Calendar,
+  ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getAllSos } from '@/services/api/apiSos';
@@ -39,6 +41,28 @@ function calculateDuration(sos) {
 }
 
 /** Tên đội cứu trợ đã gán (populate `full_name` như History / backend) */
+const DATE_RANGE_PRESETS = [
+  { value: '7d', label: '7 ngày qua' },
+  { value: '30d', label: '30 ngày qua' },
+  { value: 'today', label: 'Hôm nay' },
+  { value: 'all', label: 'Tất cả thời gian' },
+];
+
+function filterSosByDatePreset(list, preset) {
+  if (!Array.isArray(list) || preset === 'all') return list;
+  const now = Date.now();
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const t0 = startOfToday.getTime();
+
+  if (preset === 'today') {
+    return list.filter((s) => s.created_at && new Date(s.created_at).getTime() >= t0);
+  }
+  const days = preset === '30d' ? 30 : 7;
+  const ms = days * 24 * 60 * 60 * 1000;
+  return list.filter((s) => s.created_at && now - new Date(s.created_at).getTime() <= ms);
+}
+
 function getAssignedRescueLabel(sos) {
   const ar = sos?.assigned_rescue_id;
   if (ar && typeof ar === 'object') {
@@ -187,6 +211,7 @@ export default function DashboardPage() {
   const [allSos, setAllSos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [trendWindow, setTrendWindow] = useState('this_week');
+  const [dateRangePreset, setDateRangePreset] = useState('7d');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -203,13 +228,18 @@ export default function DashboardPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const filteredSos = useMemo(
+    () => filterSosByDatePreset(allSos, dateRangePreset),
+    [allSos, dateRangePreset],
+  );
+
   const stats = useMemo(() => {
-    const total = allSos.length;
-    const resolved = allSos.filter((s) => normalizeStatus(s.status) === 'RESOLVED');
-    const active = allSos.filter((s) =>
+    const total = filteredSos.length;
+    const resolved = filteredSos.filter((s) => normalizeStatus(s.status) === 'RESOLVED');
+    const active = filteredSos.filter((s) =>
       ['PENDING', 'ASSIGNED', 'IN_PROGRESS'].includes(normalizeStatus(s.status)),
     );
-    const cancelled = allSos.filter((s) => normalizeStatus(s.status) === 'CANCELLED');
+    const cancelled = filteredSos.filter((s) => normalizeStatus(s.status) === 'CANCELLED');
 
     const durations = resolved
       .map((s) => calculateDuration(s))
@@ -221,10 +251,10 @@ export default function DashboardPage() {
     const completionRate = total > 0 ? Math.round((resolved.length / total) * 1000) / 10 : 0;
 
     const now = Date.now();
-    const last7days = allSos.filter(
+    const last7days = filteredSos.filter(
       (s) => s.created_at && now - new Date(s.created_at).getTime() <= 7 * 24 * 60 * 60 * 1000,
     );
-    const prev7days = allSos.filter(
+    const prev7days = filteredSos.filter(
       (s) =>
         s.created_at &&
         now - new Date(s.created_at).getTime() > 7 * 24 * 60 * 60 * 1000 &&
@@ -244,42 +274,42 @@ export default function DashboardPage() {
       completionRate,
       trendPercent,
     };
-  }, [allSos]);
+  }, [filteredSos]);
 
   const distribution = useMemo(() => {
     const typeMap = new Map();
-    allSos.forEach((s) => {
+    filteredSos.forEach((s) => {
       const { label, emoji } = getIncidentTypeDisplay(s.incident_type);
       const key = label;
       if (!typeMap.has(key)) typeMap.set(key, { label, emoji, count: 0 });
       typeMap.get(key).count += 1;
     });
     const sorted = Array.from(typeMap.values()).sort((a, b) => b.count - a.count);
-    const total = allSos.length || 1;
+    const total = filteredSos.length || 1;
     return sorted.map((item) => ({
       ...item,
       percent: Math.round((item.count / total) * 100),
     }));
-  }, [allSos]);
+  }, [filteredSos]);
 
   /** Số sự cố theo đội được phân công (không dùng phân loại loại sự cố) */
   const rescueTeamDistribution = useMemo(() => {
     const teamMap = new Map();
-    allSos.forEach((s) => {
+    filteredSos.forEach((s) => {
       const label = getAssignedRescueLabel(s);
       if (!teamMap.has(label)) teamMap.set(label, { label, emoji: null, count: 0 });
       teamMap.get(label).count += 1;
     });
     const sorted = Array.from(teamMap.values()).sort((a, b) => b.count - a.count);
-    const total = allSos.length || 1;
+    const total = filteredSos.length || 1;
     return sorted.map((item) => ({
       ...item,
       percent: Math.round((item.count / total) * 100),
     }));
-  }, [allSos]);
+  }, [filteredSos]);
 
   const donutSlices = useMemo(() => {
-    const total = allSos.length;
+    const total = filteredSos.length;
     if (total === 0 || distribution.length === 0) return [];
     const cx = 50;
     const cy = 50;
@@ -320,7 +350,7 @@ export default function DashboardPage() {
         percent: item.percent,
       };
     });
-  }, [allSos.length, distribution]);
+  }, [filteredSos.length, distribution]);
 
   const donutChartRef = useRef(null);
   const [donutHover, setDonutHover] = useState(null);
@@ -382,7 +412,7 @@ export default function DashboardPage() {
       return d === 0 ? 6 : d - 1; // T2..CN => 0..6
     };
 
-    allSos.forEach((s) => {
+    filteredSos.forEach((s) => {
       if (!s.created_at) return;
       const createdAt = new Date(s.created_at);
       if (Number.isNaN(createdAt.getTime())) return;
@@ -407,7 +437,7 @@ export default function DashboardPage() {
       this_week: thisWeekCounts.map((c, i) => ({ label: dayLabels[i], count: c, height: (c / max) * 100 })),
       prev_week: prevWeekCounts.map((c, i) => ({ label: dayLabels[i], count: c, height: (c / max) * 100 })),
     };
-  }, [allSos]);
+  }, [filteredSos]);
 
   const activeTrendData = trendWindow === 'prev_week' ? trendSeries.prev_week : trendSeries.this_week;
 
@@ -428,13 +458,35 @@ export default function DashboardPage() {
             Phân tích dữ liệu thời gian thực và báo cáo định kỳ.
           </p>
         </div>
-        <button
-          type="button"
-          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
-        >
-          <Download className="size-4" />
-          Xuất báo cáo PDF
-        </button>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="relative">
+            <Calendar className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-500" />
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
+            <select
+              value={dateRangePreset}
+              onChange={(e) => setDateRangePreset(e.target.value)}
+              aria-label="Lọc theo khoảng thời gian"
+              className={cn(
+                'h-10 min-w-[11.5rem] cursor-pointer appearance-none rounded-lg border border-gray-200',
+                'bg-white py-2 pl-10 pr-9 text-sm font-medium text-gray-700 shadow-sm',
+                'outline-none transition hover:border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
+              )}
+            >
+              {DATE_RANGE_PRESETS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+          >
+            <Download className="size-4 shrink-0" />
+            Xuất báo cáo PDF
+          </button>
+        </div>
       </div>
 
       {/* Stats cards */}
@@ -681,7 +733,7 @@ export default function DashboardPage() {
             {Array.from({ length: 12 }, (_, i) => {
               const hourStart = i * 2;
               const hourEnd = hourStart + 2;
-              const count = allSos.filter((s) => {
+              const count = filteredSos.filter((s) => {
                 if (!s.created_at) return false;
                 const h = new Date(s.created_at).getHours();
                 return h >= hourStart && h < hourEnd;
@@ -690,7 +742,7 @@ export default function DashboardPage() {
                 ...Array.from({ length: 12 }, (_, j) => {
                   const hs = j * 2;
                   const he = hs + 2;
-                  return allSos.filter((x) => {
+                  return filteredSos.filter((x) => {
                     if (!x.created_at) return false;
                     const hh = new Date(x.created_at).getHours();
                     return hh >= hs && hh < he;
