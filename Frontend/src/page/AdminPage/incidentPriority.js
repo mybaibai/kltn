@@ -29,17 +29,19 @@ export function deriveIncidentPriority(sos) {
 }
 
 export function incidentPriorityTableBadgeClass(key) {
-  if (key === 'urgent') return 'bg-brand-red/10 text-brand-red ring-1 ring-brand-red/25';
-  if (key === 'high') return 'bg-brand-gray-bg text-brand-brown ring-1 ring-brand-muted/25';
-  if (key === 'low') return 'bg-slate-50 text-slate-600 ring-1 ring-slate-200';
-  if (key === 'unclassified') return 'bg-amber-50 text-amber-900 ring-1 ring-amber-200/80';
-  return 'bg-white text-brand-muted ring-1 ring-[#E5E7EB]';
+  if (key === 'urgent') return 'bg-rose-100 text-rose-700 ring-1 ring-rose-200';
+  if (key === 'high') return 'bg-orange-100 text-orange-700 ring-1 ring-orange-200';
+  if (key === 'medium') return 'bg-amber-100 text-amber-700 ring-1 ring-amber-200';
+  if (key === 'low') return 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200';
+  if (key === 'unclassified') return 'bg-slate-100 text-slate-600 ring-1 ring-slate-200';
+  return 'bg-slate-100 text-slate-600 ring-1 ring-slate-200';
 }
 
 export function incidentPriorityDetailTextClass(key) {
-  if (key === 'urgent') return 'text-brand-red';
+  if (key === 'urgent') return 'text-rose-700';
   if (key === 'high') return 'text-orange-600';
-  if (key === 'low') return 'text-slate-600';
-  if (key === 'unclassified') return 'text-amber-800';
-  return 'text-brand-muted';
+  if (key === 'medium') return 'text-amber-700';
+  if (key === 'low') return 'text-emerald-700';
+  if (key === 'unclassified') return 'text-slate-600';
+  return 'text-slate-600';
 }
