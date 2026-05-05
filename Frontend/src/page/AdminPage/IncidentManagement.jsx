@@ -7,6 +7,10 @@ import { cn } from '@/lib/utils';
 import { formatSosCode, getIncidentTypeDisplay } from '@/constants/incidentMeta';
 import { getAllSos } from '@/services/api/apiSos';
 import IncidentDetailModal from './IncidentDetailModal';
+import {
+  deriveIncidentPriority,
+  incidentPriorityTableBadgeClass,
+} from './incidentPriority';
 
 const STATUS_FILTER_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
@@ -17,11 +21,14 @@ const STATUS_FILTER_OPTIONS = [
   { value: 'CANCELLED', label: 'Đã hủy' },
 ];
 
+/** `value` = `deriveIncidentPriority(sos).key`; nhãn khớp thang AI (`priority_label`). */
 const PRIORITY_FILTER_OPTIONS = [
   { value: '', label: 'Tất cả mức độ' },
-  { value: 'urgent', label: 'Khẩn cấp' },
+  { value: 'urgent', label: 'Cực kì cao' },
   { value: 'high', label: 'Cao' },
   { value: 'medium', label: 'Trung bình' },
+  { value: 'low', label: 'Thấp' },
+  { value: 'unclassified', label: 'Chưa phân loại' },
 ];
 
 const TIME_FILTER_OPTIONS = [
@@ -48,17 +55,6 @@ function normalizeStatusKey(raw) {
     .replace(/[\s-]+/g, '_');
 }
 
-/** Mức độ: chỉ theo `ai_priority_score` từ backend — không suy từ PENDING. */
-function derivePriority(sos) {
-  const s = sos.ai_priority_score;
-  if (s != null && !Number.isNaN(Number(s))) {
-    const n = Number(s);
-    if (n >= 70) return { key: 'urgent', label: 'KHẨN CẤP' };
-    if (n >= 40) return { key: 'high', label: 'CAO' };
-    return { key: 'medium', label: 'TRUNG BÌNH' };
-  }
-  return { key: 'medium', label: 'TRUNG BÌNH' };
-}
 
 function statusRow(raw) {
   const s = normalizeStatusKey(raw);
@@ -75,12 +71,6 @@ function statusRow(raw) {
     default:
       return { text: raw || '—', dot: 'bg-brand-muted' };
   }
-}
-
-function priorityBadgeClass(key) {
-  if (key === 'urgent') return 'bg-brand-red/10 text-brand-red ring-1 ring-brand-red/25';
-  if (key === 'high') return 'bg-brand-gray-bg text-brand-brown ring-1 ring-brand-muted/25';
-  return 'bg-white text-brand-muted ring-1 ring-[#E5E7EB]';
 }
 
 function inTimeRange(createdAt, range) {
@@ -148,7 +138,7 @@ export default function IncidentManagement() {
     const q = search.trim().toLowerCase();
     return rows.filter((sos) => {
       if (priorityFilter) {
-        const { key } = derivePriority(sos);
+        const { key } = deriveIncidentPriority(sos);
         if (key !== priorityFilter) return false;
       }
       if (!inTimeRange(sos.created_at, timeFilter)) return false;
@@ -342,7 +332,7 @@ export default function IncidentManagement() {
                       typeof sos.victim_id === 'object' && sos.victim_id?.full_name
                         ? sos.victim_id.full_name
                         : '—';
-                    const pr = derivePriority(sos);
+                    const pr = deriveIncidentPriority(sos);
                     const st = statusRow(sos.status);
                     return (
                       <tr
@@ -375,7 +365,7 @@ export default function IncidentManagement() {
                           <span
                             className={cn(
                               'inline-flex rounded-md px-2 py-0.5 text-xs font-semibold',
-                              priorityBadgeClass(pr.key)
+                              incidentPriorityTableBadgeClass(pr.key)
                             )}
                           >
                             {pr.label}

@@ -4,6 +4,10 @@ import { X, Clock, AlertTriangle, MapPin, Phone, Navigation, StickyNote } from '
 import { cn } from '@/lib/utils';
 import { formatSosCode, getIncidentTypeDisplay } from '@/constants/incidentMeta';
 import { updateSosStatus } from '@/services/api/apiSos';
+import {
+  deriveIncidentPriority,
+  incidentPriorityDetailTextClass,
+} from './incidentPriority';
 
 function normalizeStatusKey(s) {
   const x = String(s ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_');
@@ -37,17 +41,6 @@ function statusBadgeClass(s) {
     case 'CANCELLED': return 'bg-gray-100 text-gray-500 ring-1 ring-gray-200';
     default: return 'bg-gray-100 text-gray-500 ring-1 ring-gray-200';
   }
-}
-
-function derivePriority(sos) {
-  const s = sos.ai_priority_score;
-  if (s != null && !Number.isNaN(Number(s))) {
-    const n = Number(s);
-    if (n >= 70) return { label: 'Khẩn cấp', cls: 'text-brand-red' };
-    if (n >= 40) return { label: 'Cao', cls: 'text-orange-600' };
-    return { label: 'Trung bình', cls: 'text-brand-muted' };
-  }
-  return { label: 'Trung bình', cls: 'text-brand-muted' };
 }
 
 function formatTimeFull(iso) {
@@ -125,7 +118,8 @@ export default function IncidentDetailModal({ sos, onClose, onStatusChanged }) {
   const victimPhone = victim?.phone || '—';
 
   const { label: typeLabel } = getIncidentTypeDisplay(sos.incident_type);
-  const priority = derivePriority(sos);
+  const pr = deriveIncidentPriority(sos);
+  const priority = { label: pr.label, cls: incidentPriorityDetailTextClass(pr.key) };
   const code = formatSosCode(sos._id);
   const lat = sos.location?.coordinates?.[1] ?? sos.location?.latitude;
   const lng = sos.location?.coordinates?.[0] ?? sos.location?.longitude;
