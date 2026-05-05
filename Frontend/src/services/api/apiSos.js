@@ -1,5 +1,24 @@
-import api from './index.js';
 import { auth } from '@/lib/firebase';
+import axios from "axios";
+
+const api = axios.create({
+  baseURL: "http://localhost:3001", 
+});
+
+api.interceptors.request.use(async (config) => {
+  try {
+    const fbUser = auth.currentUser;
+
+    if (fbUser) {
+      const idToken = await fbUser.getIdToken();
+      config.headers.Authorization = `Bearer ${idToken}`;
+    }
+  } catch (err) {
+    console.log("Token error:", err);
+  }
+
+  return config;
+});
 
 async function withVictimAuthHeader(config = {}) {
   const headers = { ...(config.headers || {}) };

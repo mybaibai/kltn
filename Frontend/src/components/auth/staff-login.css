@@ -1,10 +1,16 @@
 .staff-auth-page {
+  --staff-font-body: "Geist Variable", "Segoe UI", sans-serif;
+  --staff-font-display: "Geist Variable", "Segoe UI", sans-serif;
   position: relative;
   min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: 20px;
-  overflow: hidden;
+  padding: 24px 20px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  font-family: var(--staff-font-body);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
   background: linear-gradient(130deg, #f4f6fb 0%, #f8f7fb 52%, #fbf5f8 100%);
 }
 
@@ -18,6 +24,8 @@
 }
 
 .staff-auth-shell {
+  position: relative;
+  z-index: 1;
   width: min(100%, 560px);
   display: grid;
   justify-items: center;
@@ -26,62 +34,55 @@
 .staff-auth-card {
   width: min(100%, 430px);
   background: #fff;
-  border-radius: 11px;
+  border-radius: 14px;
   border: 1px solid #e8edf5;
   box-shadow: 0 12px 30px rgba(43, 66, 103, 0.12);
-  padding: 22px 22px 18px;
+  padding: 24px 24px 20px;
 }
 
 .staff-brand {
   display: flex;
-  align-items: center;
-  gap: 11px;
-  margin-bottom: 12px;
+  justify-content: center;
+  margin-bottom: 10px;
 }
 
-.staff-brand-icon {
-  height: 42px;
-  width: 42px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  background: linear-gradient(140deg, #2952c7, #2949b2);
-  box-shadow: 0 8px 18px rgba(24, 78, 175, 0.28);
-}
-
-.staff-brand h1 {
-  margin: 0;
-  color: #284bab;
-  font-size: clamp(30px, 2.6vw, 40px);
-  font-weight: 700;
-  line-height: 1;
+.staff-brand-logo {
+  width: min(100%, 240px);
+  height: auto;
+  display: block;
 }
 
 .staff-auth-title {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   text-align: center;
   color: #222531;
-  font-size: clamp(38px, 3vw, 48px);
-  font-weight: 700;
-  line-height: 1.06;
+  font-family: var(--staff-font-display);
+  font-size: clamp(30px, 2.8vw, 38px);
+  font-weight: 760;
+  line-height: 1.18;
+  letter-spacing: -0.018em;
 }
 
 .staff-auth-subtitle {
-  margin: 2px auto 18px;
-  max-width: 300px;
+  margin: 8px auto 18px;
+  max-width: 340px;
   text-align: center;
-  color: #4e525f;
-  font-size: 15px;
-  line-height: 1.28;
+  color: #5b6272;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.staff-auth-form {
+  display: grid;
 }
 
 .staff-auth-label {
   display: block;
   margin: 0 0 7px;
-  color: #464b58;
-  font-size: 15px;
-  font-weight: 600;
+  color: #434b59;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.25;
 }
 
 .staff-auth-field {
@@ -90,9 +91,9 @@
   gap: 8px;
   width: 100%;
   border: 1px solid #eceef3;
-  border-radius: 8px;
+  border-radius: 10px;
   background: #f7f7fa;
-  min-height: 47px;
+  min-height: 50px;
   padding: 0 11px;
   margin-bottom: 14px;
 }
@@ -108,11 +109,12 @@
   background: transparent;
   font-size: 15px;
   color: #2f3441;
+  line-height: 1.35;
   outline: none;
 }
 
 .staff-auth-field input::placeholder {
-  color: #cab9bd;
+  color: #9ca4b4;
 }
 
 .staff-toggle-password {
@@ -129,15 +131,15 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .staff-checkbox {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  color: #4f5160;
-  font-size: 14px;
+  color: #505868;
+  font-size: 13px;
 }
 
 .staff-checkbox input {
@@ -150,7 +152,7 @@
   background: transparent;
   color: #294cab;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
   padding: 0;
 }
 
@@ -161,8 +163,10 @@
   border-radius: 10px;
   background: linear-gradient(90deg, #284bb4, #2948af);
   color: #fff;
-  font-size: 29px;
+  font-size: 21px;
   font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.005em;
   box-shadow: 0 10px 16px rgba(35, 74, 170, 0.22);
 }
 
@@ -174,13 +178,14 @@
 .staff-submit-inner {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .staff-auth-error {
-  margin: 0 0 10px;
+  margin: 0 0 12px;
   color: #b42318;
   font-size: 13px;
+  line-height: 1.4;
 }
 
 .staff-auth-divider {
@@ -192,7 +197,8 @@
 .staff-auth-footer {
   text-align: center;
   color: #646879;
-  font-size: 15px;
+  font-size: 14px;
+  line-height: 1.42;
 }
 
 .staff-auth-footer button {
@@ -204,13 +210,41 @@
   padding: 0;
 }
 
+.staff-auth-sos-link {
+  margin: 0 0 12px;
+  text-align: center;
+  font-size: 13px;
+}
+
+.staff-auth-sos-link a {
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.staff-auth-sos-link a:hover {
+  text-decoration: underline;
+}
+
 @media (max-width: 520px) {
   .staff-auth-card {
     width: min(100%, 390px);
     padding: 18px 14px 16px;
   }
 
+  .staff-brand h1 {
+    font-size: clamp(24px, 7.5vw, 30px);
+  }
+
+  .staff-auth-title {
+    font-size: clamp(30px, 10vw, 38px);
+  }
+
   .staff-auth-submit {
-    font-size: 25px;
+    font-size: 19px;
+  }
+
+  .staff-auth-row {
+    gap: 8px;
   }
 }

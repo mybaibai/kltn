@@ -56,14 +56,14 @@ export const findNearestRescue = async (lng, lat, maxDistance = 10000) => {
 
 export const getAllSos = (filter = {}) =>
   SosRequest.find(filter)
-    .populate('victim_id', 'full_name phone')
+    .populate('victim_id', 'full_name phone auth.phone')
     .populate('assigned_rescue_id', 'full_name phone')
     .populate('incident_type', 'name icon color_code is_active')
     .sort({ created_at: -1 });
 
 export const getSosById = (id) =>
   SosRequest.findById(id)
-    .populate('victim_id', 'full_name phone profile')
+    .populate('victim_id', 'full_name phone auth.phone profile')
     .populate('assigned_rescue_id', 'full_name phone')
     .populate('incident_type', 'name icon color_code');
 
@@ -94,7 +94,7 @@ export const getSosByRequester = async (requesterId) => {
 
 export const getSosByTeam = (teamId) =>
   SosRequest.find({ assigned_rescue_id: teamId })
-    .populate('victim_id', 'full_name phone')
+    .populate('victim_id', 'full_name phone auth.phone')
     .populate('assigned_rescue_id', 'full_name phone')
     .populate('incident_type', 'name icon color_code')
     .sort({ created_at: -1 });

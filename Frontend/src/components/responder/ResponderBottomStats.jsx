@@ -4,13 +4,13 @@ export default function ResponderBottomStats({ teamStats, nearestTeamsCount, req
   return (
     <div className="responder-bottom-strip">
       <div>
-        <Siren size={15} /> Tong doi cuu tro: {teamStats.total}
+        <Siren size={15} /> Tổng đội cứu trợ: {teamStats.total}
       </div>
       <div>
-        <Clock3 size={15} /> SOS cho xu ly: {requestStats.pending}/{requestStats.total}
+        <Clock3 size={15} /> SOS chờ xử lý: {requestStats.pending}/{requestStats.total}
       </div>
       <div>
-        <Gauge size={15} /> Doi gan nhat trong 10km: {nearestTeamsCount}
+        <Gauge size={15} /> Đội gần nhất trong 10km: {nearestTeamsCount}
       </div>
     </div>
   );
