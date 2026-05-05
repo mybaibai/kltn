@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   findNearestTeams,
@@ -13,7 +13,6 @@ import ResponderRequestList from "./ResponderRequestList";
 import ResponderDetailPanel from "./ResponderDetailPanel";
 import ResponderBottomStats from "./ResponderBottomStats";
 import {
-  FLOATING_ALERTS,
   LEVEL_META,
   REQUESTS,
   mapSosToResponderRequests,
@@ -25,30 +24,184 @@ export default function ResponderMissionBoard({ user }) {
   const userId = user?._id;
   const [requests, setRequests] = useState([]);
   const [selectedId, setSelectedId] = useState("");
+  const [proximitySort, setProximitySort] = useState("nearest");
+  const [urgencyLevel, setUrgencyLevel] = useState("all");
   const [teamStats, setTeamStats] = useState({ total: 0, active: 0 });
   const [nearestTeams, setNearestTeams] = useState([]);
   const [gps, setGps] = useState(null);
   const [apiMessage, setApiMessage] = useState("");
   const [requestStats, setRequestStats] = useState({ total: 0, pending: 0 });
   const [acceptLoading, setAcceptLoading] = useState(false);
+  const [toastAlerts, setToastAlerts] = useState([]);
+  const requestsRef = useRef([]);
+  const knownRequestIdsRef = useRef(new Set());
+  const hasHydratedRequestsRef = useRef(false);
+  const toastTimersRef = useRef(new Map());
+
+  function hideLowLevelRequests(items) {
+    if (!Array.isArray(items)) return [];
+    return items.filter((item) => String(item?.level || "").toLowerCase() !== "low");
+  }
+
+  function handleSelectRequest(requestId) {
+    if (!requestId) return;
+    setSelectedId(String(requestId));
+  }
+
+  function dismissToast(popupId) {
+    setToastAlerts((prev) => prev.filter((item) => item.popupId !== popupId));
+    const activeTimer = toastTimersRef.current.get(popupId);
+    if (activeTimer) {
+      window.clearTimeout(activeTimer);
+      toastTimersRef.current.delete(popupId);
+    }
+  }
+
+  function pushToastFromRequest(requestItem) {
+    const popupId = `toast-${requestItem.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const level = requestItem.level;
+    const tag = LEVEL_META[level]?.label || "SOS";
+    const description = requestItem.distanceKm != null
+      ? `${requestItem.address} • ${requestItem.distanceKm}km`
+      : requestItem.address;
+
+    const alert = {
+      popupId,
+      level,
+      tag,
+      ago: "Vừa xong",
+      title: requestItem.title,
+      description,
+      actionLabel: "Xem chi tiết",
+      requestId: String(requestItem.id),
+    };
+
+    setToastAlerts((prev) => [alert, ...prev].slice(0, 4));
+
+    const timer = window.setTimeout(() => {
+      dismissToast(popupId);
+    }, 5200);
+
+    toastTimersRef.current.set(popupId, timer);
+  }
+
+  function syncRequests(nextRequests, options = {}) {
+    const { notifyNew = true } = options;
+
+    setRequests(nextRequests);
+    setSelectedId((prev) => prev || String(nextRequests[0]?.id || ""));
+
+    const nextIds = new Set(nextRequests.map((item) => String(item.id)));
+
+    if (notifyNew && hasHydratedRequestsRef.current) {
+      const incoming = nextRequests
+        .filter((item) => !knownRequestIdsRef.current.has(String(item.id)))
+        .slice(0, 3);
+
+      incoming.forEach((item) => pushToastFromRequest(item));
+    }
+
+    knownRequestIdsRef.current = nextIds;
+    if (!hasHydratedRequestsRef.current) {
+      hasHydratedRequestsRef.current = true;
+    }
+  }
+
+  function syncStatsFromRequests(nextRequests) {
+    setRequestStats({
+      total: nextRequests.length,
+      pending: nextRequests.filter(
+        (item) => String(item?.source?.status || "").toLowerCase() === "pending",
+      ).length,
+    });
+  }
+
+  function upsertRealtimeSos(rawSos, options = {}) {
+    const { notifyNew = true } = options;
+    if (!rawSos?._id) return;
+
+    const mapped = mapSosToResponderRequests([rawSos], gps);
+    const incoming = mapped[0];
+    if (!incoming) return;
+
+    const current = requestsRef.current;
+    const index = current.findIndex((item) => String(item.id) === String(incoming.id));
+
+    if (String(incoming?.level || "").toLowerCase() === "low") {
+      if (index < 0) return;
+      const next = current.filter((item) => String(item.id) !== String(incoming.id));
+      syncRequests(next, { notifyNew: false });
+      syncStatsFromRequests(next);
+      return;
+    }
+
+    let next;
+    if (index >= 0) {
+      next = [...current];
+      next[index] = {
+        ...next[index],
+        ...incoming,
+        source: {
+          ...(next[index]?.source || {}),
+          ...(incoming?.source || {}),
+        },
+      };
+    } else {
+      next = [incoming, ...current];
+    }
+
+    syncRequests(next, { notifyNew });
+    syncStatsFromRequests(next);
+    setApiMessage("");
+  }
+
+  const visibleRequests = useMemo(() => {
+    const filtered =
+      urgencyLevel === "all"
+        ? [...requests]
+        : requests.filter((item) => item.level === urgencyLevel);
+
+    const getCreatedAt = (item) => {
+      const value = item?.source?.created_at || item?.source?.createdAt;
+      const timestamp = value ? new Date(value).getTime() : 0;
+      return Number.isFinite(timestamp) ? timestamp : 0;
+    };
+
+    const getDistance = (item) => {
+      const value = Number(item?.distanceKm);
+      return Number.isFinite(value) ? value : null;
+    };
+
+    filtered.sort((a, b) => {
+      if (proximitySort === "latest") {
+        return getCreatedAt(b) - getCreatedAt(a);
+      }
+
+      if (proximitySort === "farthest") {
+        const aDistance = getDistance(a);
+        const bDistance = getDistance(b);
+        if (aDistance == null && bDistance == null) return 0;
+        if (aDistance == null) return 1;
+        if (bDistance == null) return -1;
+        return bDistance - aDistance;
+      }
+
+      const aDistance = getDistance(a);
+      const bDistance = getDistance(b);
+      if (aDistance == null && bDistance == null) return 0;
+      if (aDistance == null) return 1;
+      if (bDistance == null) return -1;
+      return aDistance - bDistance;
+    });
+
+    return filtered;
+  }, [requests, urgencyLevel, proximitySort]);
 
   const selectedRequest = useMemo(
     () =>
-      requests.find((item) => item.id === selectedId) || requests[0] || null,
-    [requests, selectedId],
+      visibleRequests.find((item) => String(item.id) === String(selectedId)) || visibleRequests[0] || null,
+    [visibleRequests, selectedId],
   );
-
-  const floatingAlerts = useMemo(() => {
-    if (!requests.length) return FLOATING_ALERTS;
-    return requests.slice(0, 2).map((item) => ({
-      level: item.level,
-      tag: LEVEL_META[item.level]?.label || "SOS",
-      ago: item.recentAgo,
-      title: item.title,
-      description: `${item.address} • ${item.distanceKm}km`,
-      actionLabel: "NHAN NGAY",
-    }));
-  }, [requests]);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,19 +211,18 @@ export default function ResponderMissionBoard({ user }) {
         const res = await getAllSos();
         const rawList = res?.data?.data || [];
         const sosList = rawList;
-        const mapped = mapSosToResponderRequests(sosList, gps);
+        const mapped = hideLowLevelRequests(mapSosToResponderRequests(sosList, gps));
         if (cancelled) return;
 
         if (!mapped.length) {
-          setRequests([]);
+          syncRequests([], { notifyNew: false });
           setSelectedId("");
           setRequestStats({ total: 0, pending: 0 });
-          setApiMessage((prev) => prev || "Chua co yeu cau SOS nao");
+          setApiMessage((prev) => prev || "Chưa có yêu cầu SOS nào");
           return;
         }
 
-        setRequests(mapped);
-        setSelectedId((prev) => prev || mapped[0].id);
+        syncRequests(mapped, { notifyNew: true });
         setRequestStats({
           total: sosList.length,
           pending: sosList.filter(
@@ -79,11 +231,11 @@ export default function ResponderMissionBoard({ user }) {
         });
       } catch {
         if (cancelled) return;
-        setRequests(REQUESTS);
-        setSelectedId(REQUESTS[0].id);
+        syncRequests(REQUESTS, { notifyNew: false });
+        setSelectedId(String(REQUESTS[0].id));
         setRequestStats({ total: REQUESTS.length, pending: REQUESTS.length });
         setApiMessage(
-          (prev) => prev || "Khong tai duoc danh sach SOS tu he thong",
+          (prev) => prev || "Không tải được danh sách SOS từ hệ thống",
         );
       }
     }
@@ -95,10 +247,26 @@ export default function ResponderMissionBoard({ user }) {
   }, [gps, userId]);
 
   useEffect(() => {
-    if (!requests.length) return;
-    if (requests.some((item) => item.id === selectedId)) return;
-    setSelectedId(requests[0].id);
-  }, [requests, selectedId]);
+    return () => {
+      toastTimersRef.current.forEach((timerId) => {
+        window.clearTimeout(timerId);
+      });
+      toastTimersRef.current.clear();
+    };
+  }, []);
+
+  useEffect(() => {
+    requestsRef.current = requests;
+  }, [requests]);
+
+  useEffect(() => {
+    if (!visibleRequests.length) {
+      setSelectedId("");
+      return;
+    }
+    if (visibleRequests.some((item) => String(item.id) === String(selectedId))) return;
+    setSelectedId(String(visibleRequests[0].id));
+  }, [visibleRequests, selectedId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,7 +284,7 @@ export default function ResponderMissionBoard({ user }) {
         });
       } catch {
         if (cancelled) return;
-        setApiMessage((prev) => prev || "Khong tai duoc danh sach doi cuu tro");
+        setApiMessage((prev) => prev || "Không tải được danh sách đội cứu trợ");
       }
     }
 
@@ -152,7 +320,7 @@ export default function ResponderMissionBoard({ user }) {
 
       // fallback: GPS trình duyệt
       if (!navigator.geolocation) {
-        setApiMessage((prev) => prev || "Trinh duyet khong ho tro GPS");
+        setApiMessage((prev) => prev || "Trình duyệt không hỗ trợ GPS");
         return;
       }
 
@@ -167,7 +335,7 @@ export default function ResponderMissionBoard({ user }) {
         },
         () => {
           if (!cancelled) {
-            setApiMessage((prev) => prev || "Khong lay duoc vi tri hien tai");
+            setApiMessage((prev) => prev || "Không lấy được vị trí hiện tại");
           }
         },
         {
@@ -197,7 +365,7 @@ export default function ResponderMissionBoard({ user }) {
         setNearestTeams(nearestRes?.data?.data || []);
       } catch {
         if (cancelled) return;
-        setApiMessage((prev) => prev || "Khong dong bo duoc vi tri doi");
+        setApiMessage((prev) => prev || "Không đồng bộ được vị trí đội");
       }
     }
 
@@ -251,24 +419,83 @@ export default function ResponderMissionBoard({ user }) {
       );
     });
 
-    // Listen: New SOS assigned to this rescue or broadcasted updates
-    socket.on("sos_assigned", async () => {
+    async function refreshRealtimeSosList() {
       try {
         const res = await getAllSos();
         const rawList = res?.data?.data || [];
         const sosList = rawList;
-        const mapped = mapSosToResponderRequests(sosList, gps);
-        setRequests(mapped);
-        setSelectedId((prev) => prev || mapped[0]?.id || "");
+        const mapped = hideLowLevelRequests(mapSosToResponderRequests(sosList, gps));
+        syncRequests(mapped, { notifyNew: true });
+        syncStatsFromRequests(mapped);
       } catch {
         // keep current UI state if refresh fails
       }
-    });
+    }
+
+    async function handleSosCreated(data = {}) {
+      const requestId = data.request_id ? String(data.request_id) : "";
+      if (!requestId) return;
+
+      try {
+        const detailRes = await getSosDetail(requestId);
+        const fullSos = detailRes?.data?.data;
+        if (fullSos?._id) {
+          upsertRealtimeSos(fullSos, { notifyNew: true });
+          return;
+        }
+      } catch {
+        // Keep socket payload fallback below if detail endpoint is temporarily unavailable.
+      }
+
+      upsertRealtimeSos(
+        {
+          _id: requestId,
+          status: data.status || "PENDING",
+          address: data.address || "",
+          description: data.description || "",
+          victim_name: data.victim_name || "",
+          victim_phone: data.victim_phone || "",
+          incident_type_name: data.incident_type_name || "",
+          location: data.location,
+          created_at: data.created_at || new Date().toISOString(),
+        },
+        { notifyNew: true },
+      );
+    }
+
+    function handleSosAssigned(data = {}) {
+      const requestId = data.request_id ? String(data.request_id) : "";
+      if (!requestId) return;
+
+      const existing = requestsRef.current.find((item) => String(item.id) === requestId);
+      if (!existing) {
+        refreshRealtimeSosList();
+        return;
+      }
+
+      upsertRealtimeSos(
+        {
+          ...(existing.source || {}),
+          _id: requestId,
+          status: data.status || "ASSIGNED",
+        },
+        { notifyNew: false },
+      );
+    }
+
+    // Listen: SOS updates from backend
+    socket.on("sos_created", handleSosCreated);
+    socket.on("sos_new_pending", handleSosCreated);
+    socket.on("sos_broadcast_all", handleSosCreated);
+    socket.on("sos_assigned", handleSosAssigned);
 
     return () => {
       socket.off("mission_location_confirmed");
       socket.off("mission_stage_update");
-      socket.off("sos_assigned");
+      socket.off("sos_created", handleSosCreated);
+      socket.off("sos_new_pending", handleSosCreated);
+      socket.off("sos_broadcast_all", handleSosCreated);
+      socket.off("sos_assigned", handleSosAssigned);
     };
   }, [gps, selectedRequest?.id, userId]);
 
@@ -310,12 +537,12 @@ export default function ResponderMissionBoard({ user }) {
       }
 
       await acceptMission(finalAssignmentId);
-      navigate(`/rescue/tracking/${selectedRequest.id}`);
+      navigate(`/responder/tracking/${selectedRequest.id}`);
     } catch (e) {
       setApiMessage(
         e?.response?.data?.message ||
           e?.message ||
-          "Khong nhan duoc nhiem vu",
+          "Không nhận được nhiệm vụ",
       );
     } finally {
       setAcceptLoading(false);
@@ -325,16 +552,25 @@ export default function ResponderMissionBoard({ user }) {
   return (
     <div className="responder-board-page">
       <div className="responder-board-shell">
-        <p className="responder-mini-title">Quan ly nhiem vu</p>
-        <ResponderBoardHeader user={user} />
+        <p className="responder-mini-title">Quản lý nhiệm vụ</p>
+        <ResponderBoardHeader
+          user={user}
+          proximitySort={proximitySort}
+          urgencyLevel={urgencyLevel}
+          onProximitySortChange={setProximitySort}
+          onUrgencyLevelChange={setUrgencyLevel}
+        />
 
         <section className="responder-grid">
           <ResponderRequestList
-            requests={requests}
+            requests={visibleRequests}
             selectedRequestId={selectedRequest?.id || ""}
             levelMeta={LEVEL_META}
             apiMessage={apiMessage}
-            onSelectRequest={setSelectedId}
+            emptyMessage={requests.length > 0 && !visibleRequests.length
+              ? "Không có yêu cầu phù hợp bộ lọc hiện tại"
+              : undefined}
+            onSelectRequest={handleSelectRequest}
             onAcceptRequest={handleAcceptMission}
             acceptLoading={acceptLoading}
           />
@@ -343,7 +579,9 @@ export default function ResponderMissionBoard({ user }) {
             selectedRequest={selectedRequest}
             teamStats={teamStats}
             nearestTeams={nearestTeams}
-            floatingAlerts={floatingAlerts}
+            toastAlerts={toastAlerts}
+            onDismissToast={dismissToast}
+            onSelectToastRequest={handleSelectRequest}
             onAcceptMission={handleAcceptMission}
             acceptLoading={acceptLoading}
           />
