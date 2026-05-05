@@ -63,12 +63,8 @@ const createCustomIcon = () => {
 const victimIcon = createCustomIcon('#ff4d4f', '#ffffff', true); // Red + Pulse
 const rescueIcon = createCustomIcon('#2f54eb', '#ffffff', false); // Blue
 
-// --------------------------------------------------------------------------
-// SmoothMarker: Shopee-style smooth movement via requestAnimationFrame
-//   - Khi position thay đổi, animate từ vị trí cũ → mới trong `duration` ms
-//   - Dùng Leaflet setLatLng() trực tiếp, bypasss React re-render mỗi frame
-// --------------------------------------------------------------------------
-const SMOOTH_DURATION_MS = 900; // phải ≤ backend tick interval (1000ms)
+
+const SMOOTH_DURATION_MS = 900; 
 
 function easeInOut(t) {
   return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
@@ -394,7 +390,6 @@ export default function TrackingPage() {
     const poll = setInterval(fetchData, 8000);
     return () => { active = false; clearInterval(poll); };
   
-    // ❌ Bỏ persona khỏi đây — persona được set BÊN TRONG effect, không phải input
   }, [sosId, preferVictimToken, victimUser, staffUser, loadTracking]);
 
   // Socket Tracking
@@ -473,6 +468,35 @@ export default function TrackingPage() {
     return parseCoord(tracking?.rescue_location);
   }, [tracking, isMocking, mockCoords]);
 
+  const [cancelCountdown, setCancelCountdown] = useState(60);
+  const [canCancel, setCanCancel] = useState(true);
+
+  useEffect(() => {
+    const CANCEL_WINDOW = 60;
+
+    // Lần đầu tạo request → lưu timestamp
+    if (!localStorage.getItem('requestCreatedAt')) {
+      localStorage.setItem('requestCreatedAt', Date.now().toString());
+    }
+
+    const tick = () => {
+      const createdAt = parseInt(localStorage.getItem('requestCreatedAt') || '0');
+      const elapsed = Math.floor((Date.now() - createdAt) / 1000);
+      const remaining = CANCEL_WINDOW - elapsed;
+
+      if (remaining <= 0) {
+        setCanCancel(false);
+        setCancelCountdown(0);
+      } else {
+        setCanCancel(true);
+        setCancelCountdown(remaining);
+      }
+    };
+
+    tick(); 
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, []);
   // Route recalculation — debounced 3s để không spam OSRM API mỗi tick
   useEffect(() => {
     if (!victimPt || !rescuePt) return;
@@ -581,8 +605,8 @@ export default function TrackingPage() {
             <div className="px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-xl border border-white/10 text-[10px] font-bold tracking-wider uppercase">
               {requestCode}
             </div>
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider ${isCancelled ? 'bg-gray-500/20 text-gray-300' : isResolved ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400 animate-pulse'}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${isCancelled ? 'bg-gray-400' : isResolved ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider ${isCancelled ? 'bg-gray-500/20 text-gray-300' : isResolved ? 'bg-emerald-500/20 text-emerald-600' : 'bg-amber-500/20 text-amber-600 animate-pulse'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isCancelled ? 'bg-gray-400' : isResolved ? 'bg-emerald-400' : 'bg-amber-500'}`} />
               {isCancelled ? 'Đã huỷ' : isResolved ? 'Hoàn thành' : 'Đang thực hiện'}
             </div>
           </div>
@@ -690,13 +714,13 @@ export default function TrackingPage() {
           <button onClick={() => window.location.reload()} className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold text-xs hover:bg-black transition-all shadow-xl shadow-gray-200 uppercase tracking-widest">
              LÀM MỚI
           </button>
-          {!isResolved && !isCancelled && (
+          {!isResolved && !isCancelled && canCancel && (
             <button
-            onClick={() => setShowCancelModal(true)}
-            className="px-8 py-4 border-2 border-rose-500 text-rose-600 rounded-2xl font-bold text-xs hover:bg-rose-50 transition-all uppercase tracking-widest"
-          >
-            HUỶ
-          </button>
+              onClick={() => setShowCancelModal(true)}
+              className="px-8 py-4 border-2 border-rose-500 text-rose-600 rounded-2xl font-bold text-xs hover:bg-rose-50 transition-all uppercase tracking-widest"
+            >
+              HUỶ ({cancelCountdown}s)
+            </button>
           )}
         </div>
       </div>
@@ -705,7 +729,6 @@ export default function TrackingPage() {
       {showCancelModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 backdrop-blur-[2px] p-4">
           <div className="relative z-50 bg-white w-full max-w-[340px] rounded-[30px] p-6 shadow-2xl">
-            {/* Nút X đóng ở góc - Làm nhỏ lại */}
             <button 
               onClick={() => setShowCancelModal(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition"
@@ -715,33 +738,34 @@ export default function TrackingPage() {
               </svg>
             </button>
         
-            {/* Icon Cảnh báo - Thu nhỏ từ w-20 xuống w-16 */}
+            {/* Icon Cảnh báo */}
             <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center">
               <svg className="w-8 h-8 text-rose-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
         
-            {/* Title - Giảm margin bottom */}
+            {/* Title */}
             <h2 className="text-center text-[20px] font-bold text-slate-900 leading-tight mb-2 px-4">
               Bạn có chắc muốn huỷ yêu cầu?
             </h2>
         
-            {/* Content - Giảm margin bottom từ mb-10 xuống mb-6 */}
+            {/* Content */}
             <div className="text-center text-[14px] text-gray-500 leading-normal mb-7">
               <p>Hành động này sẽ dừng quá trình cứu trợ.</p>
               <p>Bạn có thể gửi lại yêu cầu sau.</p>
             </div>
         
-            {/* Actions - Giảm padding nút từ py-4 xuống py-3.5 */}
+            {/* Actions */}
             <div className="flex flex-col gap-2.5">
-              <button
-                onClick={handleCancelRequest}
-                className="w-full py-3.5 rounded-2xl bg-[#d93025] text-white font-bold text-[15px] flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-sm"
-              >
-                <span className="border-2 border-white/80 rounded-full w-4 h-4 flex items-center justify-center text-[8px] font-black">✕</span>
-                Huỷ yêu cầu
-              </button>
+            <button
+              onClick={handleCancelRequest}
+              disabled={!canCancel}
+              className="w-full py-3.5 rounded-2xl bg-[#d93025] text-white font-bold text-[15px] flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <span className="border-2 border-white/80 rounded-full w-4 h-4 flex items-center justify-center text-[8px] font-black">✕</span>
+              Huỷ yêu cầu {canCancel && `(${cancelCountdown}s)`}
+            </button>
         
               <button
                 onClick={() => setShowCancelModal(false)}

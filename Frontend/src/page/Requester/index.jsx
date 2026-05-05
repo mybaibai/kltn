@@ -1,5 +1,5 @@
 // Frontend/src/page/SosPage/index.jsx
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link , useLocation} from 'react-router-dom';
 import { useState, useRef, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -9,6 +9,8 @@ import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png';
 import { sendSos } from '@/services/api/apiSos';
 import LoginRequester from './LoginRequester';
 import SOSForm from './SOSform';  
+import Logo from "@/assets/logo.svg";
+
 import {
   subscribeAuthState,
   logoutVictimFirebase,
@@ -305,7 +307,14 @@ export default function SosPage() {
       setSending(false);
     }
   };
+  const location = useLocation();
 
+  useEffect(() => {
+    if (location.state?.toast) {
+      showToast(location.state.toast, 'warning');
+      window.history.replaceState({}, '');
+    }
+  }, [location.state]);
   return (
     <div className="relative h-screen w-full overflow-hidden font-sans">
       {showLogin && (
@@ -317,21 +326,12 @@ export default function SosPage() {
       {/* HEADER */}
       <header className="fixed top-0 left-0 right-0 z-[1000] p-4 md:p-6">
         <nav className="mx-auto flex max-w-7xl items-center justify-between 
-        rounded-2xl border border-white/20 bg-white/10 px-6 py-3 shadow-lg backdrop-blur-xl">
+          rounded-2xl border border-white/20 bg-white/10 px-6 py-3 shadow-lg backdrop-blur-xl">
   
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500 shadow-lg">
-              🛡️
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-gray-800">SOS Đà Nẵng</h1>
-              <div className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-green-500 animate-ping"></span>
-                <span className="text-[10px] text-gray-600">Hệ thống trực tuyến</span>
-              </div>
-            </div>
-          </div>
-  
+          <Link to="/" className="flex items-center gap-2">
+            <img src={Logo} alt="SOSGo" className="h-8.5 object-contain" />
+          </Link>
+
           {/* MENU + AVATAR */}
           <div className="flex items-center gap-6">
             <button className="text-sm">Bản đồ</button>
@@ -540,14 +540,6 @@ export default function SosPage() {
           <div className="bg-black/70 text-white text-xs px-4 py-1 rounded-full">
             NHẤN NÚT ĐỂ GỬI YÊU CẦU CỨU HỘ
           </div>
-        {/* TOAST */}
-        {toast && (
-          <div className="fixed top-50 left-1/2 -translate-x-1/2 z-[999999]">
-            <div className="bg-yellow-500 text-white px-4 py-3 rounded-xl shadow-xl animate-slide-in">
-              {toast.msg}
-            </div>
-          </div>
-        )}
         </div>
         {/* RIGHT BUTTONS */}
         <div className="pointer-events-auto absolute bottom-8 right-8 flex flex-col gap-3">
@@ -601,6 +593,46 @@ export default function SosPage() {
           sending={sending}
           user={user}
         />
+      )}
+      {toast && (
+        <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 
+          px-4 py-3 rounded-2xl shadow-2xl text-sm font-medium backdrop-blur-sm border
+          ${toast.type === 'warning' 
+            ? 'bg-amber-50/95 text-amber-800 border-amber-200' 
+            : toast.type === 'success' 
+            ? 'bg-emerald-50/95 text-emerald-800 border-emerald-200' 
+            : 'bg-red-50/95 text-red-800 border-red-200'}`}>
+          
+          {/* Icon */}
+          <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0
+            ${toast.type === 'warning' ? 'bg-amber-100' : toast.type === 'success' ? 'bg-emerald-100' : 'bg-red-100'}`}>
+            {toast.type === 'warning' && (
+              <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+              </svg>
+            )}
+            {toast.type === 'success' && (
+              <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M20 6L9 17l-5-5"/>
+              </svg>
+            )}
+            {toast.type === 'error' && (
+              <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/>
+              </svg>
+            )}
+          </div>
+
+          {toast.msg}
+
+          {/* Close */}
+          <button onClick={() => setToast(null)}
+            className="ml-1 text-gray-400 hover:text-gray-600 transition">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <path d="M18 6L6 18M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
       )}
     </div>
   );

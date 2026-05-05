@@ -2,12 +2,25 @@ import { auth } from '@/lib/firebase';
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:3001", 
+  baseURL: "http://localhost:3001/api",
 });
+import { onAuthStateChanged } from "firebase/auth";
 
-api.interceptors.request.use(async (config) => {
+function waitForUser() {
+  return new Promise((resolve) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe(); // chỉ chạy 1 lần
+      resolve(user);
+    });
+  });
+
+}api.interceptors.request.use(async (config) => {
   try {
-    const fbUser = auth.currentUser;
+    let fbUser = auth.currentUser;
+
+    if (!fbUser) {
+      fbUser = await waitForUser();
+    }
 
     if (fbUser) {
       const idToken = await fbUser.getIdToken();
@@ -22,15 +35,20 @@ api.interceptors.request.use(async (config) => {
 
 async function withVictimAuthHeader(config = {}) {
   const headers = { ...(config.headers || {}) };
+
   try {
-    const fbUser = auth.currentUser;
+    let fbUser = auth.currentUser;
+
+    if (!fbUser) {
+      fbUser = await waitForUser(); 
+    }
+
     if (fbUser) {
       const idToken = await fbUser.getIdToken();
       if (idToken) headers.Authorization = `Bearer ${idToken}`;
     }
-  } catch {
-    /* fallback to interceptor default token */
-  }
+  } catch {}
+
   return { ...config, headers };
 }
 
