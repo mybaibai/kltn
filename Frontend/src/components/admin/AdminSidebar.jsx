@@ -31,8 +31,8 @@ export default function AdminSidebar() {
     <aside className="sticky top-0 flex h-dvh w-64 shrink-0 flex-col overflow-y-auto border-r border-[#E8E8EC] bg-[#FAFAFA]">
       <div className="flex items-center justify-start px-3 py-4">
         <img
-          src="https://res.cloudinary.com/dgbtibqno/image/upload/v1776916527/kjblpw26innfxt4xeuqt.png"
-          alt="SOSGO — Nền tảng kết nối cứu trợ khẩn cấp thông minh"
+          src="https://res.cloudinary.com/dgbtibqno/image/upload/v1777905987/e070vnndeaw9aravqhsx.png"
+          alt="SOSGo EMERGENCY SUPPORT"
           className="h-auto w-auto max-w-[120px] object-contain object-left"
         />
       </div>
