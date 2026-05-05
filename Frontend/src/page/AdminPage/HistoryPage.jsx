@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ChevronLeft,
-  ChevronRight,
-  ClipboardList,
-  Clock,
-  CheckCircle2,
-  Search,
-} from 'lucide-react';
+import { ClipboardList, Clock, CheckCircle2, Search } from 'lucide-react';
+import { getAdminPaginationItems } from '@/lib/adminPagination';
 import { cn } from '@/lib/utils';
 import { formatSosCode, getIncidentTypeDisplay } from '@/constants/incidentMeta';
 import { getAllSos } from '@/services/api/apiSos';
@@ -219,18 +213,10 @@ export default function HistoryPage() {
     return Math.round((durations.reduce((a, b) => a + b, 0) / durations.length) * 10) / 10;
   }, [resolvedRows]);
 
-  const pagesArr = useMemo(() => {
-    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
-    const result = [];
-    result.push(1);
-    if (safePage > 3) result.push('...');
-    for (let i = Math.max(2, safePage - 1); i <= Math.min(totalPages - 1, safePage + 1); i++) {
-      result.push(i);
-    }
-    if (safePage < totalPages - 2) result.push('...');
-    result.push(totalPages);
-    return result;
-  }, [totalPages, safePage]);
+  const pagesArr = useMemo(
+    () => getAdminPaginationItems(safePage, totalPages),
+    [safePage, totalPages],
+  );
 
   return (
     <div className="w-full px-6 py-8 space-y-6">
@@ -441,26 +427,29 @@ export default function HistoryPage() {
               type="button"
               disabled={safePage <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 disabled:opacity-40"
+              className="min-w-9 rounded-lg px-2 py-1.5 text-sm font-medium text-gray-500 hover:bg-gray-100 disabled:opacity-40"
+              aria-label="Trang trước"
             >
-              <ChevronLeft className="size-4" />
+              {'<'}
             </button>
-            {pagesArr.map((n, i) =>
-              n === '...' ? (
-                <span key={`ellipsis-${i}`} className="px-2 text-gray-400">…</span>
+            {pagesArr.map((item, i) =>
+              item === 'ellipsis' ? (
+                <span key={`ellipsis-${i}`} className="min-w-9 px-1 text-center text-sm text-gray-400 select-none">
+                  ...
+                </span>
               ) : (
                 <button
-                  key={n}
+                  key={item}
                   type="button"
-                  onClick={() => setPage(n)}
+                  onClick={() => setPage(item)}
                   className={cn(
                     'min-w-9 rounded-lg px-2.5 py-1.5 text-sm font-medium transition',
-                    n === safePage
+                    item === safePage
                       ? 'bg-blue-600 text-white'
                       : 'text-gray-500 hover:bg-gray-100',
                   )}
                 >
-                  {n}
+                  {item}
                 </button>
               ),
             )}
@@ -468,9 +457,10 @@ export default function HistoryPage() {
               type="button"
               disabled={safePage >= totalPages}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 disabled:opacity-40"
+              className="min-w-9 rounded-lg px-2 py-1.5 text-sm font-medium text-gray-500 hover:bg-gray-100 disabled:opacity-40"
+              aria-label="Trang sau"
             >
-              <ChevronRight className="size-4" />
+              {'>'}
             </button>
           </div>
         </div>

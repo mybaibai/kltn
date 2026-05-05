@@ -1,22 +1,37 @@
-import { auth } from '@/lib/firebase';
+import { auth, waitForFirebaseAuth } from '@/lib/firebase';
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:3001", 
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3001/api",
 });
 
 api.interceptors.request.use(async (config) => {
-  try {
-    const fbUser = auth.currentUser;
+  config.headers = config.headers || {};
+  const url = config.url || "";
+  if (url.includes("/auth/firebase")) return config;
 
-    if (fbUser) {
-      const idToken = await fbUser.getIdToken();
-      config.headers.Authorization = `Bearer ${idToken}`;
+  if (config.skipStaffJwt) {
+    const user = await waitForFirebaseAuth();
+    if (user) {
+      const token = await user.getIdToken();
+      config.headers.Authorization = `Bearer ${token}`;
     }
-  } catch (err) {
-    console.log("Token error:", err);
+    return config;
   }
 
+  const jwt = typeof localStorage !== "undefined"
+    ? localStorage.getItem("auth_token")
+    : null;
+  if (jwt) {
+    config.headers.Authorization = `Bearer ${jwt}`;
+    return config;
+  }
+
+  const user = await waitForFirebaseAuth();
+  if (user) {
+    const token = await user.getIdToken();
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   return config;
 });
 

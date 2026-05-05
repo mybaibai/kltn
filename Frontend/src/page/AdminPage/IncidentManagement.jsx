@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  Filter,
-  Map,
-  Search,
-} from 'lucide-react';
+import { Eye, Filter, Map, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getAdminPaginationItems } from '@/lib/adminPagination';
 import { cn } from '@/lib/utils';
 import { formatSosCode, getIncidentTypeDisplay } from '@/constants/incidentMeta';
 import { getAllSos } from '@/services/api/apiSos';
@@ -189,6 +183,11 @@ export default function IncidentManagement() {
     const start = (safePage - 1) * PAGE_SIZE;
     return filtered.slice(start, start + PAGE_SIZE);
   }, [filtered, safePage]);
+
+  const pagesArr = useMemo(
+    () => getAdminPaginationItems(safePage, totalPages),
+    [safePage, totalPages],
+  );
 
   useEffect(() => {
     setPage(1);
@@ -442,34 +441,40 @@ export default function IncidentManagement() {
                 type="button"
                 disabled={safePage <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="rounded-lg p-2 text-brand-muted hover:bg-brand-gray-bg disabled:opacity-40"
+                className="min-w-9 rounded-lg px-2 py-1.5 text-sm font-medium text-brand-muted hover:bg-brand-gray-bg disabled:opacity-40"
                 aria-label="Trang trước"
               >
-                <ChevronLeft className="size-4" />
+                {'<'}
               </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setPage(n)}
-                  className={cn(
-                    'min-w-9 rounded-lg px-2 py-1.5 text-sm font-medium transition',
-                    n === safePage
-                      ? 'bg-brand-red text-white'
-                      : 'text-brand-muted hover:bg-brand-gray-bg'
-                  )}
-                >
-                  {n}
-                </button>
-              ))}
+              {pagesArr.map((item, i) =>
+                item === 'ellipsis' ? (
+                  <span key={`ellipsis-${i}`} className="min-w-9 px-1 text-center text-sm text-brand-muted select-none">
+                    ...
+                  </span>
+                ) : (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setPage(item)}
+                    className={cn(
+                      'min-w-9 rounded-lg px-2 py-1.5 text-sm font-medium transition',
+                      item === safePage
+                        ? 'bg-brand-red text-white'
+                        : 'text-brand-muted hover:bg-brand-gray-bg',
+                    )}
+                  >
+                    {item}
+                  </button>
+                ),
+              )}
               <button
                 type="button"
                 disabled={safePage >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="rounded-lg p-2 text-brand-muted hover:bg-brand-gray-bg disabled:opacity-40"
+                className="min-w-9 rounded-lg px-2 py-1.5 text-sm font-medium text-brand-muted hover:bg-brand-gray-bg disabled:opacity-40"
                 aria-label="Trang sau"
               >
-                <ChevronRight className="size-4" />
+                {'>'}
               </button>
             </div>
           </div>
