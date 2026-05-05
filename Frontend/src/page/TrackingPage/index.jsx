@@ -13,7 +13,7 @@ import "leaflet/dist/leaflet.css";
 import {
   CheckCircle2, Clock, Loader2, ShieldCheck,
   MapPin, User, Phone, AlertTriangle,
-  Ambulance, Search, X, RefreshCw
+  Ambulance, Search, X, RefreshCw, Brain, Lightbulb
 } from 'lucide-react';
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -187,9 +187,10 @@ const STAGE_TO_STEP = {
 };
 
 const PRIORITY_CONFIG = {
-  HIGH:   { label: 'Cao / Khẩn cấp', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' },
-  MEDIUM: { label: 'Trung bình',      color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' },
-  LOW:    { label: 'Thấp',            color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' },
+  'Cực kì cao': { label: 'Cực kì cao', color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-200' },
+  'Cao':        { label: 'Cao / Khẩn cấp', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' },
+  'Trung bình':  { label: 'Trung bình',      color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' },
+  'Thấp':       { label: 'Thấp',            color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' },
 };
 
 const INCIDENT_META = {
@@ -291,6 +292,7 @@ export default function TrackingPage() {
   const [mockCoords, setMockCoords] = useState(null);
   const [botRunning, setBotRunning] = useState(false);
   const [routeCoords, setRouteCoords] = useState([]);
+  const [aiTimeout, setAiTimeout] = useState(false);
 
   // Session Memo
   const staffUser = useMemo(() => {
@@ -447,6 +449,56 @@ export default function TrackingPage() {
     };
   }, [persona]);
 
+  // AI Socket Listeners
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleAiAnalyzed = (payload) => {
+      if (payload.request_id === sosId) {
+        setSos(prev => ({
+          ...prev,
+          ai_priority_score: payload.ai_priority,
+          ai_priority_label: payload.ai_priority_label,
+          ai_category: payload.ai_category,
+           ai_situation_summary: payload.situation_summary,
+          ai_rescue_summary: payload.rescue_summary,
+          ai_suggestion: payload.victim_advice,
+        }));
+        setToaster({ message: "AI đã hoàn tất phân tích sự cố", type: "info" });
+      }
+    };
+
+    const handleAiAdvice = (payload) => {
+      if (payload.request_id === sosId) {
+        setSos(prev => ({
+          ...prev,
+          ai_suggestion: payload.victim_advice,
+          ai_category: payload.ai_category,
+          ai_priority_score: payload.ai_priority,
+          ai_priority_label: payload.ai_priority_label,
+        }));
+        setToaster({ message: "Có lời khuyên sơ cứu mới từ AI", type: "success" });
+      }
+    };
+
+    socket.on("sos_ai_analyzed", handleAiAnalyzed);
+    socket.on("sos_ai_advice", handleAiAdvice);
+
+    // Timeout for AI loading state
+    const timer = setTimeout(() => {
+      if (!sos?.ai_suggestion && !sos?.ai_rescue_summary) {
+        setAiTimeout(true);
+      }
+    }, 15000);
+
+    return () => {
+      socket.off("sos_ai_analyzed", handleAiAnalyzed);
+      socket.off("sos_ai_advice", handleAiAdvice);
+      clearTimeout(timer);
+    };
+  }, [sosId, sos?.ai_suggestion, sos?.ai_rescue_summary]);
+
   // Simulation Logic re-implantation
   useEffect(() => {
     if (!isMocking || !assignmentId || persona !== "rescue" || !mockCoords) return;
@@ -508,7 +560,7 @@ export default function TrackingPage() {
       } catch {
         setRouteCoords([[rescuePt.lat, rescuePt.lng], [victimPt.lat, victimPt.lng]]);
       }
-    }, 3000);
+    }, 500);
 
     return () => clearTimeout(timerId);
   }, [victimPt?.lat, victimPt?.lng, rescuePt?.lat, rescuePt?.lng]);
@@ -695,6 +747,106 @@ export default function TrackingPage() {
                 </div>
               </div>
             </div>
+
+            {/* AI INSIGHTS CARD */}
+            {(!isResolved && !isCancelled) || sos.ai_suggestion || sos.ai_rescue_summary ? (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="relative overflow-hidden"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 rounded-[32px]" />
+                <div className="relative bg-white/60 backdrop-blur-sm border border-indigo-100 rounded-[32px] p-6 shadow-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-2xl bg-indigo-500 flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+                      <Brain size={20} className={!sos.ai_suggestion && !sos.ai_rescue_summary ? "animate-bounce" : "animate-pulse"} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">AI Phân tích</h3>
+                      <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-widest">
+                        {!sos.ai_suggestion && !sos.ai_rescue_summary ? "Đang xử lý dữ liệu..." : "Hỗ trợ thông minh"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {!sos.ai_suggestion && !sos.ai_rescue_summary && !isResolved && !isCancelled ? (
+                    <div className="flex flex-col gap-2 py-2">
+                      <div className="flex items-center gap-3 text-slate-400">
+                        <Loader2 size={16} className="animate-spin" />
+                        <p className="text-[11px] italic">
+                          {aiTimeout ? "Kết nối với AI hơi lâu, vui lòng chờ..." : "AI đang phân tích tình huống để đưa ra lời khuyên..."}
+                        </p>
+                      </div>
+                      {aiTimeout && (
+                        <button 
+                          onClick={() => window.location.reload()}
+                          className="text-[10px] text-indigo-600 font-bold hover:underline w-fit"
+                        >
+                          Tải lại trang nếu chờ quá lâu
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      {(persona === 'rescue' || persona === 'observer' || (staffUser?.role === 'ADMIN')) && (
+                        <div className="space-y-3 mb-4 last:mb-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg shadow-sm border ${
+                              sos.ai_priority_label === 'Cực kì cao' ? 'bg-rose-600 text-white border-rose-500 animate-pulse' :
+                              sos.ai_priority_label === 'Cao' ? 'bg-red-500 text-white border-red-400' :
+                              sos.ai_priority_label === 'Trung bình' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                              'bg-emerald-100 text-emerald-700 border-emerald-200'
+                            }`}>
+                              ƯU TIÊN: {sos.ai_priority_label || (sos.ai_priority_score >= 8 ? 'Cao' : sos.ai_priority_score >= 4 ? 'Trung bình' : 'Thấp')}
+                            </span>
+                            <span className="text-[10px] font-bold px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg border border-slate-200 uppercase">
+                              {sos.ai_category || '—'}
+                            </span>
+                          </div>
+                          {/* TÌNH HUỐNG — rescue đọc trước */}
+{sos.ai_situation_summary && (
+  <div className="bg-orange-50 border border-orange-100 rounded-2xl p-3 mb-2">
+    <span className="font-bold text-orange-700 text-[11px] uppercase block mb-1">
+      🔥 Tình huống:
+    </span>
+    <p className="text-xs text-orange-800 leading-relaxed font-medium">
+      {sos.ai_situation_summary}
+    </p>
+  </div>
+)}
+
+{/* TÓM TẮT CỨU HỘ — giải pháp */}
+{sos.ai_rescue_summary ? (
+  <p className="text-xs text-slate-600 leading-relaxed font-medium">
+    <span className="font-bold text-slate-900 text-[11px] uppercase block mb-1">
+      🛠️ Tóm tắt cứu hộ:
+    </span>
+    {sos.ai_rescue_summary}
+  </p>
+                          ) : (
+                            <p className="text-[11px] italic text-slate-400">Đang chờ tóm tắt cứu hộ...</p>
+                          )}
+                        </div>
+                      )}
+
+                      {(persona === 'victim' || persona === 'observer' || (staffUser?.role === 'ADMIN')) && (
+                        <div className={`flex gap-4 ${persona === 'observer' || (staffUser?.role === 'ADMIN') ? 'border-t border-indigo-50 pt-4 mt-4' : ''}`}>
+                          <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                            <Lightbulb size={18} />
+                          </div>
+                          <div>
+                            <span className="font-bold text-amber-600 text-[11px] uppercase block mb-1">Lời khuyên nạn nhân:</span>
+                            <p className="text-xs text-slate-700 leading-relaxed italic">
+                              {sos.ai_suggestion || "Hãy giữ bình tĩnh và chờ đội cứu trợ đến. Không tự ý di chuyển nếu gặp chấn thương nặng."}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </motion.div>
+            ) : null}
 
             {/* Victim Info Card */}
             <div className="bg-emerald-50 rounded-3xl p-5 border border-emerald-100 flex items-center gap-4">
