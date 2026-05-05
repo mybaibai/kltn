@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   MapContainer,
@@ -27,6 +27,7 @@ import {
 import { getSocket, initSocketFromSession } from "@/services/socket";
 import { getCurrentTracking } from "@/services/api/apiTracking";
 import { getSosDetail } from "@/services/api/apiSos";
+import { getOSRMRoute } from "@/services/api/apiRouting";
 
 // ─── Leaflet Icons ────────────────────────────────────────────────────────────
 const victimIcon = new L.Icon({
@@ -122,6 +123,8 @@ export default function RescueTrackingView() {
   const [lastEmit, setLastEmit] = useState(null);
   const [stageLoading, setStageLoading] = useState(false);
   const [socket, setSocket] = useState(() => getSocket());
+  /** Lộ trình lái xe (OSRM), giống nhánh huyhuynh-dev / TrackingPage */
+  const [routeCoords, setRouteCoords] = useState([]);
 
   const watchIdRef = useRef(null);
   const emitIntervalRef = useRef(null);
@@ -297,6 +300,45 @@ export default function RescueTrackingView() {
       ? sos?.incident_type?.name
       : INCIDENT_LABEL[sos?.incident_type] || sos?.incident_type || "—";
 
+  const victimPt = useMemo(() => {
+    if (!hasVictim) return null;
+    return { lat: victimLat, lng: victimLng };
+  }, [hasVictim, victimLat, victimLng]);
+
+  const rescuePt = useMemo(() => {
+    if (myLocation) return { lat: myLocation.lat, lng: myLocation.lng };
+    const rl = tracking?.rescue_location;
+    if (rl?.coordinates?.length >= 2) {
+      const [lng, lat] = rl.coordinates;
+      return { lat, lng };
+    }
+    return null;
+  }, [myLocation, tracking?.rescue_location]);
+
+  useEffect(() => {
+    if (!victimPt || !rescuePt) {
+      setRouteCoords([]);
+      return;
+    }
+    const timerId = setTimeout(async () => {
+      try {
+        const res = await getOSRMRoute(
+          rescuePt.lat,
+          rescuePt.lng,
+          victimPt.lat,
+          victimPt.lng,
+        );
+        setRouteCoords(res.routeCoords || []);
+      } catch {
+        setRouteCoords([
+          [rescuePt.lat, rescuePt.lng],
+          [victimPt.lat, victimPt.lng],
+        ]);
+      }
+    }, 500);
+    return () => clearTimeout(timerId);
+  }, [victimPt?.lat, victimPt?.lng, rescuePt?.lat, rescuePt?.lng]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-950">
@@ -348,16 +390,14 @@ export default function RescueTrackingView() {
           )}
 
           {/* Line between rescue and victim */}
-          {hasMyLoc && hasVictim && (
+          {routeCoords.length > 1 && (
             <Polyline
-              positions={[
-                [myLocation.lat, myLocation.lng],
-                [victimLat, victimLng],
-              ]}
-              color="#3b82f6"
-              weight={2}
-              opacity={0.5}
-              dashArray="8 6"
+              positions={routeCoords}
+              color="#6366f1"
+              weight={6}
+              opacity={0.6}
+              lineCap="round"
+              lineJoin="round"
             />
           )}
         </MapContainer>

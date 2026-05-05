@@ -138,6 +138,12 @@ io.on("connection", (socket) => {
     console.log(`📍 Socket ${socket.id} (${socket.userRole}) joined room sos-${sos_id}`);
   });
 
+  socket.on("leave_sos_room", ({ sos_id }) => {
+    if (!sos_id) return;
+    socket.leave(`sos-${sos_id}`);
+    console.log(`📍 Socket ${socket.id} left room sos-${sos_id}`);
+  });
+
   // ─── Responder location update ───────────────────────────────────────────────
   socket.on("responder_location_update", async (data) => {
     try {
@@ -182,6 +188,7 @@ io.on("connection", (socket) => {
 
       // ─── NEW: Broadcast qua sos-room để cả 2 cùng nhận 1 lúc ─────────────────
       io.to(`sos-${sos._id}`).emit("sos_room_update", {
+        request_id: assignment.request_id,
         rescue_location: result.assignment.current_location,
         victim_location: sos.location,
         distance_km: result.distance_km,
@@ -255,6 +262,7 @@ io.on("connection", (socket) => {
 
       // ─── NEW: Broadcast qua sos-room ─────────────────────────────────────────
       io.to(`sos-${sos._id}`).emit("sos_room_update", {
+        request_id: assignment.request_id,
         stage: result.new_stage,
         stage_changed: true,
         timestamp: new Date(),

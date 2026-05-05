@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import markerIconUrl from 'leaflet/dist/images/marker-icon.png';
@@ -40,7 +40,7 @@ function RecenterMap({ lat, lng }) {
   return null;
 }
 
-export default function MapView({ userPosition, teamPosition, height = '380px' }) {
+export default function MapView({ userPosition, teamPosition, routePositions, height = '380px' }) {
   const fallbackCenter = [16.0544, 108.2022];
   const center = userPosition?.lat && userPosition?.lng
     ? [userPosition.lat, userPosition.lng]
@@ -67,6 +67,17 @@ export default function MapView({ userPosition, teamPosition, height = '380px' }
           <Marker position={[teamPosition.lat, teamPosition.lng]} icon={blueIcon}>
             <Popup>{teamPosition.label || 'Vị trí cứu trợ'}</Popup>
           </Marker>
+        )}
+
+        {Array.isArray(routePositions) && routePositions.length > 1 && (
+          <Polyline
+            positions={routePositions}
+            color="#6366f1"
+            weight={6}
+            opacity={0.6}
+            lineCap="round"
+            lineJoin="round"
+          />
         )}
       </MapContainer>
     </div>
