@@ -20,7 +20,6 @@ import { STAFF_ROLE_ADMIN, STAFF_ROLE_RESCUE } from '@/services/auth/session';
 import UsersPage from '@/page/AdminPage/UsersPage';
 import HistoryPage from '@/page/AdminPage/HistoryPage';
 import { Toaster } from 'react-hot-toast';
-import RescueTrackingView from './components/responder/RescueTracking';
 
 export default function App() {
   return (
