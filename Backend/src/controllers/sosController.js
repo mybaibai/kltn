@@ -86,16 +86,9 @@ export const create = async (req, res) => {
     });
 
     // Broadcast realtime cho tất cả đội cứu hộ để cập nhật danh sách ngay
-    console.log(`📢 Broadcasting sos_created to rescue-all room. Payload:`, {
-      request_id: fullSos?._id,
-      status: 'PENDING',
-      victim_name: victimName,
-      address: fullSos?.address,
-    });
     io.to('rescue-all').emit('sos_created', {
       ...rescueRealtimePayload,
     });
-    console.log(`✅ sos_created emitted to rescue-all`);
 
     // Notify đội gần nhất ngay lập tức
     try {
@@ -233,6 +226,54 @@ export const updateStatus = async (req, res) => {
       req.body.updated_by || null,
       req.body.note || ''
     );
+    const status = String(req.body.status || sos?.status || '').toUpperCase();
+    const plain = typeof sos?.toObject === 'function' ? sos.toObject() : sos;
+    const victimId = plain?.victim_id?._id || plain?.victim_id;
+    const rescueId = plain?.assigned_rescue_id?._id || plain?.assigned_rescue_id;
+
+    if (status === 'CANCELLED' || status === 'RESOLVED') {
+      const timer = pendingBroadcastTimers.get(String(req.params.id));
+      if (timer) {
+        clearTimeout(timer);
+        pendingBroadcastTimers.delete(String(req.params.id));
+      }
+    }
+
+    io.to('rescue-all').emit('sos_status_updated', {
+      request_id: req.params.id,
+      status,
+      rescue_id: rescueId || null,
+      victim_id: victimId || null,
+      updated_at: new Date(),
+    });
+
+    io.to('admin-dashboard').emit('sos_status_updated', {
+      request_id: req.params.id,
+      status,
+      rescue_id: rescueId || null,
+      victim_id: victimId || null,
+      updated_at: new Date(),
+    });
+
+    if (victimId) {
+      io.to(`victim-${victimId}`).emit('sos_status_updated', {
+        request_id: req.params.id,
+        status,
+        rescue_id: rescueId || null,
+        victim_id: victimId,
+        updated_at: new Date(),
+      });
+    }
+
+    if (rescueId) {
+      io.to(`rescue-${rescueId}`).emit('sos_status_updated', {
+        request_id: req.params.id,
+        status,
+        rescue_id: rescueId,
+        victim_id: victimId || null,
+        updated_at: new Date(),
+      });
+    }
     res.status(200).json({ success: true, data: sos });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

@@ -28,7 +28,13 @@ export const getSosByRequester = async (requesterId) => {
 };
 export const getSosByTeam = (teamId) => api.get(`/sos/team/${teamId}`);
 export const getAllSos = (status) => api.get('/sos', { params: status ? { status } : {} });
-export const updateSosStatus = (id, status) => api.patch(`/sos/${id}/status`, { status });
+export const updateSosStatus = async (id, status, opts = {}) => {
+  if (opts.preferVictimToken) {
+    const config = await withVictimAuthHeader({ skipStaffJwt: true });
+    return api.patch(`/sos/${id}/status`, { status }, { ...config, skipStaffJwt: true });
+  }
+  return api.patch(`/sos/${id}/status`, { status });
+};
 export const assignTeam = (sosId, teamId) => api.patch(`/sos/${sosId}/assign`, { team_id: teamId });
 
 export const patchVictimSosLocation = (sosId, latitude, longitude) =>

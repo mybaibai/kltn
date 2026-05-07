@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   Bell,
+  Clock3,
   Lock,
   Mail,
   MapPin,
@@ -12,10 +13,11 @@ import {
   Shield,
   UploadCloud,
 } from "lucide-react";
-import rescueLogo from "@/assets/logorescue.svg";
+import ResponderSidebar from "@/components/responder/ResponderSidebar";
 import { getAllTeams, getTeamDetail, updateTeam } from "@/services/api/apiTeam";
 import { getAuthUser } from "@/services/auth/session";
 import "./team-edit-page.css";
+
 
 function initialsFromName(name) {
   if (!name) return "RT";
@@ -286,16 +288,15 @@ export default function ResponderTeamEditPage() {
 
   return (
     <div className="team-edit-page">
+      <ResponderSidebar active="team" />
+
       <div className="team-edit-shell">
-        <p className="team-edit-mini-title">Chỉnh sửa thông tin</p>
-
-        <header className="team-edit-topbar">
-          <Link to="/responder/team-info" className="team-edit-back-btn" aria-label="Quay lại thông tin đội">
-            <ArrowLeft size={16} />
-          </Link>
-
-          <div className="team-edit-brand">
-            <img className="team-edit-brand-logo" src={rescueLogo} alt="Logo Sentinel Rescue" />
+        <header className="team-edit-topbar team-edit-topbar--simple">
+          <div className="team-edit-title-group">
+            <h1>Cài đặt Đội cứu hộ</h1>
+            <Link to="/responder/team-info" className="team-edit-back-btn" aria-label="Quay lại thông tin đội">
+              <ArrowLeft size={16} />
+            </Link>
           </div>
 
           <div className="team-edit-topbar-user">
@@ -341,8 +342,6 @@ export default function ResponderTeamEditPage() {
         </header>
 
         <main className="team-edit-content">
-          <p className="team-edit-breadcrumb">Cấu hình &gt; <span>Chỉnh sửa thông tin đội</span></p>
-          <h1>Cài đặt Đội cứu hộ</h1>
           <p className="team-edit-subtitle">Cập nhật hồ sơ công khai và các thông tin liên hệ khẩn cấp.</p>
 
           {loadingTeam ? <p className="team-edit-loading">Đang tải dữ liệu đội...</p> : null}
@@ -353,29 +352,30 @@ export default function ResponderTeamEditPage() {
             <div className="team-edit-card-banner" />
 
             <div className="team-edit-card-head">
-              <div className="team-badge-avatar">
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt={teamName} className="team-badge-avatar-img" />
-                ) : (
-                  <Shield size={38} />
-                )}
+              <div className="team-badge-avatar-wrap">
+                <div className="team-badge-avatar">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt={teamName} className="team-badge-avatar-img" />
+                  ) : (
+                    <Shield size={38} />
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="team-avatar-edit"
+                  aria-label="Đổi ảnh đại diện"
+                  onClick={handleAvatarClick}
+                >
+                  <Pencil size={12} />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleAvatarSelect}
+                />
               </div>
-
-              <button
-                type="button"
-                className="team-avatar-edit"
-                aria-label="Đổi ảnh đại diện"
-                onClick={handleAvatarClick}
-              >
-                <Pencil size={12} />
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                style={{ display: 'none' }}
-                onChange={handleAvatarSelect}
-              />
 
               <div className="team-head-meta">
                 <h2>{teamName}</h2>
@@ -425,19 +425,6 @@ export default function ResponderTeamEditPage() {
                       value={form.phone}
                       onChange={(event) => updateField("phone", event.target.value)}
                       placeholder="090 123 4567"
-                    />
-                  </div>
-                </label>
-
-                <label className="team-field">
-                  <span>Liên hệ khẩn cấp</span>
-                  <div className="field-with-icon">
-                    <Shield size={13} />
-                    <input
-                      type="text"
-                      value={form.emergencyContact}
-                      onChange={(event) => updateField("emergencyContact", event.target.value)}
-                      placeholder="Người phụ trách / Hotline"
                     />
                   </div>
                 </label>

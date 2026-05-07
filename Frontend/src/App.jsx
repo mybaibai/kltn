@@ -7,6 +7,7 @@ import AdminTrackingPage from '@/page/AdminPage/AdminTrackingPage';
 import AdminPlaceholder from '@/page/AdminPage/AdminPlaceholder';
 import StaffLoginPage from '@/page/StaffLoginPage';
 import ResponderPage from '@/page/ResponderPage';
+import ResponderActivityHistoryPage from '@/page/ResponderActivityHistoryPage';
 import ResponderTeamInfoPage from '@/page/ResponderTeamInfoPage';
 import ResponderTeamEditPage from '@/page/ResponderTeamEditPage';
 import RequesterProfile from '@/components/requester/RequesterProfile';
@@ -75,6 +76,14 @@ export default function App() {
           element={(
             <StaffRoleGuard allowRoles={[STAFF_ROLE_RESCUE]}>
               <ResponderTeamEditPage />
+            </StaffRoleGuard>
+          )}
+        />
+        <Route
+          path="/responder/history"
+          element={(
+            <StaffRoleGuard allowRoles={[STAFF_ROLE_RESCUE]}>
+              <ResponderActivityHistoryPage />
             </StaffRoleGuard>
           )}
         />

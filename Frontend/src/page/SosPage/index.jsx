@@ -9,8 +9,6 @@ import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png';
 import { sendSos } from '@/services/api/apiSos';
 import LoginRequester from './LoginRequester';
 import SOSForm from './SOSform';  
-import { getSocket, initSocketFromSession } from '@/services/socket';
-import { ShieldCheck, X } from 'lucide-react';
 import {
   subscribeAuthState,
   logoutVictimFirebase,
@@ -133,91 +131,11 @@ export default function SosPage() {
   const [gpsError, setGpsError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [sending, setSending] = useState(false);
-  const [toastAlerts, setToastAlerts] = useState([]);
+  const [toast, setToast] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [socket, setSocket] = useState(() => getSocket());
   const DEFAULT_CENTER = [16.0544, 108.2022];
   const [open, setOpen] = useState(false);
   const menuRef = useRef();
-  const lastCreatedSosRef = useRef(null);
-  const toastTimersRef = useRef(new Map());
-  const knownToastIdsRef = useRef(new Set());
-
-  // Toast management
-  const dismissToast = (popupId) => {
-    setToastAlerts((prev) => prev.filter((item) => item.popupId !== popupId));
-    const activeTimer = toastTimersRef.current.get(popupId);
-    if (activeTimer) {
-      window.clearTimeout(activeTimer);
-      toastTimersRef.current.delete(popupId);
-    }
-  };
-
-  const pushToast = (msg, type = 'info') => {
-    const popupId = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    
-    if (knownToastIdsRef.current.has(msg)) {
-      return;
-    }
-    knownToastIdsRef.current.add(msg);
-    setTimeout(() => knownToastIdsRef.current.delete(msg), 2000);
-
-    const bgColor = type === 'success' ? 'bg-green-500' : type === 'warning' ? 'bg-yellow-500' : 'bg-red-500';
-    const icon = type === 'success' ? '✅' : type === 'warning' ? '⚠️' : '❌';
-
-    setToastAlerts((prev) => [{ popupId, msg, type, bgColor, icon }, ...prev].slice(0, 3));
-
-    const timer = window.setTimeout(() => {
-      dismissToast(popupId);
-    }, 4000);
-
-    toastTimersRef.current.set(popupId, timer);
-  };
-
-  useEffect(() => {
-    if (socket) return;
-    const nextSocket = initSocketFromSession();
-    if (nextSocket) setSocket(nextSocket);
-  }, [socket]);
-
-  // Listen for SOS creation events
-  useEffect(() => {
-    if (!socket) return;
-
-    socket.on('sos_created', (data) => {
-      const popupId = `sos-created-${data.request_id}`;
-      if (knownToastIdsRef.current.has(popupId)) {
-        return;
-      }
-      knownToastIdsRef.current.add(popupId);
-
-      setToastAlerts((prev) => [
-        {
-          popupId,
-          msg: '✅ Yêu cầu cứu hộ được gửi thành công!',
-          type: 'success',
-          bgColor: 'bg-green-500',
-          icon: '✅',
-          detail: 'Đội cứu hộ gần nhất đã được thông báo',
-        },
-        ...prev,
-      ].slice(0, 3));
-
-      const timer = window.setTimeout(() => {
-        dismissToast(popupId);
-        if (lastCreatedSosRef.current) {
-          navigate(`/tracking/${lastCreatedSosRef.current}`);
-          lastCreatedSosRef.current = null;
-        }
-      }, 4000);
-
-      toastTimersRef.current.set(popupId, timer);
-    });
-
-    return () => {
-      socket.off('sos_created');
-    };
-  }, [socket, navigate]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -259,7 +177,8 @@ export default function SosPage() {
   }, []);
 
   const showToast = (msg, type = 'error') => {
-    pushToast(msg, type);
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 4000);
   };
 
   useEffect(() => {
@@ -621,7 +540,14 @@ export default function SosPage() {
           <div className="bg-black/70 text-white text-xs px-4 py-1 rounded-full">
             NHẤN NÚT ĐỂ GỬI YÊU CẦU CỨU HỘ
           </div>
-
+        {/* TOAST */}
+        {toast && (
+          <div className="fixed bottom-6 right-6 z-[999999]">
+            <div className="bg-yellow-500 text-white px-4 py-3 rounded-xl shadow-xl animate-slide-in">
+              {toast.msg}
+            </div>
+          </div>
+        )}
         </div>
         {/* RIGHT BUTTONS */}
         <div className="pointer-events-auto absolute bottom-8 right-8 flex flex-col gap-3">
@@ -666,29 +592,6 @@ export default function SosPage() {
       </div>
 
   
-  
-      {/* TOAST NOTIFICATIONS - BOTTOM RIGHT */}
-      <div className="fixed bottom-6 right-6 z-[999999] flex flex-col gap-2 max-w-sm">
-        {toastAlerts.map((alert) => (
-          <div
-            key={alert.popupId}
-            className={`${alert.bgColor} text-white px-4 py-3 rounded-xl shadow-xl flex items-start gap-3 border border-opacity-20 border-white animate-slide-in`}
-          >
-            <span className="text-lg mt-0.5">{alert.icon}</span>
-            <div className="flex-1">
-              <p className="font-semibold text-sm">{alert.msg}</p>
-              {alert.detail && <p className="text-xs opacity-90 mt-0.5">{alert.detail}</p>}
-            </div>
-            <button
-              onClick={() => dismissToast(alert.popupId)}
-              className="ml-2 text-white hover:opacity-80 font-bold text-lg flex-shrink-0"
-            >
-              ✕
-            </button>
-          </div>
-        ))}
-      </div>
-
       {/* MODAL */}
       {showModal && (
         <SOSForm

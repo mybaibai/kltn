@@ -10,7 +10,7 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { getSosDetail, patchVictimSosLocation } from "@/services/api/apiSos";
+import { getSosDetail, patchVictimSosLocation, updateSosStatus } from "@/services/api/apiSos";
 import {
   getCurrentTracking,
   updateRescueStage,
@@ -115,6 +115,7 @@ export default function TrackingPage({ mode = "rescue" }) {
   const [refreshing, setRefreshing] = useState(false);
   const [arriving, setArriving] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([
     {
@@ -157,6 +158,8 @@ export default function TrackingPage({ mode = "rescue" }) {
     if (isStaff) return false;
     return !!(auth.currentUser && victimUser);
   }, [victimUser, staffUser]);
+
+  const cancelPath = useMemo(() => (persona === "rescue" ? "/responder" : "/sos"), [persona]);
 
   const loadTracking = useCallback(
     async (aid, victimMode) => {
@@ -285,6 +288,22 @@ export default function TrackingPage({ mode = "rescue" }) {
       socket.off("victim_tracking_update", onVictimUpdate);
     };
   }, [persona, assignmentId, loadTracking]);
+
+  const handleCancelRequest = useCallback(async () => {
+    if (!sosId || cancelling) return;
+    try {
+      setCancelling(true);
+      await updateSosStatus(sosId, "CANCELLED", { preferVictimToken });
+      setToast("Đã hủy yêu cầu cứu trợ");
+      setTimeout(() => setToast(null), 6000);
+      navigate(cancelPath, { replace: true });
+    } catch (e) {
+      setToast(e?.response?.data?.message || e?.message || "Không thể hủy yêu cầu");
+      setTimeout(() => setToast(null), 6000);
+    } finally {
+      setCancelling(false);
+    }
+  }, [sosId, cancelling, preferVictimToken, navigate, cancelPath]);
 
   const handleToggleNotifications = useCallback(() => {
     setShowNotifications((prev) => {
@@ -566,7 +585,6 @@ export default function TrackingPage({ mode = "rescue" }) {
     tracking?.target_address ||
     sos?.victim_id?.profile?.address ||
     "Chưa có địa chỉ";
-  const cancelPath = persona === "rescue" ? "/responder" : "/sos";
   const useRescueLayout = mode === "rescue";
   const unreadCount = notifications.filter((item) => item.unread).length;
 
@@ -761,9 +779,14 @@ export default function TrackingPage({ mode = "rescue" }) {
                 >
                   {refreshing ? "Đang làm mới" : "Làm mới"}
                 </button>
-                <Link to={cancelPath} className="victim-cancel-btn">
-                  Hủy
-                </Link>
+                  <button
+                    type="button"
+                    className="victim-cancel-btn"
+                    onClick={handleCancelRequest}
+                    disabled={cancelling || stageKey === "COMPLETED" || stageKey === "CANCELLED"}
+                  >
+                    {cancelling ? "Đang hủy" : "Hủy"}
+                  </button>
               </div>
             </aside>
           </div>
@@ -932,9 +955,14 @@ export default function TrackingPage({ mode = "rescue" }) {
                 {stageKey === "COMPLETED" ? "Đã hoàn thành" : (completing ? "Đang cập nhật" : "Hoàn thành")}
               </button>
 
-              <Link to={cancelPath} className="tracking-secondary-btn danger">
-                <AlertTriangle size={14} /> Hủy
-              </Link>
+              <button
+                type="button"
+                className="tracking-secondary-btn danger"
+                onClick={handleCancelRequest}
+                disabled={cancelling || stageKey === "COMPLETED" || stageKey === "CANCELLED"}
+              >
+                <AlertTriangle size={14} /> {cancelling ? "Đang hủy" : "Hủy"}
+              </button>
             </div>
 
           </aside>

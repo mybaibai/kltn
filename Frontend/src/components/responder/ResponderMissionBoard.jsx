@@ -501,17 +501,40 @@ export default function ResponderMissionBoard({ user }) {
       );
     }
 
+    async function handleSosStatusUpdated(data = {}) {
+      const requestId = data.request_id ? String(data.request_id) : "";
+      if (!requestId) return;
+      const status = String(data.status || "").toUpperCase();
+
+      if (status === "CANCELLED" || status === "RESOLVED") {
+        const next = requestsRef.current.filter((item) => String(item.id) !== requestId);
+        syncRequests(next, { notifyNew: false });
+        syncStatsFromRequests(next);
+        return;
+      }
+
+      upsertRealtimeSos(
+        {
+          _id: requestId,
+          status: status || "PENDING",
+        },
+        { notifyNew: false },
+      );
+    }
+
     function setupListeners() {
       console.log("📡 Registering SOS socket listeners");
       socket.off("sos_created", handleSosCreated);
       socket.off("sos_new_pending", handleSosCreated);
       socket.off("sos_broadcast_all", handleSosCreated);
       socket.off("sos_assigned", handleSosAssigned);
+      socket.off("sos_status_updated", handleSosStatusUpdated);
 
       socket.on("sos_created", handleSosCreated);
       socket.on("sos_new_pending", handleSosCreated);
       socket.on("sos_broadcast_all", handleSosCreated);
       socket.on("sos_assigned", handleSosAssigned);
+      socket.on("sos_status_updated", handleSosStatusUpdated);
     }
 
     // If socket is already connected, setup immediately
@@ -533,6 +556,7 @@ export default function ResponderMissionBoard({ user }) {
         socket.off("sos_new_pending", handleSosCreated);
         socket.off("sos_broadcast_all", handleSosCreated);
         socket.off("sos_assigned", handleSosAssigned);
+        socket.off("sos_status_updated", handleSosStatusUpdated);
       };
     }
 
@@ -543,6 +567,7 @@ export default function ResponderMissionBoard({ user }) {
       socket.off("sos_new_pending", handleSosCreated);
       socket.off("sos_broadcast_all", handleSosCreated);
       socket.off("sos_assigned", handleSosAssigned);
+      socket.off("sos_status_updated", handleSosStatusUpdated);
       setupListeners();
     };
     socket.on("reconnect", onReconnect);
@@ -552,6 +577,7 @@ export default function ResponderMissionBoard({ user }) {
       socket.off("sos_new_pending", handleSosCreated);
       socket.off("sos_broadcast_all", handleSosCreated);
       socket.off("sos_assigned", handleSosAssigned);
+      socket.off("sos_status_updated", handleSosStatusUpdated);
       socket.off("reconnect", onReconnect);
     };
   }, [userId, user?.role, gps]);
@@ -681,6 +707,7 @@ export default function ResponderMissionBoard({ user }) {
             onSelectRequest={handleSelectRequest}
             onAcceptRequest={handleAcceptMission}
             acceptLoading={acceptLoading}
+            currentUserId={userId}
           />
 
           <ResponderDetailPanel

@@ -1,7 +1,31 @@
 import { useEffect, useMemo, useState } from "react";
 import { getIncidentTypeDisplay } from "@/constants/incidentMeta";
+import CarIcon from "@/assets/car.svg?react";
+import FireIcon from "@/assets/fire.svg?react";
+import LostIcon from "@/assets/lost.svg?react";
+import MedicalIcon from "@/assets/medical.svg?react";
+import WaveIcon from "@/assets/wave.svg?react";
+import MoreIcon from "@/assets/more.svg?react";
 
 const PAGE_SIZE = 5;
+
+const INCIDENT_TYPE_ICON_MAP = {
+  "Thiên tai": WaveIcon,
+  "Cháy nổ": FireIcon,
+  "Tai nạn giao thông": CarIcon,
+  "Sức khỏe": MedicalIcon,
+  "Sức khỏe khẩn cấp": MedicalIcon,
+  "Lạc đường": LostIcon,
+  "Sự cố phương tiện": CarIcon,
+  "Khác": MoreIcon,
+};
+
+function resolveIncidentDisplay(incidentType) {
+  const display = getIncidentTypeDisplay(incidentType);
+  if (display.emoji) return display;
+  const CustomIcon = INCIDENT_TYPE_ICON_MAP[display.label];
+  return CustomIcon ? { ...display, Icon: CustomIcon } : display;
+}
 
 function buildPageItems(totalPages, currentPage) {
   if (totalPages <= 7) {
@@ -46,8 +70,25 @@ export default function ResponderRequestList({
   onSelectRequest,
   onAcceptRequest,
   acceptLoading,
+  currentUserId,
 }) {
   const [currentPage, setCurrentPage] = useState(() => readStoredPage());
+
+  function isRequestAlreadyAccepted(item) {
+    const source = item?.source;
+    if (!source) return false;
+
+    const hasAssignment = !!source?.assignment?._id || !!source?.assignment;
+    const assignedRescueId = source?.assigned_rescue_id?._id || source?.assigned_rescue_id;
+    const isAssignedToCurrentUser = assignedRescueId && currentUserId && String(assignedRescueId) === String(currentUserId);
+
+    return hasAssignment || isAssignedToCurrentUser || source?.status?.toUpperCase() !== "PENDING";
+  }
+
+  function handleAcceptRequest(item) {
+    if (!onAcceptRequest) return;
+    onAcceptRequest(item);
+  }
 
   const totalPages = Math.max(1, Math.ceil(requests.length / PAGE_SIZE));
 
@@ -92,7 +133,7 @@ export default function ResponderRequestList({
           <article className="responder-request-empty">{emptyMessage || "Chưa có yêu cầu SOS để hiển thị"}</article>
         ) : pagedRequests.map((item) => {
           const meta = levelMeta[item.level] || levelMeta.high;
-          const incidentDisplay = getIncidentTypeDisplay(item.incidentType);
+          const incidentDisplay = resolveIncidentDisplay(item.incidentType);
           const selected = String(item.id) === String(selectedRequestId);
           return (
             <article
@@ -127,14 +168,16 @@ export default function ResponderRequestList({
                 <button type="button" onClick={() => onSelectRequest?.(String(item.id))}>
                   Xem chi tiết
                 </button>
-                <button
-                  type="button"
-                  className="responder-accept-btn"
-                  disabled={!onAcceptRequest || acceptLoading}
-                  onClick={() => onAcceptRequest?.(item)}
-                >
-                  {acceptLoading ? "ĐANG XỬ LÝ..." : "Nhận"}
-                </button>
+                {!isRequestAlreadyAccepted(item) && (
+                  <button
+                    type="button"
+                    className="responder-accept-btn"
+                    disabled={!onAcceptRequest || acceptLoading}
+                    onClick={() => handleAcceptRequest(item)}
+                  >
+                    {acceptLoading ? "ĐANG XỬ LÝ..." : "Nhận"}
+                  </button>
+                )}
               </div>
             </article>
           );

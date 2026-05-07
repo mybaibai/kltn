@@ -68,25 +68,12 @@ export function initSocketFromSession() {
 
     const user = staffUser || victimUser;
     const userId = user?._id || user?.id;
-    const rawRole = user?.role;
-    const userRole = normalizeRole(rawRole);
-    
-    console.log("🔌 Socket init from session:", {
-      userId,
-      rawRole,
-      normalizedRole: userRole,
-      hasStaffUser: !!staffUser,
-      hasVictimUser: !!victimUser,
-      staffUserRole: staffUser?.role,
-    });
+    const userRole = normalizeRole(user?.role);
+    console.log("🔌 Socket init - userId:", userId, "userRole:", userRole);
 
-    if (!userId || !userRole) {
-      console.warn("⚠️ Missing userId or userRole for socket init");
-      return null;
-    }
+    if (!userId || !userRole) return null;
     return initSocket(authToken, userId, userRole);
-  } catch (err) {
-    console.error("❌ Error in initSocketFromSession:", err);
+  } catch {
     return null;
   }
 }

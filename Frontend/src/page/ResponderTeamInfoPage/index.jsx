@@ -9,6 +9,7 @@ import {
   MapPin,
   Plus,
 } from "lucide-react";
+import ResponderSidebar from "@/components/responder/ResponderSidebar";
 import rescueLogo from "@/assets/logorescue.svg";
 import { getAuthUser } from "@/services/auth/session";
 import { getTeamDetail, getAllTeams } from "@/services/api/apiTeam";
@@ -216,18 +217,15 @@ export default function ResponderTeamInfoPage() {
 
   return (
     <div className="team-info-page">
+      <ResponderSidebar active="team" />
       <div className="team-info-shell">
-        <p className="team-info-mini-title">Quản lý thông tin cá nhân</p>
+        <p className="team-info-mini-title">Hồ sơ cá nhân</p>
 
         {/* ── Topbar ── */}
         <header className="team-info-topbar">
           <Link to="/responder" className="team-info-back-btn" aria-label="Quay lại bảng nhiệm vụ">
             <ArrowLeft size={16} />
           </Link>
-
-          <div className="team-info-brand">
-            <img className="team-info-brand-logo" src={rescueLogo} alt="Logo Sentinel Rescue" />
-          </div>
 
           <div className="team-info-topbar-user">
             <div className="team-info-notification-wrap" ref={notificationRef}>
@@ -275,10 +273,6 @@ export default function ResponderTeamInfoPage() {
         {/* ── Content ── */}
         <div className="team-info-content">
           <div className="team-info-main-col">
-            <h1>Quản lý thông tin đội cứu trợ</h1>
-            <p className="team-info-subtitle">
-              Cập nhật hồ sơ và điều chỉnh trạng thái hoạt động của đội.
-            </p>
 
             {loadingTeam && <p className="team-info-loading">Đang tải dữ liệu đội từ API...</p>}
             {teamError   && <p className="team-info-error">{teamError}</p>}
@@ -301,15 +295,15 @@ export default function ResponderTeamInfoPage() {
                   <div>
                     <h2>{teamName}</h2>
                     <p><MapPin size={13} /> {teamAddress}</p>
+                    <span className="team-id-chip">{teamIdText}</span>
                   </div>
                 </div>
-                <span className="team-id-chip">{teamIdText}</span>
-                <Link to="/responder/team-info/edit" className="edit-info-btn">
-                  Chỉnh sửa thông tin
-                </Link>
+                <div className="team-card-top-actions">
+                  <span className="team-status-pill">{liveBadge}</span>
+                </div>
               </div>
 
-              <div className="team-card-kpis">
+              <div className="team-card-kpis team-card-kpis-compact">
                 {/* userSchema */}
                 <article>
                   <p>Số điện thoại</p>
@@ -324,13 +318,17 @@ export default function ResponderTeamInfoPage() {
                   <strong>{teamStatus}</strong>
                 </article>
 
-
                 {/* auth */}
                 <article>
                   <p>Email</p>
                   <strong>{authEmail}</strong>
                 </article>
+              </div>
 
+              <div className="team-card-actions team-card-actions-left">
+                <Link to="/responder/team-info/edit" className="edit-info-btn">
+                  Chỉnh sửa thông tin
+                </Link>
               </div>
             </section>
 
