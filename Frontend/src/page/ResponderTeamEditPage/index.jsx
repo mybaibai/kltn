@@ -209,15 +209,9 @@ export default function ResponderTeamEditPage() {
         avatar_url: form.avatarUrl,
       };
 
-      const nextAuth = {
-        ...(team?.auth || {}),
-        email: form.email,
-      };
-
       const payload = {
         full_name: form.name,
         phone: form.phone,
-        auth: nextAuth,
         profile: nextProfile,
       };
 
@@ -405,10 +399,15 @@ export default function ResponderTeamEditPage() {
 
                 <label className="team-field">
                   <span>Email liên hệ</span>
-                  <div className="field-with-icon">
+                  <div className="field-with-icon is-readonly">
                     <Mail size={13} />
                     <input
                       type="email"
+                      name="email"
+                      autoComplete="email"
+                      inputMode="email"
+                      required
+                      readOnly
                       value={form.email}
                       onChange={(event) => updateField("email", event.target.value)}
                       placeholder="email@team.com"

@@ -78,6 +78,10 @@ export default function ResponderBoardHeader({
     };
   }, []);
 
+  function toggleMenu(menuName) {
+    setOpenMenu((prev) => (prev === menuName ? null : menuName));
+  }
+
   function handleToggleNotifications() {
     setOpenMenu((prev) => {
       const next = prev === "notifications" ? null : "notifications";
