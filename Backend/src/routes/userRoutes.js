@@ -1,5 +1,5 @@
 import express from 'express';
-import { create, getAll, getDetail, update, toggleActive, remove, getMe, updateProfile }
+import { create, getAll, getDetail, update, toggleActive, remove, getMe, updateProfile,addEmergencyContact,removeEmergencyContact     }
   from '../controllers/userController.js';
 import { requireAuth, attachAuthUser } from '../middleware/authMiddleware.js';
 
@@ -13,6 +13,12 @@ router.get('/:id',                  getDetail);
 router.put('/:id',                  update);
 router.patch('/:id/toggle-active',  toggleActive);
 router.delete('/:id',               remove);
-
+router.post('/profile/emergency-contact', requireAuth, attachAuthUser, addEmergencyContact);
+router.delete(
+  "/profile/emergency-contact/:index",
+  requireAuth,
+  attachAuthUser,
+  removeEmergencyContact
+);
 export default router;
 

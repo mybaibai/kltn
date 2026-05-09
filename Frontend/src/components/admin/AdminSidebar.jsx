@@ -7,7 +7,6 @@ import {
   Settings,
   HelpCircle,
   LogOut,
-  Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { clearAllAuth } from '@/services/auth/session';
@@ -17,10 +16,10 @@ const navItems = [
   { to: '/admin/incidents', label: 'Quản lý sự cố', icon: AlertTriangle, end: true },
   { to: '/admin/users', label: 'Quản lý người dùng', icon: Users, end: false },
   { to: '/admin/history', label: 'Lịch sử', icon: History, end: false },
-  { to: '/admin/settings', label: 'Cài đặt', icon: Settings, end: false },
+ // { to: '/admin/settings', label: 'Cài đặt', icon: Settings, end: false },
 ];
 
-export default function AdminSidebar({ onReportClick, gpsLoading }) {
+export default function AdminSidebar() {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -30,15 +29,12 @@ export default function AdminSidebar({ onReportClick, gpsLoading }) {
 
   return (
     <aside className="sticky top-0 flex h-dvh w-64 shrink-0 flex-col overflow-y-auto border-r border-[#E8E8EC] bg-[#FAFAFA]">
-      <div className="px-5 py-6">
-        <div className="text-left">
-          <p className="text-lg font-bold leading-snug text-brand-blue">
-            Hệ thống cứu hộ
-          </p>
-          <p className="mt-0.5 text-sm font-normal leading-snug text-brand-brown">
-            Hệ thống quản lý khẩn cấp
-          </p>
-        </div>
+      <div className="flex items-center justify-start px-3 py-4">
+        <img
+          src="https://res.cloudinary.com/dgbtibqno/image/upload/v1777905987/e070vnndeaw9aravqhsx.png"
+          alt="SOSGo EMERGENCY SUPPORT"
+          className="h-auto w-auto max-w-[120px] object-contain object-left"
+        />
       </div>
 
       <nav className="flex flex-1 flex-col gap-0.5 p-3">
@@ -63,6 +59,7 @@ export default function AdminSidebar({ onReportClick, gpsLoading }) {
       </nav>
 
       <div className="border-t border-[#E8E8EC] p-3">
+        {/* Ẩn nút báo cáo SOS từ admin — bật lại khi cần
         <button
           type="button"
           onClick={onReportClick}
@@ -72,6 +69,7 @@ export default function AdminSidebar({ onReportClick, gpsLoading }) {
           <Bell className="size-4" />
           {gpsLoading ? 'Đang lấy vị trí…' : 'Báo cáo sự cố mới'}
         </button>
+        */}
         <div className="flex flex-col gap-0.5">
           <button
             type="button"

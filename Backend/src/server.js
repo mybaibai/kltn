@@ -30,8 +30,17 @@ const io = new Server(httpServer, {
 
 app.use(
   cors({
-    origin: "http://localhost:3000",
-    credentials: false,
+    origin: (origin, cb) => {
+      const allowList = String(
+        process.env.FRONTEND_ORIGINS ||
+          "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173"
+      )
+        .split(",")
+        .map((x) => x.trim());
+      if (!origin || allowList.includes(origin)) return cb(null, true);
+      return cb(null, false);
+    },
+    credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
@@ -99,23 +108,20 @@ io.use(async (socket, next) => {
 });
 
 // ===== SOCKET.IO EVENTS =====
+
 io.on("connection", (socket) => {
   console.log(`✅ Socket connected: ${socket.id} (User: ${socket.userId})`);
 
   // === Join rooms by role ===
   if (socket.userRole === "VICTIM") {
     socket.join(`victim-${socket.userId}`);
-    console.log(
-      `👤 Victim ${socket.userId} joined room victim-${socket.userId}`,
-    );
+    console.log(`👤 Victim ${socket.userId} joined room victim-${socket.userId}`);
   }
 
   if (socket.userRole === "RESCUE" || socket.userRole === "RESPONDER") {
     socket.join(`rescue-${socket.userId}`);
     socket.join("rescue-all");
-    console.log(
-      `🚑 Rescue ${socket.userId} joined room rescue-${socket.userId} + rescue-all`,
-    );
+    console.log(`🚑 Rescue ${socket.userId} joined room rescue-${socket.userId} + rescue-all`);
   }
 
   if (socket.userRole === "ADMIN" || socket.userRole === "STAFF") {
@@ -123,17 +129,27 @@ io.on("connection", (socket) => {
     console.log(`🛡️ Admin joined admin-dashboard`);
   }
 
-  // === Responder location update ===
+  // ─── NEW: Join SOS-specific room ────────────────────────────────────────────
+  // Cả victim và rescue đều emit event này sau khi load trang tracking
+  // Room name: "sos-{sosId}" → dùng để broadcast realtime 2 chiều
+  socket.on("join_sos_room", ({ sos_id }) => {
+    if (!sos_id) return;
+    socket.join(`sos-${sos_id}`);
+    console.log(`📍 Socket ${socket.id} (${socket.userRole}) joined room sos-${sos_id}`);
+  });
+
+  socket.on("leave_sos_room", ({ sos_id }) => {
+    if (!sos_id) return;
+    socket.leave(`sos-${sos_id}`);
+    console.log(`📍 Socket ${socket.id} left room sos-${sos_id}`);
+  });
+
+  // ─── Responder location update ───────────────────────────────────────────────
   socket.on("responder_location_update", async (data) => {
     try {
       const { assignment_id, latitude, longitude } = data;
-      console.log("📍 Location update:", {
-        assignment_id,
-        latitude,
-        longitude,
-      });
+      console.log("📍 Location update:", { assignment_id, latitude, longitude });
 
-      // Gọi tracking service
       const result = await trackingService.updateRescueLocation(
         assignment_id,
         latitude,
@@ -146,26 +162,12 @@ io.on("connection", (socket) => {
         return;
       }
 
-      // Load SOS để lấy victim_id
       const SosRequest = (await import("./models/sosRequestModel.js")).default;
-      const RescueAssignment = (
-        await import("./models/rescueAssignmentModel.js")
-      ).default;
+      const RescueAssignment = (await import("./models/rescueAssignmentModel.js")).default;
       const assignment = await RescueAssignment.findById(assignment_id);
       const sos = await SosRequest.findById(assignment.request_id);
 
-      const trackingData = {
-        assignment_id,
-        stage: result.assignment.stage,
-        distance_km: result.distance_km,
-        eta_minutes: result.eta_minutes,
-        rescue_location: result.assignment.current_location,
-        victim_location: sos.location,
-        stage_changed: result.stage_changed,
-        timestamp: new Date(),
-      };
-
-      // 📢 Broadcast to VICTIM
+      // 📢 Broadcast to VICTIM: rescue location
       io.to(`victim-${sos.victim_id}`).emit("victim_tracking_update", {
         stage: result.assignment.stage,
         distance_km: result.distance_km,
@@ -175,12 +177,24 @@ io.on("connection", (socket) => {
         timestamp: new Date(),
       });
 
-      // 📢 Broadcast to RESCUE (confirm)
-      socket.emit("mission_location_confirmed", {
+      // ─── NEW: Broadcast victim location về RESCUE ────────────────────────────
+      // Rescue cần biết victim đứng ở đâu để hiển thị trên map
+      io.to(`rescue-${socket.userId}`).emit("mission_location_confirmed", {
         distance_km: result.distance_km,
         eta_minutes: result.eta_minutes,
-        victim_location: sos.location,
+        victim_location: sos.location,   // GeoJSON {type, coordinates:[lng,lat]}
         current_stage: result.assignment.stage,
+      });
+
+      // ─── NEW: Broadcast qua sos-room để cả 2 cùng nhận 1 lúc ─────────────────
+      io.to(`sos-${sos._id}`).emit("sos_room_update", {
+        request_id: assignment.request_id,
+        rescue_location: result.assignment.current_location,
+        victim_location: sos.location,
+        distance_km: result.distance_km,
+        eta_minutes: result.eta_minutes,
+        stage: result.assignment.stage,
+        timestamp: new Date(),
       });
 
       // 📢 Broadcast to ADMIN
@@ -207,13 +221,12 @@ io.on("connection", (socket) => {
     }
   });
 
-  // === Responder stage change ===
+  // ─── Responder stage change ──────────────────────────────────────────────────
   socket.on("responder_stage_change", async (data) => {
     try {
       const { assignment_id, new_stage, reason } = data;
       console.log("🔄 Stage change:", { assignment_id, new_stage });
 
-      // Gọi tracking service
       const result = await trackingService.updateRescueStage(
         assignment_id,
         new_stage,
@@ -227,10 +240,7 @@ io.on("connection", (socket) => {
         return;
       }
 
-      // Load SOS để lấy victim_id
-      const RescueAssignment = (
-        await import("./models/rescueAssignmentModel.js")
-      ).default;
+      const RescueAssignment = (await import("./models/rescueAssignmentModel.js")).default;
       const SosRequest = (await import("./models/sosRequestModel.js")).default;
       const assignment = await RescueAssignment.findById(assignment_id);
       const sos = await SosRequest.findById(assignment.request_id);
@@ -250,7 +260,15 @@ io.on("connection", (socket) => {
         timestamp: new Date(),
       });
 
-      // 📢 Broadcast to RESCUE
+      // ─── NEW: Broadcast qua sos-room ─────────────────────────────────────────
+      io.to(`sos-${sos._id}`).emit("sos_room_update", {
+        request_id: assignment.request_id,
+        stage: result.new_stage,
+        stage_changed: true,
+        timestamp: new Date(),
+      });
+
+      // 📢 Broadcast to RESCUE (confirm)
       socket.emit("mission_stage_update", {
         stage: result.new_stage,
         stage_changed: true,

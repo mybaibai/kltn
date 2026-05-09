@@ -12,14 +12,12 @@ function loadStaffUser() {
 
 export default function AdminTopBar() {
   const staff = useMemo(() => loadStaffUser(), []);
-  const title =
-    staff?.role === 'Admin'
-      ? 'Quản trị viên'
-      : staff?.role === 'Rescue'
-        ? 'Cứu hộ'
-        : 'Tài khoản';
   const subtitle = staff?.auth?.email || staff?.role || '—';
   const name = staff?.full_name?.trim() || staff?.auth?.email || '—';
+  const metaLine =
+    staff?.role === 'Admin'
+      ? subtitle
+      : `${staff?.role === 'Rescue' ? 'Cứu hộ' : 'Tài khoản'} · ${subtitle}`;
 
   return (
     <header className="flex h-16 shrink-0 items-center justify-end gap-4 border-b border-[#E8E8EC] bg-white px-6">
@@ -35,9 +33,7 @@ export default function AdminTopBar() {
         <div className="size-10 overflow-hidden rounded-full bg-gradient-to-br from-brand-blue to-[#152a66] ring-2 ring-white" />
         <div className="text-right leading-tight">
           <p className="text-sm font-semibold text-brand-brown">{name}</p>
-          <p className="text-xs text-brand-muted">
-            {title} · {subtitle}
-          </p>
+          <p className="text-xs text-brand-muted">{metaLine}</p>
         </div>
       </div>
     </header>

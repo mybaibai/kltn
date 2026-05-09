@@ -4,6 +4,9 @@ import TrackingPage from '@/page/TrackingPage';
 import AdminLayout from '@/layouts/AdminLayout';
 import IncidentManagement from '@/page/AdminPage/IncidentManagement';
 import AdminTrackingPage from '@/page/AdminPage/AdminTrackingPage';
+import DashboardPage from '@/page/AdminPage/DashboardPage';
+import UsersPage from '@/page/AdminPage/UsersPage';
+import HistoryPage from '@/page/AdminPage/HistoryPage';
 import AdminPlaceholder from '@/page/AdminPage/AdminPlaceholder';
 import StaffLoginPage from '@/page/StaffLoginPage';
 import ResponderPage from '@/page/ResponderPage';
@@ -13,10 +16,20 @@ import ResponderTeamEditPage from '@/page/ResponderTeamEditPage';
 import RequesterProfile from '@/components/requester/RequesterProfile';
 import { StaffLoginGate, StaffRoleGuard, StaffHomeRedirect } from '@/components/auth/AuthGuards';
 import { STAFF_ROLE_ADMIN, STAFF_ROLE_RESCUE } from '@/services/auth/session';
+import { Toaster } from 'react-hot-toast';
 
 export default function App() {
   return (
     <BrowserRouter>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            fontSize: "14px",
+          },
+        }}
+      />
       <Routes>
         <Route path="/" element={<SosPage />} />
         <Route path="/sos" element={<SosPage />} />
@@ -41,11 +54,11 @@ export default function App() {
           )}
         >
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
-          <Route path="dashboard" element={<AdminPlaceholder title="Dashboard" />} />
+          <Route path="dashboard" element={<DashboardPage />} />
           <Route path="incidents" element={<IncidentManagement />} />
-            <Route path="tracking/:sosId" element={<AdminTrackingPage />} />
-          <Route path="users" element={<AdminPlaceholder title="Quản lý người dùng" />} />
-          <Route path="history" element={<AdminPlaceholder title="Lịch sử" />} />
+          <Route path="tracking/:sosId" element={<AdminTrackingPage />} />
+          <Route path="users" element={<UsersPage title="Quản lý người dùng" />} />
+          <Route path="history" element={<HistoryPage />} />
           <Route path="settings" element={<AdminPlaceholder title="Cài đặt" />} />
         </Route>
         <Route

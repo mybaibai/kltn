@@ -55,18 +55,82 @@ export const getMe = async (req, res) => {
 export const updateProfile = async (req, res) => {
   try {
     const { full_name, profile } = req.body;
-    // We update only allowed fields or merge profile
+
     const updateData = {};
+
     if (full_name !== undefined) updateData.full_name = full_name;
-    
-    // Merge profile fields if provided
+
     if (profile) {
-      const user = await userService.getUserById(req.user._id);
-      const newProfile = { ...(user.profile || {}), ...profile };
-      updateData.profile = newProfile;
+      // date_of_birth và gender nằm trong profile subdocument
+      if (profile.date_of_birth !== undefined) updateData["profile.date_of_birth"] = profile.date_of_birth || null;
+      if (profile.gender !== undefined) updateData["profile.gender"] = profile.gender;
+      if (profile.address !== undefined) updateData["profile.address"] = profile.address;
+      if (profile.height !== undefined) updateData["profile.height"] = profile.height || null;
+      if (profile.weight !== undefined) updateData["profile.weight"] = profile.weight || null;
+      if (profile.allergies !== undefined) updateData["profile.allergies"] = profile.allergies;
+      if (profile.medical_history !== undefined) updateData["profile.medical_history"] = profile.medical_history;
+      
+      // blood_type: chỉ set nếu có giá trị hợp lệ, tránh validation error với enum
+      if (profile.blood_type && ['O', 'A', 'B', 'AB'].includes(profile.blood_type)) {
+        updateData["profile.blood_type"] = profile.blood_type;
+      }
     }
 
     const updatedUser = await userService.updateUser(req.user._id, updateData);
     res.status(200).json({ success: true, data: updatedUser });
-  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+  } catch (err) {
+    console.error("updateProfile error:", err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const addEmergencyContact = async (req, res) => {
+  try {
+    const { name, phone, relation } = req.body;
+    if (!name || !phone) return res.status(400).json({ success: false, message: 'Thiếu tên hoặc số điện thoại' });
+
+    const updatedUser = await userService.addEmergencyContact(req.user._id, { name, phone, relation });
+    res.status(200).json({ success: true, data: updatedUser });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const removeEmergencyContact = async (req, res) => {
+  try {
+    console.log("=== REMOVE API HIT ===");
+    console.log("params:", req.params);
+    console.log("req.user:", req.user); 
+
+    const index = parseInt(req.params.index);
+
+    if (isNaN(index)) {
+      return res.status(400).json({ success: false, message: "Index không hợp lệ" });
+    }
+
+    const user = await userService.getUserById(req.user._id);
+    
+    if (!user || !user.profile || !user.profile.emergency_contacts) {
+      return res.status(400).json({
+        success: false,
+        message: "Không có dữ liệu liên hệ khẩn cấp"
+      });
+    }
+
+    if (index < 0 || index >= user.profile.emergency_contacts.length) {
+      return res.status(400).json({
+        success: false,
+        message: "Index vượt phạm vi"
+      });
+    }
+
+    user.profile.emergency_contacts.splice(index, 1);
+
+    await user.save();
+
+    res.status(200).json({ success: true, data: user });
+  } catch (err) {
+    console.error("Remove error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
 };
