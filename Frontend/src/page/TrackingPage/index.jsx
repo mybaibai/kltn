@@ -34,6 +34,7 @@ import {
   RotateCw,
   UserCircle,
 } from "lucide-react";
+import rescueLogo from "@/assets/rescue.svg";
 import "./tracking-page.css";
 
 const markerShadow =
@@ -151,7 +152,6 @@ export default function TrackingPage({ mode = "rescue" }) {
     }
   }, []);
 
-  /** Cứu hộ / admin: luôn dùng JWT dù trình duyệt còn phiên Firebase nạn nhân */
   const preferVictimToken = useMemo(() => {
     const role = String(staffUser?.role || "").toLowerCase();
     const isStaff = role === "admin" || role === "rescue";
@@ -277,8 +277,7 @@ export default function TrackingPage({ mode = "rescue" }) {
       setTimeout(() => setToast(null), 6000);
     };
     const onVictimUpdate = () => {
-      if (assignmentId)
-        loadTracking(assignmentId, persona === "victim");
+      if (assignmentId) loadTracking(assignmentId, persona === "victim");
     };
 
     socket.on("rescue_accepted", onAccepted);
@@ -331,8 +330,7 @@ export default function TrackingPage({ mode = "rescue" }) {
   useEffect(() => {
     if (!sosId || persona !== "victim" || !assignmentId) return;
     if (!navigator.geolocation) return;
-    
-    // Victim always uses real-time GPS (not fixed location)
+
     const id = navigator.geolocation.watchPosition(
       async (pos) => {
         try {
@@ -355,8 +353,7 @@ export default function TrackingPage({ mode = "rescue" }) {
   useEffect(() => {
     if (persona !== "rescue" || !assignmentId) return;
     if (!navigator.geolocation) return;
-    
-    // Rescue uses fixed location from seed - skip real-time GPS update
+
     const isTestMode = import.meta.env.VITE_USE_FIXED_LOCATIONS === "true";
     if (isTestMode) {
       return;
@@ -387,8 +384,7 @@ export default function TrackingPage({ mode = "rescue" }) {
     const loc = sos?.location;
     if (loc?.coordinates?.length === 2) {
       const [lng, lat] = loc.coordinates;
-      if (Number.isFinite(lat) && Number.isFinite(lng))
-        return { lat, lng };
+      if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
     }
     return null;
   }, [tracking, sos]);
@@ -397,7 +393,6 @@ export default function TrackingPage({ mode = "rescue" }) {
     return parseCoord(tracking?.rescue_location);
   }, [tracking]);
 
-  // ===== OSRM Road Routing =====
   const [routeCoords, setRouteCoords] = useState([]);
   const [routeDistance, setRouteDistance] = useState(null);
   const [routeEta, setRouteEta] = useState(null);
@@ -412,10 +407,11 @@ export default function TrackingPage({ mode = "rescue" }) {
       return;
     }
 
-    // Tránh gọi OSRM liên tục nếu toạ độ không thay đổi nhiều (làm tròn 4 chữ số)
     const key = [
-      victimPt.lat.toFixed(4), victimPt.lng.toFixed(4),
-      rescuePt.lat.toFixed(4), rescuePt.lng.toFixed(4),
+      victimPt.lat.toFixed(4),
+      victimPt.lng.toFixed(4),
+      rescuePt.lat.toFixed(4),
+      rescuePt.lng.toFixed(4),
     ].join(",");
     if (key === prevRouteKey.current) return;
     prevRouteKey.current = key;
@@ -425,8 +421,10 @@ export default function TrackingPage({ mode = "rescue" }) {
     (async () => {
       try {
         const result = await getOSRMRoute(
-          rescuePt.lat, rescuePt.lng,
-          victimPt.lat, victimPt.lng,
+          rescuePt.lat,
+          rescuePt.lng,
+          victimPt.lat,
+          victimPt.lng,
         );
         if (cancelled) return;
         setRouteCoords(result.routeCoords || []);
@@ -435,7 +433,6 @@ export default function TrackingPage({ mode = "rescue" }) {
       } catch (e) {
         console.warn("OSRM routing failed, using straight line:", e.message);
         if (!cancelled) {
-          // Fallback straight line
           setRouteCoords([
             [rescuePt.lat, rescuePt.lng],
             [victimPt.lat, victimPt.lng],
@@ -446,10 +443,11 @@ export default function TrackingPage({ mode = "rescue" }) {
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [victimPt, rescuePt]);
 
-  // Distance/ETA tốt nhất: ưu tiên OSRM > tracking API > null
   const rawDistance = routeDistance ?? tracking?.distance_km;
   const rawEta = routeEta ?? tracking?.eta_minutes;
   const displayDistance = Number.isFinite(Number(rawDistance))
@@ -585,222 +583,57 @@ export default function TrackingPage({ mode = "rescue" }) {
     tracking?.target_address ||
     sos?.victim_id?.profile?.address ||
     "Chưa có địa chỉ";
-  const useRescueLayout = mode === "rescue";
+  const isRescue = mode === "rescue";
+  const steps = isRescue ? RESCUE_STEPS : VICTIM_STEPS;
   const unreadCount = notifications.filter((item) => item.unread).length;
-
-  if (!useRescueLayout) {
-    return (
-      <div className="victim-tracking-page-root">
-        {toast ? <div className="tracking-toast">{toast}</div> : null}
-
-        <div className="victim-tracking-shell">
-          <header className="victim-tracking-topbar">
-            <div className="victim-brand">
-              <div className="victim-logo">
-                SOS<span>Go</span>
-              </div>
-              <div>
-                <p className="victim-brand-title">Theo dõi cứu hộ</p>
-                <p className="victim-brand-sub">Cập nhật trạng thái theo thời gian thực</p>
-              </div>
-            </div>
-            <div className="victim-tracking-actions" ref={notificationRef}>
-              <button
-                type="button"
-                className="victim-bell-btn"
-                onClick={handleToggleNotifications}
-                aria-label="Thông báo"
-              >
-                <Bell size={16} />
-                {unreadCount > 0 ? (
-                  <span className="victim-bell-badge">{unreadCount}</span>
-                ) : null}
-              </button>
-              {showNotifications ? (
-                <div className="victim-notification-dropdown">
-                  <p className="victim-notification-title">Thông báo</p>
-                  <div className="victim-notification-list">
-                    {notifications.length ? (
-                      notifications.map((item) => (
-                        <div
-                          key={item.id}
-                          className={`victim-notification-item ${item.unread ? "is-unread" : ""}`}
-                        >
-                          <p className="victim-notification-heading">{item.title}</p>
-                          <p className="victim-notification-detail">{item.detail}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="victim-notification-empty">Không có thông báo mới.</p>
-                    )}
-                  </div>
-                </div>
-              ) : null}
-              <div className="victim-avatar" aria-hidden>
-                <UserCircle size={20} />
-              </div>
-            </div>
-          </header>
-
-          <div className="victim-tracking-workspace">
-            <section className="victim-tracking-map-wrap">
-              <MapContainer
-                center={center}
-                zoom={14}
-                style={{ width: "100%", height: "100%" }}
-                scrollWheelZoom
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                <FitBounds
-                  points={[
-                    ...(victimPt ? [[victimPt.lat, victimPt.lng]] : []),
-                    ...(rescuePt ? [[rescuePt.lat, rescuePt.lng]] : []),
-                  ]}
-                />
-
-                {victimPt ? (
-                  <Marker position={[victimPt.lat, victimPt.lng]} icon={victimIcon}>
-                    <Popup>Nạn nhân</Popup>
-                  </Marker>
-                ) : null}
-
-                {rescuePt ? (
-                  <Marker position={[rescuePt.lat, rescuePt.lng]} icon={rescueIcon}>
-                    <Popup>Đội cứu hộ · {tracking?.rescue_name || ""}</Popup>
-                  </Marker>
-                ) : null}
-
-                {routeCoords.length >= 2 ? (
-                  <Polyline
-                    positions={routeCoords}
-                    color="#2563eb"
-                    weight={4}
-                    opacity={0.85}
-                  />
-                ) : null}
-              </MapContainer>
-            </section>
-
-            <aside className="victim-tracking-side">
-              {!assignmentId ? (
-                <p className="victim-waiting-note">
-                  Đang chờ hệ thống phân công đội cứu hộ gần bạn...
-                </p>
-              ) : null}
-
-              <div className="victim-chip-row">
-                <span className="victim-chip-code">{sosCode}</span>
-                <span className="victim-chip-status">
-                  {stageKey === "COMPLETED" ? "HOÀN THÀNH" : "ĐANG THỰC HIỆN"}
-                </span>
-              </div>
-
-              <h1 className="victim-panel-title">Theo dõi cứu trợ</h1>
-              <p className="victim-panel-subtitle">Thông tin cập nhật thời gian thực</p>
-
-              <div className="victim-stepper" aria-label="Quy trình cứu hộ">
-                {VICTIM_STEPS.map((step, index) => {
-                  const done = index < stepIndex;
-                  const active = index === stepIndex;
-                  return (
-                    <div
-                      key={step}
-                      className={`victim-step-item ${done ? "is-done" : ""} ${active ? "is-active" : ""}`}
-                    >
-                      <span className="victim-step-dot">{done ? <Check size={10} /> : <span />}</span>
-                      <span>{step}</span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="victim-kpi-grid">
-                <article className="victim-kpi-card distance">
-                  <p>Khoảng cách</p>
-                  <strong>
-                    {displayDistance != null ? `${Number(displayDistance).toFixed(2)} km` : "—"}
-                  </strong>
-                </article>
-                <article className="victim-kpi-card eta">
-                  <p>Dự kiến đến</p>
-                  <strong>{displayEta != null ? `${displayEta} phút` : "—"}</strong>
-                </article>
-              </div>
-
-              <article className="victim-info-card">
-                <div className="victim-info-head">
-                  <LocateFixed size={14} />
-                  <span>Địa điểm cứu trợ</span>
-                </div>
-                <p>{destination}</p>
-              </article>
-
-              <article className="victim-info-card victim-inline-row">
-                <div>
-                  <p className="victim-inline-label">Sự cố</p>
-                  <strong>{incidentName}</strong>
-                </div>
-                <span className={`victim-severity-pill ${severity.className}`}>{severity.label}</span>
-              </article>
-
-              <article className="victim-contact-card">
-                <div>
-                  <p>Đội cứu trợ</p>
-                  <strong>{rescueName}</strong>
-                </div>
-                <a
-                  href={rescuePhone !== "—" ? `tel:${rescuePhone}` : undefined}
-                  className="victim-icon-btn"
-                  aria-label="Gọi đội cứu trợ"
-                >
-                  <Phone size={14} />
-                </a>
-              </article>
-
-              <article className="victim-contact-card">
-                <div>
-                  <p>Người gặp nạn</p>
-                  <strong>{victimPhone}</strong>
-                </div>
-                <button type="button" className="victim-icon-btn" aria-label="Nhắn tin người gặp nạn">
-                  <MessageSquare size={14} />
-                </button>
-              </article>
-
-              <div className="victim-action-row">
-                <button
-                  type="button"
-                  className="victim-refresh-btn"
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                >
-                  {refreshing ? "Đang làm mới" : "Làm mới"}
-                </button>
-                  <button
-                    type="button"
-                    className="victim-cancel-btn"
-                    onClick={handleCancelRequest}
-                    disabled={cancelling || stageKey === "COMPLETED" || stageKey === "CANCELLED"}
-                  >
-                    {cancelling ? "Đang hủy" : "Hủy"}
-                  </button>
-              </div>
-            </aside>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="tracking-page-root">
       {toast ? <div className="tracking-toast">{toast}</div> : null}
 
       <div className="tracking-container">
-        <p className="tracking-context-title">Theo dõi cứu hộ</p>
+        <header className="tracking-topbar">
+          <div className="tracking-brand">
+            <img className="tracking-brand-logo" src={rescueLogo} alt="SOSGo" />
+
+          </div>
+          <div className="tracking-top-actions" ref={notificationRef}>
+            <button
+              type="button"
+              className="tracking-bell-btn"
+              onClick={handleToggleNotifications}
+              aria-label="Thông báo"
+            >
+              <Bell size={16} />
+              {unreadCount > 0 ? (
+                <span className="tracking-bell-badge">{unreadCount}</span>
+              ) : null}
+            </button>
+            {showNotifications ? (
+              <div className="tracking-notification-dropdown">
+                <p className="tracking-notification-title">Thông báo</p>
+                <div className="tracking-notification-list">
+                  {notifications.length ? (
+                    notifications.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`tracking-notification-item ${item.unread ? "is-unread" : ""}`}
+                      >
+                        <p className="tracking-notification-heading">{item.title}</p>
+                        <p className="tracking-notification-detail">{item.detail}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="tracking-notification-empty">Không có thông báo mới.</p>
+                  )}
+                </div>
+              </div>
+            ) : null}
+            <div className="tracking-avatar" aria-hidden>
+              <UserCircle size={20} />
+            </div>
+          </div>
+        </header>
 
         <div className="tracking-workspace">
           <section className="tracking-map-wrap">
@@ -858,16 +691,24 @@ export default function TrackingPage({ mode = "rescue" }) {
           </section>
 
           <aside className="tracking-side-panel">
+            {!assignmentId ? (
+              <p className="tracking-waiting-note">
+                Đang chờ hệ thống phân công đội cứu hộ gần bạn...
+              </p>
+            ) : null}
+
             <div className="tracking-chip-row">
               <span className="tracking-chip-code">{sosCode}</span>
-              <span className="tracking-chip-status">ĐANG THỰC HIỆN</span>
+              <span className={`tracking-chip-status ${stageKey === "COMPLETED" ? "is-complete" : ""}`}>
+                {stageKey === "COMPLETED" ? "HOÀN THÀNH" : "ĐANG THỰC HIỆN"}
+              </span>
             </div>
 
             <h1 className="tracking-panel-title">Theo dõi cứu trợ</h1>
             <p className="tracking-panel-subtitle">Thông tin cập nhật thời gian thực</p>
 
             <div className="tracking-stepper" aria-label="Quy trình cứu hộ">
-              {RESCUE_STEPS.map((step, index) => {
+              {steps.map((step, index) => {
                 const done = index < stepIndex;
                 const active = index === stepIndex;
                 return (
@@ -914,7 +755,11 @@ export default function TrackingPage({ mode = "rescue" }) {
                 <p>Đội cứu trợ</p>
                 <strong>{rescueName}</strong>
               </div>
-              <a href={rescuePhone !== "—" ? `tel:${rescuePhone}` : undefined} className="tracking-icon-btn" aria-label="Gọi đội cứu trợ">
+              <a
+                href={rescuePhone !== "—" ? `tel:${rescuePhone}` : undefined}
+                className="tracking-icon-btn"
+                aria-label="Gọi đội cứu trợ"
+              >
                 <Phone size={14} />
               </a>
             </article>
@@ -930,30 +775,43 @@ export default function TrackingPage({ mode = "rescue" }) {
             </article>
 
             <div className="tracking-action-row">
-              <button
-                type="button"
-                className="tracking-arrived-btn"
-                onClick={handleArrivedSupport}
-                disabled={
-                  arriving ||
-                  !assignmentId ||
-                  stageKey === "RESCUING" ||
-                  stageKey === "COMPLETED" ||
-                  stageKey === "CANCELLED"
-                }
-              >
-                {stageKey === "RESCUING" ? "Đang hỗ trợ" : (arriving ? "Đang cập nhật" : "Đã tới")}
-              </button>
+              {isRescue ? (
+                <>
+                  <button
+                    type="button"
+                    className="tracking-arrived-btn"
+                    onClick={handleArrivedSupport}
+                    disabled={
+                      arriving ||
+                      !assignmentId ||
+                      stageKey === "RESCUING" ||
+                      stageKey === "COMPLETED" ||
+                      stageKey === "CANCELLED"
+                    }
+                  >
+                    {stageKey === "RESCUING" ? "Đang hỗ trợ" : (arriving ? "Đang cập nhật" : "Đã tới")}
+                  </button>
 
-              <button
-                type="button"
-                className="tracking-primary-btn"
-                onClick={handleCompleteMission}
-                disabled={completing || !assignmentId || stageKey === "COMPLETED" || stageKey === "CANCELLED"}
-              >
-                <RotateCw size={14} className={completing ? "spinning" : ""} />
-                {stageKey === "COMPLETED" ? "Đã hoàn thành" : (completing ? "Đang cập nhật" : "Hoàn thành")}
-              </button>
+                  <button
+                    type="button"
+                    className="tracking-primary-btn"
+                    onClick={handleCompleteMission}
+                    disabled={completing || !assignmentId || stageKey === "COMPLETED" || stageKey === "CANCELLED"}
+                  >
+                    <RotateCw size={14} className={completing ? "spinning" : ""} />
+                    {stageKey === "COMPLETED" ? "Đã hoàn thành" : (completing ? "Đang cập nhật" : "Hoàn thành")}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="tracking-primary-btn"
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                >
+                  {refreshing ? "Đang làm mới" : "Làm mới"}
+                </button>
+              )}
 
               <button
                 type="button"
@@ -964,7 +822,6 @@ export default function TrackingPage({ mode = "rescue" }) {
                 <AlertTriangle size={14} /> {cancelling ? "Đang hủy" : "Hủy"}
               </button>
             </div>
-
           </aside>
         </div>
       </div>
