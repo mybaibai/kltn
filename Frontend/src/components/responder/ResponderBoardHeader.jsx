@@ -14,10 +14,6 @@ function initialsFromName(name) {
 
 export default function ResponderBoardHeader({
   user,
-  proximitySort,
-  urgencyLevel,
-  onProximitySortChange,
-  onUrgencyLevelChange,
 }) {
   const navigate = useNavigate();
   const [openMenu, setOpenMenu] = useState(null);
@@ -82,10 +78,6 @@ export default function ResponderBoardHeader({
     };
   }, []);
 
-  function toggleMenu(menuName) {
-    setOpenMenu((prev) => (prev === menuName ? null : menuName));
-  }
-
   function handleToggleNotifications() {
     setOpenMenu((prev) => {
       const next = prev === "notifications" ? null : "notifications";
@@ -114,135 +106,6 @@ export default function ResponderBoardHeader({
     <header className="responder-topbar" ref={topbarRef}>
       <div className="responder-brand">
         <img className="responder-brand-logo" src={rescueLogo} alt="Logo Sentinel Rescue" />
-      </div>
-
-      <div className="responder-toolbar">
-        <div className="responder-filter-dropdown">
-          <button
-            type="button"
-            className="responder-filter-trigger"
-            onClick={() => toggleMenu("proximity")}
-            aria-expanded={openMenu === "proximity"}
-            aria-haspopup="menu"
-          >
-            {proximityLabelMap[proximitySort] || "Gần nhất"}
-            <ChevronDown size={14} className={`responder-filter-chevron ${openMenu === "proximity" ? "is-open" : ""}`} />
-          </button>
-
-          {openMenu === "proximity" ? (
-            <ul className="responder-filter-menu" role="menu" aria-label="Sắp xếp khoảng cách">
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${proximitySort === "nearest" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onProximitySortChange?.("nearest");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Gần nhất
-                </button>
-              </li>
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${proximitySort === "farthest" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onProximitySortChange?.("farthest");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Xa nhất
-                </button>
-              </li>
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${proximitySort === "latest" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onProximitySortChange?.("latest");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Mới nhất
-                </button>
-              </li>
-            </ul>
-          ) : null}
-        </div>
-
-        <div className="responder-filter-dropdown">
-          <button
-            type="button"
-            className="responder-filter-trigger"
-            onClick={() => toggleMenu("urgency")}
-            aria-expanded={openMenu === "urgency"}
-            aria-haspopup="menu"
-          >
-            {urgencyLabelMap[urgencyLevel] || "Mức độ khẩn cấp: Tất cả"}
-            <ChevronDown size={14} className={`responder-filter-chevron ${openMenu === "urgency" ? "is-open" : ""}`} />
-          </button>
-
-          {openMenu === "urgency" ? (
-            <ul className="responder-filter-menu" role="menu" aria-label="Lọc mức độ khẩn cấp">
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${urgencyLevel === "all" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onUrgencyLevelChange?.("all");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Mức độ khẩn cấp: Tất cả
-                </button>
-              </li>
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${urgencyLevel === "high" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onUrgencyLevelChange?.("high");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Mức độ khẩn cấp: Cao
-                </button>
-              </li>
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${urgencyLevel === "medium" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onUrgencyLevelChange?.("medium");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Mức độ khẩn cấp: Trung bình
-                </button>
-              </li>
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${urgencyLevel === "low" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onUrgencyLevelChange?.("low");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Mức độ khẩn cấp: Thấp
-                </button>
-              </li>
-            </ul>
-          ) : null}
-        </div>
       </div>
 
       <div className="responder-userbox">

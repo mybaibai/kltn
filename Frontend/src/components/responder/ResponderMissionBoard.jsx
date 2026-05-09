@@ -686,7 +686,6 @@ export default function ResponderMissionBoard({ user }) {
   return (
     <div className="responder-board-page">
       <div className="responder-board-shell">
-        <p className="responder-mini-title">Quản lý nhiệm vụ</p>
         <ResponderBoardHeader
           user={user}
           proximitySort={proximitySort}
@@ -708,6 +707,10 @@ export default function ResponderMissionBoard({ user }) {
             onAcceptRequest={handleAcceptMission}
             acceptLoading={acceptLoading}
             currentUserId={userId}
+            proximitySort={proximitySort}
+            urgencyLevel={urgencyLevel}
+            onProximitySortChange={setProximitySort}
+            onUrgencyLevelChange={setUrgencyLevel}
           />
 
           <ResponderDetailPanel

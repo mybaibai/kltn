@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { getIncidentTypeDisplay } from "@/constants/incidentMeta";
 import CarIcon from "@/assets/car.svg?react";
 import FireIcon from "@/assets/fire.svg?react";
@@ -71,8 +72,26 @@ export default function ResponderRequestList({
   onAcceptRequest,
   acceptLoading,
   currentUserId,
+  proximitySort,
+  urgencyLevel,
+  onProximitySortChange,
+  onUrgencyLevelChange,
 }) {
   const [currentPage, setCurrentPage] = useState(() => readStoredPage());
+  const [openMenu, setOpenMenu] = useState(null);
+
+  const proximityLabelMap = {
+    nearest: "Gần nhất",
+    farthest: "Xa nhất",
+    latest: "Mới nhất",
+  };
+
+  const urgencyLabelMap = {
+    all: "Mức độ khẩn cấp",
+    high: "Cao",
+    medium: "Trung bình",
+    low: "Thấp",
+  };
 
   function isRequestAlreadyAccepted(item) {
     const source = item?.source;
@@ -125,6 +144,136 @@ export default function ResponderRequestList({
         <p>
           <span className="live-dot" /> Đang giám sát thời gian thực
         </p>
+
+        <div className="responder-list-filters">
+          <div className="responder-filter-dropdown">
+            <button
+              type="button"
+              className="responder-filter-trigger"
+              onClick={() => setOpenMenu((prev) => (prev === "proximity" ? null : "proximity"))}
+              aria-expanded={openMenu === "proximity"}
+              aria-haspopup="menu"
+            >
+              {proximityLabelMap[proximitySort] || "Gần nhất"}
+              <ChevronDown size={14} className={`responder-filter-chevron ${openMenu === "proximity" ? "is-open" : ""}`} />
+            </button>
+
+            {openMenu === "proximity" ? (
+              <ul className="responder-filter-menu" role="menu" aria-label="Sắp xếp khoảng cách">
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`responder-filter-menu-item ${proximitySort === "nearest" ? "is-selected" : ""}`}
+                    onClick={() => {
+                      onProximitySortChange?.("nearest");
+                      setOpenMenu(null);
+                    }}
+                  >
+                    Gần nhất
+                  </button>
+                </li>
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`responder-filter-menu-item ${proximitySort === "farthest" ? "is-selected" : ""}`}
+                    onClick={() => {
+                      onProximitySortChange?.("farthest");
+                      setOpenMenu(null);
+                    }}
+                  >
+                    Xa nhất
+                  </button>
+                </li>
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`responder-filter-menu-item ${proximitySort === "latest" ? "is-selected" : ""}`}
+                    onClick={() => {
+                      onProximitySortChange?.("latest");
+                      setOpenMenu(null);
+                    }}
+                  >
+                    Mới nhất
+                  </button>
+                </li>
+              </ul>
+            ) : null}
+          </div>
+
+          <div className="responder-filter-dropdown">
+            <button
+              type="button"
+              className="responder-filter-trigger"
+              onClick={() => setOpenMenu((prev) => (prev === "urgency" ? null : "urgency"))}
+              aria-expanded={openMenu === "urgency"}
+              aria-haspopup="menu"
+            >
+              {urgencyLabelMap[urgencyLevel] || "Mức độ khẩn cấp"}
+              <ChevronDown size={14} className={`responder-filter-chevron ${openMenu === "urgency" ? "is-open" : ""}`} />
+            </button>
+
+            {openMenu === "urgency" ? (
+              <ul className="responder-filter-menu" role="menu" aria-label="Lọc mức độ khẩn cấp">
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`responder-filter-menu-item ${urgencyLevel === "all" ? "is-selected" : ""}`}
+                    onClick={() => {
+                      onUrgencyLevelChange?.("all");
+                      setOpenMenu(null);
+                    }}
+                  >
+                    Tất cả
+                  </button>
+                </li>
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`responder-filter-menu-item ${urgencyLevel === "high" ? "is-selected" : ""}`}
+                    onClick={() => {
+                      onUrgencyLevelChange?.("high");
+                      setOpenMenu(null);
+                    }}
+                  >
+                    Cao
+                  </button>
+                </li>
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`responder-filter-menu-item ${urgencyLevel === "medium" ? "is-selected" : ""}`}
+                    onClick={() => {
+                      onUrgencyLevelChange?.("medium");
+                      setOpenMenu(null);
+                    }}
+                  >
+                    Trung bình
+                  </button>
+                </li>
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`responder-filter-menu-item ${urgencyLevel === "low" ? "is-selected" : ""}`}
+                    onClick={() => {
+                      onUrgencyLevelChange?.("low");
+                      setOpenMenu(null);
+                    }}
+                  >
+                    Thấp
+                  </button>
+                </li>
+              </ul>
+            ) : null}
+          </div>
+        </div>
+
         {apiMessage ? <p className="responder-api-note">{apiMessage}</p> : null}
       </div>
 

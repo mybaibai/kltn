@@ -28,7 +28,7 @@
 }
 
 .responder-topbar {
-  min-height: 72px;
+  min-height: 110px;
   border-top: 1px solid #ececf0;
   border-bottom: 1px solid #ececf0;
   display: flex;
@@ -41,15 +41,16 @@
 .responder-brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  min-width: 72px;
+  gap: 14px;
+  min-width: 120px;
 }
 
 .responder-brand-logo {
-  width: 96px;
-  height: 96px;
+  width: 160px;
+  height: auto;
+  max-height: 96px;
   object-fit: contain;
-  filter: drop-shadow(0 3px 6px rgba(17, 24, 39, 0.12));
+  filter: drop-shadow(0 3px 10px rgba(17, 24, 39, 0.18));
 }
 
 .responder-brand-text {
@@ -171,7 +172,7 @@
 }
 
 .responder-userbox {
-  margin-left: 8px;
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 12px;
@@ -381,6 +382,13 @@
   gap: 8px;
   font-size: 14px;
   color: #606975;
+}
+
+.responder-list-filters {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .responder-api-note {
