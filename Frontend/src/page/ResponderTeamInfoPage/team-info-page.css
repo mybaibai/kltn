@@ -399,6 +399,7 @@
 }
 
 .team-card-kpis article {
+  min-width: 0;
   border-radius: 20px;
   background: #f8fafc;
   padding: 20px;
@@ -416,6 +417,10 @@
 .team-card-kpis strong {
   margin-top: 10px;
   display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 18px;
   line-height: 1.15;
   letter-spacing: -0.02em;
