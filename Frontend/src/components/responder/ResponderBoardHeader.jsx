@@ -14,12 +14,14 @@ function initialsFromName(name) {
 
 export default function ResponderBoardHeader({
   user,
+  notifications: externalNotifications = [],
+  onDismissNotification,
 }) {
   const navigate = useNavigate();
   const [openMenu, setOpenMenu] = useState(null);
   const topbarRef = useRef(null);
 
-  const [notifications, setNotifications] = useState([
+  const [mockNotifications] = useState([
     {
       id: "n1",
       title: "Nhiệm vụ mới gần bạn",
@@ -42,7 +44,9 @@ export default function ResponderBoardHeader({
       unread: false,
     },
   ]);
-  const unreadCount = notifications.filter((item) => item.unread).length;
+
+  const allNotifications = [...externalNotifications, ...mockNotifications];
+  const unreadCount = allNotifications.filter((item) => item.unread).length;
 
   const proximityLabelMap = {
     nearest: "Gần nhất",
@@ -85,9 +89,6 @@ export default function ResponderBoardHeader({
   function handleToggleNotifications() {
     setOpenMenu((prev) => {
       const next = prev === "notifications" ? null : "notifications";
-      if (next === "notifications") {
-        setNotifications((items) => items.map((item) => ({ ...item, unread: false })));
-      }
       return next;
     });
   }
@@ -128,15 +129,21 @@ export default function ResponderBoardHeader({
 
           {openMenu === "notifications" ? (
             <ul className="responder-notification-menu" role="menu" aria-label="Thông báo mới">
-              {notifications.map((item) => (
-                <li key={item.id} className={`responder-notification-item ${item.unread ? "is-unread" : ""}`}>
-                  <div className="responder-notification-head">
-                    <strong>{item.title}</strong>
-                    <span>{item.time}</span>
-                  </div>
-                  <p>{item.description}</p>
+              {allNotifications.length > 0 ? (
+                allNotifications.map((item) => (
+                  <li key={item.id} className={`responder-notification-item ${item.unread ? "is-unread" : ""}`}>
+                    <div className="responder-notification-head">
+                      <strong>{item.title}</strong>
+                      <span>{item.time}</span>
+                    </div>
+                    {item.description ? <p>{item.description}</p> : null}
+                  </li>
+                ))
+              ) : (
+                <li className="responder-notification-empty">
+                  <p>Không có thông báo mới</p>
                 </li>
-              ))}
+              )}
             </ul>
           ) : null}
         </div>

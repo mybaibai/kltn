@@ -270,6 +270,14 @@
   line-height: 1.35;
 }
 
+.responder-notification-empty {
+  list-style: none;
+  padding: 12px 8px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
 .responder-avatar-chip {
   width: 28px;
   height: 28px;

@@ -38,10 +38,12 @@ export default function ResponderMissionBoard({ user }) {
   const [requestStats, setRequestStats] = useState({ total: 0, pending: 0 });
   const [acceptLoading, setAcceptLoading] = useState(false);
   const [toastAlerts, setToastAlerts] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const requestsRef = useRef([]);
   const knownRequestIdsRef = useRef(new Set());
   const hasHydratedRequestsRef = useRef(false);
   const toastTimersRef = useRef(new Map());
+  const notificationTimersRef = useRef(new Map());
 
   function normalizeSocketRole(role) {
     const value = String(role || "").trim().toUpperCase();
@@ -66,6 +68,31 @@ export default function ResponderMissionBoard({ user }) {
     if (activeTimer) {
       window.clearTimeout(activeTimer);
       toastTimersRef.current.delete(popupId);
+    }
+  }
+
+  function pushNotification(message, type = "info") {
+    const notificationId = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const alert = {
+      id: notificationId,
+      title: message,
+      description: "",
+      time: "Vừa xong",
+      unread: true,
+    };
+    setNotifications((prev) => [alert, ...prev].slice(0, 10));
+    const timer = window.setTimeout(() => {
+      dismissNotification(notificationId);
+    }, 6000);
+    notificationTimersRef.current.set(notificationId, timer);
+  }
+
+  function dismissNotification(notificationId) {
+    setNotifications((prev) => prev.filter((item) => item.id !== notificationId));
+    const activeTimer = notificationTimersRef.current.get(notificationId);
+    if (activeTimer) {
+      window.clearTimeout(activeTimer);
+      notificationTimersRef.current.delete(notificationId);
     }
   }
 
@@ -165,6 +192,9 @@ export default function ResponderMissionBoard({ user }) {
 
     if (notifyNew && isNew) {
       pushToastFromRequest(incoming);
+      const address = incoming?.address || "Vị trí không xác định";
+      const distanceText = incoming?.distanceKm != null ? ` • ${incoming.distanceKm}km` : "";
+      pushNotification(`Có yêu cầu SOS vừa được gửi${distanceText !== "" ? " gần bạn" : ""}`);
     }
 
     syncRequests(next, { notifyNew: false });
@@ -508,6 +538,11 @@ export default function ResponderMissionBoard({ user }) {
 
       if (status === "CANCELLED" || status === "RESOLVED") {
         const next = requestsRef.current.filter((item) => String(item.id) !== requestId);
+        if (status === "CANCELLED") {
+          pushNotification("Yêu cầu SOS đã bị hủy");
+        } else if (status === "RESOLVED") {
+          pushNotification("Yêu cầu SOS đã được giải quyết");
+        }
         syncRequests(next, { notifyNew: false });
         syncStatsFromRequests(next);
         return;
@@ -692,6 +727,8 @@ export default function ResponderMissionBoard({ user }) {
           urgencyLevel={urgencyLevel}
           onProximitySortChange={setProximitySort}
           onUrgencyLevelChange={setUrgencyLevel}
+          notifications={notifications}
+          onDismissNotification={dismissNotification}
         />
 
         <section className="responder-grid">
