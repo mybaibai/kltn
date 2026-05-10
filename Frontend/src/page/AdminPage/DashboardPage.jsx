@@ -514,7 +514,7 @@ export default function DashboardPage() {
         />
         <StatCard
           icon={<CheckCircle2 className="size-6" />}
-          title="Chỉ số tin cậy AI"
+          title="Tỷ lệ AI phân tích thành công"
           value={`${stats.completionRate}%`}
           subtitle={`+1.2% so với tháng trước`}
           trend="Xử lý từ đồng thời gian thực"
