@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   findNearestTeams,
@@ -31,6 +31,68 @@ export default function ResponderMissionBoard({ user }) {
   const [apiMessage, setApiMessage] = useState("");
   const [requestStats, setRequestStats] = useState({ total: 0, pending: 0 });
   const [acceptLoading, setAcceptLoading] = useState(false);
+
+  // New states for filters and notifications
+  const [proximitySort, setProximitySort] = useState("nearest");
+  const [urgencyLevel, setUrgencyLevel] = useState("all");
+  const [notifications, setNotifications] = useState([]);
+  const [toastAlerts, setToastAlerts] = useState([]);
+  const requestsRef = useRef([]);
+
+  useEffect(() => {
+    requestsRef.current = requests;
+  }, [requests]);
+
+  function pushNotification(title, detail = "") {
+    const id = Date.now();
+    setNotifications((prev) => [
+      { id, title, detail, unread: true, time: "Vừa xong" },
+      ...prev,
+    ].slice(0, 10));
+  }
+
+  function dismissNotification(id) {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  }
+
+  function pushToast(message, type = "error") {
+    const id = Date.now();
+    setToastAlerts((prev) => [{ id, message, type }, ...prev].slice(0, 3));
+    setTimeout(() => {
+      setToastAlerts((prev) => prev.filter((t) => t.id !== id));
+    }, 5000);
+  }
+
+  function dismissToast(id) {
+    setToastAlerts((prev) => prev.filter((t) => t.id !== id));
+  }
+
+  function handleSelectRequest(id) {
+    setSelectedId(String(id));
+  }
+
+  const visibleRequests = useMemo(() => {
+    let list = [...requests];
+
+    // 1. Filter by urgency
+    if (urgencyLevel !== "all") {
+      list = list.filter((r) => String(r.level).toLowerCase() === urgencyLevel);
+    }
+
+    // 2. Sort by proximity or time
+    list.sort((a, b) => {
+      if (proximitySort === "nearest") return (a.distanceKm || 999) - (b.distanceKm || 999);
+      if (proximitySort === "farthest") return (b.distanceKm || 0) - (a.distanceKm || 0);
+      if (proximitySort === "latest") {
+        const timeA = new Date(a.receivedAt || 0).getTime();
+        const timeB = new Date(b.receivedAt || 0).getTime();
+        return timeB - timeA;
+      }
+      return 0;
+    });
+
+    return list;
+  }, [requests, urgencyLevel, proximitySort]);
 
   const selectedRequest = useMemo(
     () =>
@@ -207,15 +269,151 @@ export default function ResponderMissionBoard({ user }) {
     };
   }, [gps, userId]);
 
-  // ===== SOCKET.IO: Listen for realtime tracking updates =====
+  // ===== SOCKET.IO: Listen for realtime SOS & tracking updates =====
   useEffect(() => {
-    const socket = getSocket() || initSocketFromSession();
+    let socket = getSocket();
+    if (!socket) {
+      socket = initSocketFromSession();
+    }
     if (!socket) return;
 
-    // Listen: Mission location confirmed (realtime distance, ETA)
+    function syncRequests(newList, { notifyNew = false } = {}) {
+      setRequests(newList);
+      if (notifyNew) {
+        pushNotification("Yêu cầu SOS mới", "Có một sự cố vừa được báo cáo gần bạn");
+      }
+    }
+
+    function syncStatsFromRequests(list) {
+      setRequestStats({
+        total: list.length,
+        pending: list.filter((x) => String(x.source?.status || "").toUpperCase() === "PENDING").length,
+      });
+    }
+
+    async function refreshRealtimeSosList() {
+      try {
+        const res = await getAllSos();
+        const rawList = res?.data?.data || [];
+        const mapped = mapSosToResponderRequests(rawList, gps);
+        syncRequests(mapped);
+        syncStatsFromRequests(mapped);
+      } catch { /* ignore */ }
+    }
+
+    function upsertRealtimeSos(sosData, { notifyNew = true } = {}) {
+      const requestId = String(sosData._id || sosData.id || "");
+      if (!requestId) return;
+
+      const mappedItem = mapSosToResponderRequests([sosData], gps)[0];
+      if (!mappedItem) return;
+
+      const current = [...requestsRef.current];
+      const idx = current.findIndex((it) => String(it.id) === requestId);
+
+      if (idx >= 0) {
+        current[idx] = { ...current[idx], ...mappedItem };
+      } else {
+        current.unshift(mappedItem);
+        if (notifyNew) {
+          pushNotification(`SOS Mới: ${mappedItem.incidentType}`, mappedItem.address);
+        }
+      }
+
+      syncRequests(current);
+      syncStatsFromRequests(current);
+    }
+
+    async function handleSosCreated(payload) {
+      console.log("📡 Socket: sos_created/new event:", payload);
+      const requestId = payload?.request_id || payload?._id;
+      if (!requestId) return;
+
+      const alreadyExists = requestsRef.current.some((item) => String(item.id) === String(requestId));
+      
+      try {
+        const detailRes = await getSosDetail(requestId);
+        const fullSos = detailRes?.data?.data;
+        if (fullSos?._id) {
+          upsertRealtimeSos(fullSos, { notifyNew: !alreadyExists });
+          return;
+        }
+      } catch { /* fallback */ }
+      
+      await refreshRealtimeSosList();
+    }
+
+    async function handleSosAssigned(data = {}) {
+      console.log("✅ Socket: sos_assigned event received:", data);
+      const requestId = data.request_id ? String(data.request_id) : "";
+      if (!requestId) return;
+
+      const existing = requestsRef.current.find((item) => String(item.id) === requestId);
+      if (!existing) {
+        await refreshRealtimeSosList();
+        return;
+      }
+
+      upsertRealtimeSos({
+        ...(existing.source || {}),
+        _id: requestId,
+        status: data.status || "ASSIGNED",
+      }, { notifyNew: false });
+    }
+
+    async function handleSosStatusUpdated(data = {}) {
+      const requestId = data.request_id ? String(data.request_id) : "";
+      if (!requestId) return;
+      const status = String(data.status || "").toUpperCase();
+
+      if (status === "CANCELLED" || status === "RESOLVED") {
+        const next = requestsRef.current.filter((item) => String(item.id) !== requestId);
+        syncRequests(next, { notifyNew: false });
+        syncStatsFromRequests(next);
+        return;
+      }
+
+      upsertRealtimeSos({ _id: requestId, status }, { notifyNew: false });
+    }
+
+    function setupListeners() {
+      socket.off("sos_created", handleSosCreated);
+      socket.off("sos_new_pending", handleSosCreated);
+      socket.off("sos_broadcast_all", handleSosCreated);
+      socket.off("sos_assigned", handleSosAssigned);
+      socket.off("sos_status_updated", handleSosStatusUpdated);
+
+      socket.on("sos_created", handleSosCreated);
+      socket.on("sos_new_pending", handleSosCreated);
+      socket.on("sos_broadcast_all", handleSosCreated);
+      socket.on("sos_assigned", handleSosAssigned);
+      socket.on("sos_status_updated", handleSosStatusUpdated);
+    }
+
+    if (socket.connected) {
+      setupListeners();
+    } else {
+      socket.on("connect", setupListeners);
+    }
+
+    socket.on("reconnect", setupListeners);
+
+    return () => {
+      socket.off("connect", setupListeners);
+      socket.off("reconnect", setupListeners);
+      socket.off("sos_created", handleSosCreated);
+      socket.off("sos_new_pending", handleSosCreated);
+      socket.off("sos_broadcast_all", handleSosCreated);
+      socket.off("sos_assigned", handleSosAssigned);
+      socket.off("sos_status_updated", handleSosStatusUpdated);
+    };
+  }, [gps, userId]);
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
     socket.on("mission_location_confirmed", (data) => {
-      console.log("📍 Mission location confirmed:", data);
-      // Update selected request with tracking data
       setRequests((prev) =>
         prev.map((req) =>
           req.id === selectedRequest?.id
@@ -233,44 +431,21 @@ export default function ResponderMissionBoard({ user }) {
       );
     });
 
-    // Listen: Mission stage updated
     socket.on("mission_stage_update", (data) => {
-      console.log("🔄 Mission stage updated:", data);
       setRequests((prev) =>
         prev.map((req) =>
           req.id === selectedRequest?.id
-            ? {
-                ...req,
-                tracking: {
-                  ...req.tracking,
-                  stage: data.stage,
-                },
-              }
+            ? { ...req, tracking: { ...req.tracking, stage: data.stage } }
             : req,
         ),
       );
     });
 
-    // Listen: New SOS assigned to this rescue or broadcasted updates
-    socket.on("sos_assigned", async () => {
-      try {
-        const res = await getAllSos();
-        const rawList = res?.data?.data || [];
-        const sosList = rawList;
-        const mapped = mapSosToResponderRequests(sosList, gps);
-        setRequests(mapped);
-        setSelectedId((prev) => prev || mapped[0]?.id || "");
-      } catch {
-        // keep current UI state if refresh fails
-      }
-    });
-
     return () => {
       socket.off("mission_location_confirmed");
       socket.off("mission_stage_update");
-      socket.off("sos_assigned");
     };
-  }, [gps, selectedRequest?.id, userId]);
+  }, [selectedRequest?.id]);
 
   async function handleAcceptMission(selectedRequest) {
     if (!selectedRequest?.id || !userId) return;
@@ -310,7 +485,7 @@ export default function ResponderMissionBoard({ user }) {
       }
 
       await acceptMission(finalAssignmentId);
-      navigate(`/tracking/${selectedRequest.id}`);
+      navigate(`/responder/tracking/${selectedRequest.id}`);
     } catch (e) {
       setApiMessage(
         e?.response?.data?.message ||
@@ -325,18 +500,29 @@ export default function ResponderMissionBoard({ user }) {
   return (
     <div className="responder-board-page">
       <div className="responder-board-shell">
-        <p className="responder-mini-title">Quan ly nhiem vu</p>
-        <ResponderBoardHeader user={user} />
+        <ResponderBoardHeader
+          user={user}
+          notifications={notifications}
+          onDismissNotification={dismissNotification}
+        />
 
         <section className="responder-grid">
           <ResponderRequestList
-            requests={requests}
+            requests={visibleRequests}
             selectedRequestId={selectedRequest?.id || ""}
             levelMeta={LEVEL_META}
             apiMessage={apiMessage}
-            onSelectRequest={setSelectedId}
+            emptyMessage={requests.length > 0 && !visibleRequests.length
+              ? "Không có yêu cầu phù hợp bộ lọc hiện tại"
+              : undefined}
+            onSelectRequest={handleSelectRequest}
             onAcceptRequest={handleAcceptMission}
             acceptLoading={acceptLoading}
+            currentUserId={userId}
+            proximitySort={proximitySort}
+            urgencyLevel={urgencyLevel}
+            onProximitySortChange={setProximitySort}
+            onUrgencyLevelChange={setUrgencyLevel}
           />
 
           <ResponderDetailPanel
@@ -344,6 +530,9 @@ export default function ResponderMissionBoard({ user }) {
             teamStats={teamStats}
             nearestTeams={nearestTeams}
             floatingAlerts={floatingAlerts}
+            toastAlerts={toastAlerts}
+            onDismissToast={dismissToast}
+            onSelectToastRequest={handleSelectRequest}
             onAcceptMission={handleAcceptMission}
             acceptLoading={acceptLoading}
           />

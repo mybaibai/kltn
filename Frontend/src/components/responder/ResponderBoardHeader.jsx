@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, ChevronDown, LogOut } from "lucide-react";
-import rescueLogo from "@/assets/logorescue.svg";
+import rescueLogo from "@/assets/rescue.svg";
 import { clearAllAuth } from "@/services/auth/session";
 
 function initialsFromName(name) {
@@ -14,16 +14,14 @@ function initialsFromName(name) {
 
 export default function ResponderBoardHeader({
   user,
-  proximitySort,
-  urgencyLevel,
-  onProximitySortChange,
-  onUrgencyLevelChange,
+  notifications: externalNotifications = [],
+  onDismissNotification,
 }) {
   const navigate = useNavigate();
   const [openMenu, setOpenMenu] = useState(null);
   const topbarRef = useRef(null);
 
-  const [notifications, setNotifications] = useState([
+  const [mockNotifications] = useState([
     {
       id: "n1",
       title: "Nhiệm vụ mới gần bạn",
@@ -46,20 +44,10 @@ export default function ResponderBoardHeader({
       unread: false,
     },
   ]);
-  const unreadCount = notifications.filter((item) => item.unread).length;
 
-  const proximityLabelMap = {
-    nearest: "Gần nhất",
-    farthest: "Xa nhất",
-    latest: "Mới nhất",
-  };
+  const allNotifications = [...externalNotifications, ...mockNotifications];
+  const unreadCount = allNotifications.filter((item) => item.unread).length;
 
-  const urgencyLabelMap = {
-    all: "Mức độ khẩn cấp: Tất cả",
-    high: "Mức độ khẩn cấp: Cao",
-    medium: "Mức độ khẩn cấp: Trung bình",
-    low: "Mức độ khẩn cấp: Thấp",
-  };
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -87,13 +75,7 @@ export default function ResponderBoardHeader({
   }
 
   function handleToggleNotifications() {
-    setOpenMenu((prev) => {
-      const next = prev === "notifications" ? null : "notifications";
-      if (next === "notifications") {
-        setNotifications((items) => items.map((item) => ({ ...item, unread: false })));
-      }
-      return next;
-    });
+    setOpenMenu((prev) => (prev === "notifications" ? null : "notifications"));
   }
 
   async function handleLogout() {
@@ -116,134 +98,6 @@ export default function ResponderBoardHeader({
         <img className="responder-brand-logo" src={rescueLogo} alt="Logo Sentinel Rescue" />
       </div>
 
-      <div className="responder-toolbar">
-        <div className="responder-filter-dropdown">
-          <button
-            type="button"
-            className="responder-filter-trigger"
-            onClick={() => toggleMenu("proximity")}
-            aria-expanded={openMenu === "proximity"}
-            aria-haspopup="menu"
-          >
-            {proximityLabelMap[proximitySort] || "Gần nhất"}
-            <ChevronDown size={14} className={`responder-filter-chevron ${openMenu === "proximity" ? "is-open" : ""}`} />
-          </button>
-
-          {openMenu === "proximity" ? (
-            <ul className="responder-filter-menu" role="menu" aria-label="Sắp xếp khoảng cách">
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${proximitySort === "nearest" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onProximitySortChange?.("nearest");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Gần nhất
-                </button>
-              </li>
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${proximitySort === "farthest" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onProximitySortChange?.("farthest");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Xa nhất
-                </button>
-              </li>
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${proximitySort === "latest" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onProximitySortChange?.("latest");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Mới nhất
-                </button>
-              </li>
-            </ul>
-          ) : null}
-        </div>
-
-        <div className="responder-filter-dropdown">
-          <button
-            type="button"
-            className="responder-filter-trigger"
-            onClick={() => toggleMenu("urgency")}
-            aria-expanded={openMenu === "urgency"}
-            aria-haspopup="menu"
-          >
-            {urgencyLabelMap[urgencyLevel] || "Mức độ khẩn cấp: Tất cả"}
-            <ChevronDown size={14} className={`responder-filter-chevron ${openMenu === "urgency" ? "is-open" : ""}`} />
-          </button>
-
-          {openMenu === "urgency" ? (
-            <ul className="responder-filter-menu" role="menu" aria-label="Lọc mức độ khẩn cấp">
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${urgencyLevel === "all" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onUrgencyLevelChange?.("all");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Mức độ khẩn cấp: Tất cả
-                </button>
-              </li>
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${urgencyLevel === "high" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onUrgencyLevelChange?.("high");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Mức độ khẩn cấp: Cao
-                </button>
-              </li>
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${urgencyLevel === "medium" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onUrgencyLevelChange?.("medium");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Mức độ khẩn cấp: Trung bình
-                </button>
-              </li>
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${urgencyLevel === "low" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onUrgencyLevelChange?.("low");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Mức độ khẩn cấp: Thấp
-                </button>
-              </li>
-            </ul>
-          ) : null}
-        </div>
-      </div>
 
       <div className="responder-userbox">
         <div className="responder-notification-wrap">
@@ -261,15 +115,21 @@ export default function ResponderBoardHeader({
 
           {openMenu === "notifications" ? (
             <ul className="responder-notification-menu" role="menu" aria-label="Thông báo mới">
-              {notifications.map((item) => (
-                <li key={item.id} className={`responder-notification-item ${item.unread ? "is-unread" : ""}`}>
-                  <div className="responder-notification-head">
-                    <strong>{item.title}</strong>
-                    <span>{item.time}</span>
-                  </div>
-                  <p>{item.description}</p>
+              {allNotifications.length > 0 ? (
+                allNotifications.map((item) => (
+                  <li key={item.id} className={`responder-notification-item ${item.unread ? "is-unread" : ""}`}>
+                    <div className="responder-notification-head">
+                      <strong>{item.title}</strong>
+                      <span>{item.time}</span>
+                    </div>
+                    {item.description ? <p>{item.description}</p> : null}
+                  </li>
+                ))
+              ) : (
+                <li className="responder-notification-empty">
+                  <p>Không có thông báo mới</p>
                 </li>
-              ))}
+              )}
             </ul>
           ) : null}
         </div>

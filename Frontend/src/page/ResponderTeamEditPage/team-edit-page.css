@@ -263,6 +263,72 @@
   border: 1px solid #afe8c8;
 }
 
+/* --- TOAST SYSTEM --- */
+.team-edit-toasts-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.team-edit-toast {
+  pointer-events: auto;
+  min-width: 280px;
+  max-width: 420px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  animation: toast-slide-in 0.3s ease forwards;
+}
+
+@keyframes toast-slide-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.team-edit-toast--success {
+  border-left: 4px solid #10b981;
+  background: #f0fdf4;
+  color: #065f46;
+}
+
+.team-edit-toast--error {
+  border-left: 4px solid #ef4444;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.team-edit-toast span {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.team-edit-toast-close {
+  border: 0;
+  background: transparent;
+  color: currentColor;
+  opacity: 0.6;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 18px;
+  display: grid;
+  place-items: center;
+}
+
+.team-edit-toast-close:hover {
+  opacity: 1;
+}
+
 .team-edit-card {
   border-radius: 28px;
   background: #ffffff;
@@ -447,6 +513,17 @@
 
 .field-with-icon > svg:last-child {
   right: 14px;
+}
+
+.field-with-icon.is-readonly input {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.field-with-icon.is-readonly > svg {
+  color: #94a3b8;
 }
 
 .upload-box-btn {

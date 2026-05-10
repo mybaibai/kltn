@@ -163,15 +163,23 @@
   margin-top: 2px;
 }
 
-.responder-filter-trigger:focus-visible,
-.responder-filter-menu-item:focus-visible {
-  outline: 2px solid #4f80ff;
-  outline-offset: 1px;
-}
-
 .responder-filter-menu-item,
 .responder-filter-trigger {
   cursor: pointer;
+}
+
+/* Sidebar filter layout */
+.responder-list-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.responder-list-filters .responder-filter-trigger {
+  min-width: 140px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
 }
 
 .responder-userbox {
@@ -615,6 +623,59 @@
   font-weight: 900;
   font-size: 13px;
   letter-spacing: 0.02em;
+}
+
+/* Toast/Toast Alerts in Detail Panel */
+.responder-detail-toasts {
+  margin: 12px 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.responder-toast {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  animation: toast-fade-in 0.3s ease;
+}
+
+@keyframes toast-fade-in {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.responder-toast--error {
+  border-left: 4px solid #ef4444;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.responder-toast--success {
+  border-left: 4px solid #10b981;
+  background: #f0fdf4;
+  color: #065f46;
+}
+
+.responder-toast span {
+  font-size: 13px;
+  font-weight: 700;
+  flex: 1;
+}
+
+.responder-toast-close {
+  border: 0;
+  background: transparent;
+  color: currentColor;
+  opacity: 0.6;
+  cursor: pointer;
+  font-size: 18px;
 }
 
 .responder-card-footer {

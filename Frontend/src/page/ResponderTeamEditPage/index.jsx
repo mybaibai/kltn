@@ -59,10 +59,11 @@ export default function ResponderTeamEditPage() {
   const [loadingTeam, setLoadingTeam] = useState(true);
   const [teamError, setTeamError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [submitMessage, setSubmitMessage] = useState("");
+  const [toastAlerts, setToastAlerts] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationRef = useRef(null);
   const fileInputRef = useRef(null);
+  const toastTimersRef = useRef(new Map());
 
   const [form, setForm] = useState({
     name: "",
@@ -166,10 +167,31 @@ export default function ResponderTeamEditPage() {
       document.removeEventListener("keydown", handleEscape);
     };
   }, []);
+  function dismissToast(toastId) {
+    setToastAlerts((prev) => prev.filter((item) => item.toastId !== toastId));
+    const activeTimer = toastTimersRef.current.get(toastId);
+    if (activeTimer) {
+      window.clearTimeout(activeTimer);
+      toastTimersRef.current.delete(toastId);
+    }
+  }
+
+  function pushToast(message, type = "error") {
+    const toastId = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const alert = {
+      toastId,
+      message,
+      type,
+    };
+    setToastAlerts((prev) => [alert, ...prev].slice(0, 3));
+    const timer = window.setTimeout(() => {
+      dismissToast(toastId);
+    }, 4500);
+    toastTimersRef.current.set(toastId, timer);
+  }
 
   function updateField(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
-    if (submitMessage) setSubmitMessage("");
   }
 
   function handleAvatarSelect(event) {
@@ -178,7 +200,7 @@ export default function ResponderTeamEditPage() {
 
     const maxSize = 3 * 1024 * 1024;
     if (file.size > maxSize) {
-      setSubmitMessage("Ảnh quá lớn. Vui lòng chọn file dưới 3MB.");
+      pushToast("Ảnh quá lớn. Vui lòng chọn file dưới 3MB.", "error");
       return;
     }
 
@@ -186,7 +208,6 @@ export default function ResponderTeamEditPage() {
     reader.onload = () => {
       const url = String(reader.result || "");
       setForm((prev) => ({ ...prev, avatarUrl: url }));
-      if (submitMessage) setSubmitMessage("");
     };
     reader.readAsDataURL(file);
   }
@@ -199,8 +220,24 @@ export default function ResponderTeamEditPage() {
     event.preventDefault();
     if (!team?._id || saving) return;
 
+    const teamNameValue = String(form.name || "").trim();
+    if (!teamNameValue) {
+      pushToast("Vui lòng nhập tên đội.", "error");
+      return;
+    }
+
+    if (teamNameValue.length > 100) {
+      pushToast("Tên đội không được vượt quá 100 ký tự.", "error");
+      return;
+    }
+
+    const teamNamePattern = /^[\p{L}\d\s]+$/u;
+    if (!teamNamePattern.test(teamNameValue)) {
+      pushToast("Tên đội không được chứa ký tự đặc biệt.", "error");
+      return;
+    }
+
     setSaving(true);
-    setSubmitMessage("");
     try {
       const nextProfile = {
         ...(team?.profile || {}),
@@ -209,15 +246,9 @@ export default function ResponderTeamEditPage() {
         avatar_url: form.avatarUrl,
       };
 
-      const nextAuth = {
-        ...(team?.auth || {}),
-        email: form.email,
-      };
-
       const payload = {
         full_name: form.name,
         phone: form.phone,
-        auth: nextAuth,
         profile: nextProfile,
       };
 
@@ -231,17 +262,19 @@ export default function ResponderTeamEditPage() {
           /* ignore */
         }
       }
-      setSubmitMessage("Đã lưu thay đổi thông tin đội.");
-      navigate("/responder/team-info", { replace: true });
+      pushToast("Đã lưu thay đổi thông tin đội.", "success");
+      setTimeout(() => {
+        navigate("/responder/team-info");
+      }, 500);
     } catch (error) {
-      setSubmitMessage(readApiMessage(error));
+      pushToast(readApiMessage(error), "error");
     } finally {
       setSaving(false);
     }
   }
 
   const avatarUrl = form.avatarUrl || team?.profile?.avatar_url || "";
-  const teamName = form.name || "Đội cứu hộ";
+  const teamName = team?.full_name || "Đội cứu hộ";
   const normalizedStatus = String(team?.status || "").trim().toLowerCase();
   const statusSummary =
     normalizedStatus === "active" || normalizedStatus === "online"
@@ -346,7 +379,22 @@ export default function ResponderTeamEditPage() {
 
           {loadingTeam ? <p className="team-edit-loading">Đang tải dữ liệu đội...</p> : null}
           {teamError ? <p className="team-edit-error">{teamError}</p> : null}
-          {submitMessage ? <p className="team-edit-submit-msg">{submitMessage}</p> : null}
+
+          <div className="team-edit-toasts-container">
+            {toastAlerts.map((alert) => (
+              <div key={alert.toastId} className={`team-edit-toast team-edit-toast--${alert.type}`}>
+                <span>{alert.message}</span>
+                <button
+                  type="button"
+                  className="team-edit-toast-close"
+                  onClick={() => dismissToast(alert.toastId)}
+                  aria-label="Đóng thông báo"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
 
           <section className="team-edit-card">
             <div className="team-edit-card-banner" />
@@ -405,10 +453,15 @@ export default function ResponderTeamEditPage() {
 
                 <label className="team-field">
                   <span>Email liên hệ</span>
-                  <div className="field-with-icon">
+                  <div className="field-with-icon is-readonly">
                     <Mail size={13} />
                     <input
                       type="email"
+                      name="email"
+                      autoComplete="email"
+                      inputMode="email"
+                      required
+                      readOnly
                       value={form.email}
                       onChange={(event) => updateField("email", event.target.value)}
                       placeholder="email@team.com"
