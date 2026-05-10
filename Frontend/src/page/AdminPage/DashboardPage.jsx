@@ -48,6 +48,23 @@ const DATE_RANGE_PRESETS = [
   { value: 'all', label: 'Tất cả thời gian' },
 ];
 
+function pad2(value) {
+  return String(value).padStart(2, '0');
+}
+
+function formatDayLabel(date) {
+  return `${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}`;
+}
+
+function formatRangeLabel(start, endExclusive) {
+  const end = new Date(endExclusive.getTime() - 1);
+  return `${formatDayLabel(start)}-${formatDayLabel(end)}`;
+}
+
+function formatMonthLabel(date) {
+  return `T${date.getMonth() + 1}/${String(date.getFullYear()).slice(-2)}`;
+}
+
 function filterSosByDatePreset(list, preset) {
   if (!Array.isArray(list) || preset === 'all') return list;
   const now = Date.now();
@@ -61,6 +78,72 @@ function filterSosByDatePreset(list, preset) {
   const days = preset === '30d' ? 30 : 7;
   const ms = days * 24 * 60 * 60 * 1000;
   return list.filter((s) => s.created_at && now - new Date(s.created_at).getTime() <= ms);
+}
+
+function isActiveIncidentStatus(s) {
+  return ['PENDING', 'ASSIGNED', 'IN_PROGRESS'].includes(normalizeStatus(s?.status));
+}
+
+/**
+ * Xu hướng cho ô "Sự cố đang hoạt động": cùng chỉ số với số lớn — đếm phiếu **đang xử lý theo trạng thái hiện tại**
+ * có `created_at` thuộc kỳ hiện tại vs kỳ ngay trước (đồng nhất với logic filter của card).
+ */
+function computeDashboardIncidentTrend(allSos, preset) {
+  const list = Array.isArray(allSos) ? allSos : [];
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const t0 = startOfToday.getTime();
+
+  const countActiveCreated = (startMs, endMs, endInclusive = true) =>
+    list.filter((s) => {
+      if (!s.created_at || !isActiveIncidentStatus(s)) return false;
+      const t = new Date(s.created_at).getTime();
+      if (t < startMs) return false;
+      return endInclusive ? t <= endMs : t < endMs;
+    }).length;
+
+  let cur = 0;
+  let prev = 0;
+  let suffix = 'so với tuần trước';
+
+  if (preset === 'today') {
+    cur = countActiveCreated(t0, now, true);
+    prev = countActiveCreated(t0 - dayMs, t0, false);
+    suffix = 'so với hôm qua';
+  } else if (preset === '7d') {
+    const curStart = now - 7 * dayMs;
+    const prevStart = now - 14 * dayMs;
+    const prevEnd = curStart;
+    cur = countActiveCreated(curStart, now, true);
+    prev = countActiveCreated(prevStart, prevEnd, false);
+    suffix = 'so với tuần trước';
+  } else if (preset === '30d') {
+    const curStart = now - 30 * dayMs;
+    const prevStart = now - 60 * dayMs;
+    const prevEnd = curStart;
+    cur = countActiveCreated(curStart, now, true);
+    prev = countActiveCreated(prevStart, prevEnd, false);
+    suffix = 'so với tháng trước';
+  } else {
+    const curStart = now - 30 * dayMs;
+    const prevStart = now - 60 * dayMs;
+    const prevEnd = curStart;
+    cur = countActiveCreated(curStart, now, true);
+    prev = countActiveCreated(prevStart, prevEnd, false);
+    suffix = 'so với 30 ngày trước đó';
+  }
+
+  if (prev === 0 && cur === 0) {
+    return `0% ${suffix}`;
+  }
+  if (prev === 0) {
+    return `+100% ${suffix}`;
+  }
+  const pct = Math.round(((cur - prev) / prev) * 100);
+  const sign = pct > 0 ? '+' : '';
+  return `${sign}${pct}% ${suffix}`;
 }
 
 function getAssignedRescueLabel(sos) {
@@ -210,7 +293,7 @@ function ReportRow({ title, date, size, onDownload }) {
 export default function DashboardPage() {
   const [allSos, setAllSos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [trendWindow, setTrendWindow] = useState('this_week');
+  const [trendWindow, setTrendWindow] = useState('current');
   const [dateRangePreset, setDateRangePreset] = useState('7d');
 
   const load = useCallback(async () => {
@@ -233,6 +316,11 @@ export default function DashboardPage() {
     [allSos, dateRangePreset],
   );
 
+  const activeIncidentsTrendText = useMemo(
+    () => computeDashboardIncidentTrend(allSos, dateRangePreset),
+    [allSos, dateRangePreset],
+  );
+
   const stats = useMemo(() => {
     const total = filteredSos.length;
     const resolved = filteredSos.filter((s) => normalizeStatus(s.status) === 'RESOLVED');
@@ -250,21 +338,6 @@ export default function DashboardPage() {
 
     const completionRate = total > 0 ? Math.round((resolved.length / total) * 1000) / 10 : 0;
 
-    const now = Date.now();
-    const last7days = filteredSos.filter(
-      (s) => s.created_at && now - new Date(s.created_at).getTime() <= 7 * 24 * 60 * 60 * 1000,
-    );
-    const prev7days = filteredSos.filter(
-      (s) =>
-        s.created_at &&
-        now - new Date(s.created_at).getTime() > 7 * 24 * 60 * 60 * 1000 &&
-        now - new Date(s.created_at).getTime() <= 14 * 24 * 60 * 60 * 1000,
-    );
-    const trendPercent =
-      prev7days.length > 0
-        ? Math.round(((last7days.length - prev7days.length) / prev7days.length) * 100)
-        : 0;
-
     return {
       total,
       active: active.length,
@@ -272,7 +345,6 @@ export default function DashboardPage() {
       cancelled: cancelled.length,
       avgResponse,
       completionRate,
-      trendPercent,
     };
   }, [filteredSos]);
 
@@ -393,53 +465,121 @@ export default function DashboardPage() {
   }, []);
 
   const trendSeries = useMemo(() => {
-    const dayLabels = ['THỨ 2', 'THỨ 3', 'THỨ 4', 'THỨ 5', 'THỨ 6', 'THỨ 7', 'CHỦ NHẬT'];
-    const thisWeekCounts = Array(7).fill(0);
-    const prevWeekCounts = Array(7).fill(0);
+    const trendSource = Array.isArray(allSos) ? allSos : [];
+    const dayMs = 24 * 60 * 60 * 1000;
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const dayOfWeek = startOfToday.getDay(); // 0: CN, 1: T2 ... 6: T7
-    const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    const startOfThisWeek = new Date(startOfToday);
-    startOfThisWeek.setDate(startOfThisWeek.getDate() - diffToMonday);
-    const startOfNextWeek = new Date(startOfThisWeek);
-    startOfNextWeek.setDate(startOfNextWeek.getDate() + 7);
-    const startOfPrevWeek = new Date(startOfThisWeek);
-    startOfPrevWeek.setDate(startOfPrevWeek.getDate() - 7);
+    const nowMs = now.getTime();
+    const todayMs = startOfToday.getTime();
 
-    const mapDateToWeekIndex = (dateObj) => {
-      const d = dateObj.getDay();
-      return d === 0 ? 6 : d - 1; // T2..CN => 0..6
+    const buildFixedBuckets = (startMs, bucketCount, bucketSizeMs, labelFn) => {
+      const counts = Array(bucketCount).fill(0);
+      trendSource.forEach((s) => {
+        if (!s.created_at) return;
+        const t = new Date(s.created_at).getTime();
+        if (!Number.isFinite(t)) return;
+        if (t < startMs || t >= startMs + bucketCount * bucketSizeMs) return;
+        const idx = Math.min(bucketCount - 1, Math.floor((t - startMs) / bucketSizeMs));
+        counts[idx] += 1;
+      });
+      return counts.map((count, idx) => ({
+        label: labelFn(idx, startMs, bucketSizeMs),
+        count,
+        height: 0,
+      }));
     };
 
-    filteredSos.forEach((s) => {
-      if (!s.created_at) return;
-      const createdAt = new Date(s.created_at);
-      if (Number.isNaN(createdAt.getTime())) return;
-      const createdDay = new Date(
-        createdAt.getFullYear(),
-        createdAt.getMonth(),
-        createdAt.getDate(),
-      );
+    const buildMonthlyBuckets = (startMonth, monthsCount) => {
+      const counts = Array(monthsCount).fill(0);
+      const startYear = startMonth.getFullYear();
+      const startMonthIndex = startMonth.getMonth();
+      trendSource.forEach((s) => {
+        if (!s.created_at) return;
+        const createdAt = new Date(s.created_at);
+        const t = createdAt.getTime();
+        if (!Number.isFinite(t)) return;
+        const monthIndex =
+          (createdAt.getFullYear() - startYear) * 12 + (createdAt.getMonth() - startMonthIndex);
+        if (monthIndex < 0 || monthIndex >= monthsCount) return;
+        counts[monthIndex] += 1;
+      });
+      return counts.map((count, idx) => {
+        const labelDate = new Date(startYear, startMonthIndex + idx, 1);
+        return {
+          label: formatMonthLabel(labelDate),
+          count,
+          height: 0,
+        };
+      });
+    };
 
-      if (createdDay >= startOfThisWeek && createdDay < startOfNextWeek) {
-        const idx = mapDateToWeekIndex(createdDay);
-        thisWeekCounts[idx] += 1;
-        return;
-      }
-      if (createdDay >= startOfPrevWeek && createdDay < startOfThisWeek) {
-        const idx = mapDateToWeekIndex(createdDay);
-        prevWeekCounts[idx] += 1;
-      }
-    });
-    const max = Math.max(...thisWeekCounts, ...prevWeekCounts, 1);
+    let currentLabel = 'Kỳ này';
+    let previousLabel = 'Kỳ trước';
+    let current = [];
+    let previous = [];
+
+    if (dateRangePreset === 'today') {
+      const bucketCount = 6;
+      const bucketSizeMs = 4 * 60 * 60 * 1000;
+      const labelFn = (idx) => {
+        const startHour = idx * 4;
+        const endHour = Math.min(24, (idx + 1) * 4);
+        return `${pad2(startHour)}-${pad2(endHour)}`;
+      };
+      current = buildFixedBuckets(todayMs, bucketCount, bucketSizeMs, labelFn);
+      previous = buildFixedBuckets(todayMs - dayMs, bucketCount, bucketSizeMs, labelFn);
+      currentLabel = 'Hôm nay';
+      previousLabel = 'Hôm qua';
+    } else if (dateRangePreset === '7d') {
+      const bucketCount = 7;
+      const bucketSizeMs = dayMs;
+      const currentStart = todayMs - 6 * dayMs;
+      const previousStart = currentStart - 7 * dayMs;
+      const labelFn = (idx, startMs) => formatDayLabel(new Date(startMs + idx * dayMs));
+      current = buildFixedBuckets(currentStart, bucketCount, bucketSizeMs, labelFn);
+      previous = buildFixedBuckets(previousStart, bucketCount, bucketSizeMs, labelFn);
+      currentLabel = '7 ngày gần nhất';
+      previousLabel = '7 ngày trước đó';
+    } else if (dateRangePreset === '30d') {
+      const bucketCount = 6;
+      const bucketSizeMs = 5 * dayMs;
+      const currentStart = todayMs - 29 * dayMs;
+      const previousStart = currentStart - 30 * dayMs;
+      const labelFn = (idx, startMs, sizeMs) =>
+        formatRangeLabel(new Date(startMs + idx * sizeMs), new Date(startMs + (idx + 1) * sizeMs));
+      current = buildFixedBuckets(currentStart, bucketCount, bucketSizeMs, labelFn);
+      previous = buildFixedBuckets(previousStart, bucketCount, bucketSizeMs, labelFn);
+      currentLabel = '30 ngày gần nhất';
+      previousLabel = '30 ngày trước đó';
+    } else {
+      const monthsCount = 12;
+      const startOfCurrentMonth = new Date(startOfToday.getFullYear(), startOfToday.getMonth(), 1);
+      const currentStart = new Date(startOfCurrentMonth);
+      currentStart.setMonth(currentStart.getMonth() - (monthsCount - 1));
+      const previousStart = new Date(currentStart);
+      previousStart.setMonth(previousStart.getMonth() - monthsCount);
+
+      current = buildMonthlyBuckets(currentStart, monthsCount);
+      previous = buildMonthlyBuckets(previousStart, monthsCount);
+      currentLabel = '12 tháng gần nhất';
+      previousLabel = '12 tháng trước đó';
+    }
+
+    const max = Math.max(
+      ...current.map((c) => c.count),
+      ...previous.map((c) => c.count),
+      1,
+    );
+    const withHeight = (items) => items.map((item) => ({ ...item, height: (item.count / max) * 100 }));
     return {
-      this_week: thisWeekCounts.map((c, i) => ({ label: dayLabels[i], count: c, height: (c / max) * 100 })),
-      prev_week: prevWeekCounts.map((c, i) => ({ label: dayLabels[i], count: c, height: (c / max) * 100 })),
+      currentLabel,
+      previousLabel,
+      current: withHeight(current),
+      previous: withHeight(previous),
     };
-  }, [filteredSos]);
+  }, [allSos, dateRangePreset]);
 
-  const activeTrendData = trendWindow === 'prev_week' ? trendSeries.prev_week : trendSeries.this_week;
+  const activeTrendData = trendWindow === 'previous' ? trendSeries.previous : trendSeries.current;
 
   const recentReports = useMemo(() => {
     const now = new Date();
@@ -502,7 +642,7 @@ export default function DashboardPage() {
           icon={<AlertTriangle className="size-6" />}
           title="Sự cố đang hoạt động"
           value={loading ? '—' : stats.active.toLocaleString('vi-VN')}
-          trend={stats.trendPercent > 0 ? `+${stats.trendPercent}% so với tuần trước` : stats.trendPercent < 0 ? `${stats.trendPercent}% so với tuần trước` : null}
+          trend={loading || dateRangePreset === 'all' ? null : activeIncidentsTrendText}
           color="yellow"
         />
         <StatCard
@@ -533,27 +673,21 @@ export default function DashboardPage() {
                   <input
                     type="radio"
                     name="trend-window"
-                    checked={trendWindow === 'this_week'}
-                    onChange={() => setTrendWindow('this_week')}
+                    checked={trendWindow === 'current'}
+                    onChange={() => setTrendWindow('current')}
                     className="size-3.5 accent-blue-600"
                   />
-                  <span className="gap-1.5">
-                    
-                    Tuần này
-                  </span>
+                  <span className="gap-1.5">{trendSeries.currentLabel}</span>
                 </label>
                 <label className="flex cursor-pointer items-center gap-2">
                   <input
                     type="radio"
                     name="trend-window"
-                    checked={trendWindow === 'prev_week'}
-                    onChange={() => setTrendWindow('prev_week')}
+                    checked={trendWindow === 'previous'}
+                    onChange={() => setTrendWindow('previous')}
                     className="size-3.5 accent-blue-600"
                   />
-                  <span className="gap-1.5">
-                    
-                    Tuần trước
-                  </span>
+                  <span className="gap-1.5">{trendSeries.previousLabel}</span>
                 </label>
               </div>
             </div>
