@@ -80,6 +80,87 @@ function filterSosByDatePreset(list, preset) {
   return list.filter((s) => s.created_at && now - new Date(s.created_at).getTime() <= ms);
 }
 
+/** Có kết quả phân tích AI lưu trên bản ghi (đồng bộ với BE: score / nhãn / tóm tắt). */
+function hasAiAnalysisResult(s) {
+  if (s == null) return false;
+  if (s.ai_priority_score != null && s.ai_priority_score !== '') {
+    const n = Number(s.ai_priority_score);
+    if (!Number.isNaN(n)) return true;
+  }
+  if (typeof s.ai_priority_label === 'string' && s.ai_priority_label.trim().length > 0) return true;
+  if (typeof s.ai_situation_summary === 'string' && s.ai_situation_summary.trim().length > 0) return true;
+  return false;
+}
+
+function computeAiAnalysisRatePercentInRange(list, startMs, endMs, endInclusive) {
+  let total = 0;
+  let withAi = 0;
+  for (const s of list) {
+    if (!s.created_at) continue;
+    const t = new Date(s.created_at).getTime();
+    if (!Number.isFinite(t) || t < startMs) continue;
+    if (endInclusive ? t > endMs : t >= endMs) continue;
+    total += 1;
+    if (hasAiAnalysisResult(s)) withAi += 1;
+  }
+  return {
+    total,
+    withAi,
+    rate: total > 0 ? Math.round((withAi / total) * 1000) / 10 : 0,
+  };
+}
+
+/** Chênh lệch ppt % giữa kỳ hiện tại và kỳ trước; cùng cửa sổ với ô "Sự cố đang hoạt động". */
+function computeAiAnalysisRateSubtitle(allSos, preset) {
+  if (preset === 'all') return null;
+
+  const list = Array.isArray(allSos) ? allSos : [];
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const t0 = startOfToday.getTime();
+
+  let cur;
+  let prev;
+  let suffix;
+
+  if (preset === 'today') {
+    cur = computeAiAnalysisRatePercentInRange(list, t0, now, true);
+    prev = computeAiAnalysisRatePercentInRange(list, t0 - dayMs, t0, false);
+    suffix = 'so với hôm qua';
+  } else if (preset === '7d') {
+    const curStart = now - 7 * dayMs;
+    const prevStart = now - 14 * dayMs;
+    const prevEnd = curStart;
+    cur = computeAiAnalysisRatePercentInRange(list, curStart, now, true);
+    prev = computeAiAnalysisRatePercentInRange(list, prevStart, prevEnd, false);
+    suffix = 'so với tuần trước';
+  } else if (preset === '30d') {
+    const curStart = now - 30 * dayMs;
+    const prevStart = now - 60 * dayMs;
+    const prevEnd = curStart;
+    cur = computeAiAnalysisRatePercentInRange(list, curStart, now, true);
+    prev = computeAiAnalysisRatePercentInRange(list, prevStart, prevEnd, false);
+    suffix = 'so với tháng trước';
+  } else {
+    return null;
+  }
+
+  if (prev.total === 0) {
+    if (cur.total === 0) return 'Không có dữ liệu để so sánh';
+    return 'Chưa có sự cố kỳ trước để so sánh';
+  }
+
+  const delta = Math.round((cur.rate - prev.rate) * 10) / 10;
+  if (Math.abs(delta) < 0.05) {
+    return `Không đổi ${suffix}`;
+  }
+  const sign = delta > 0 ? '+' : '';
+  const deltaStr = delta.toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  return `${sign}${deltaStr}% ${suffix}`;
+}
+
 function isActiveIncidentStatus(s) {
   return ['PENDING', 'ASSIGNED', 'IN_PROGRESS'].includes(normalizeStatus(s?.status));
 }
@@ -321,6 +402,11 @@ export default function DashboardPage() {
     [allSos, dateRangePreset],
   );
 
+  const aiAnalysisRateSubtitle = useMemo(
+    () => computeAiAnalysisRateSubtitle(allSos, dateRangePreset),
+    [allSos, dateRangePreset],
+  );
+
   const stats = useMemo(() => {
     const total = filteredSos.length;
     const resolved = filteredSos.filter((s) => normalizeStatus(s.status) === 'RESOLVED');
@@ -336,7 +422,8 @@ export default function DashboardPage() {
       ? Math.round((durations.reduce((a, b) => a + b, 0) / durations.length) * 10) / 10
       : 0;
 
-    const completionRate = total > 0 ? Math.round((resolved.length / total) * 1000) / 10 : 0;
+    const withAi = filteredSos.filter(hasAiAnalysisResult).length;
+    const aiAnalysisRate = total > 0 ? Math.round((withAi / total) * 1000) / 10 : 0;
 
     return {
       total,
@@ -344,7 +431,7 @@ export default function DashboardPage() {
       resolved: resolved.length,
       cancelled: cancelled.length,
       avgResponse,
-      completionRate,
+      aiAnalysisRate,
     };
   }, [filteredSos]);
 
@@ -655,9 +742,8 @@ export default function DashboardPage() {
         <StatCard
           icon={<CheckCircle2 className="size-6" />}
           title="Tỷ lệ AI phân tích thành công"
-          value={`${stats.completionRate}%`}
-          subtitle={`+1.2% so với tháng trước`}
-          trend="Xử lý từ đồng thời gian thực"
+          value={loading ? '—' : `${stats.aiAnalysisRate}%`}
+          subtitle={loading ? null : aiAnalysisRateSubtitle}
           color="blue"
         />
       </div>
