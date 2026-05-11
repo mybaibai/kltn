@@ -4,6 +4,7 @@ import {
   updateLocation,
   updateStage,
   getCurrentTracking,
+  getCurrentTrackingBySosId,
   getTrackingHistory,
   getActiveMissions,
 } from "../controllers/trackingController.js";
@@ -15,7 +16,6 @@ import { requireAuth, attachAuthUser } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// All routes require authentication
 router.use(requireAuth);
 router.use(attachAuthUser);
 
@@ -25,19 +25,23 @@ router.post("/accept-mission", acceptMission);
 // 📍 Rescue gửi vị trí GPS
 router.post("/location", updateLocation);
 
-// 🔄 Update stage (MOVING → ARRIVED → RESCUING → COMPLETED)
+// 🔄 Update stage
 router.patch("/stage", updateStage);
 
-// 👀 Get current tracking status (Victim/Rescue/Admin)
+
+// 👀 Victim get tracking theo sosId (victim chỉ biết sosId)
+router.get("/current/by-sos/:sosId", getCurrentTrackingBySosId);
+
+// 👀 Rescue/Admin get tracking theo assignmentId
 router.get("/current/:assignmentId", getCurrentTracking);
 
-// 📊 Get tracking history (Admin only)
+// 📊 Tracking history (Admin)
 router.get("/history/:assignmentId", getTrackingHistory);
 
-// 🗺️ Get all active missions (Admin dashboard)
+// 🗺️ Active missions (Admin dashboard)
 router.get("/missions/active", getActiveMissions);
 
-// 🤖 Simulation (Bot)
+// 🤖 Simulation
 router.post("/simulate/start", startSimulation);
 router.post("/simulate/stop", stopSimulation);
 

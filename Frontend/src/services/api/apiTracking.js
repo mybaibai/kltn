@@ -45,15 +45,33 @@ export async function updateRescueStage(assignmentId, newStage, reason = "") {
   }
 }
 
-// Get current tracking status
-export async function getCurrentTracking(assignmentId, opts = {}) {
+
+/**
+ * Dùng cho RESCUE / ADMIN — biết assignmentId
+ */
+export async function getCurrentTracking(assignmentId) {
   try {
-    const response = await api.get(`/tracking/current/${assignmentId}`, {
-      skipStaffJwt: !!opts.preferVictimToken,
-    });
-    return response.data;
+    const response = await api.get(`/tracking/current/${assignmentId}`);
+    return response;
   } catch (err) {
     console.error("❌ Error getting current tracking:", err);
+    throw err;
+  }
+}
+
+/**
+ * Dùng cho VICTIM — chỉ biết sosId, không có assignmentId
+ * Gọi endpoint /tracking/current/by-sos/:sosId
+
+ */
+export async function getCurrentTrackingBySosId(sosId, opts = {}) {
+  try {
+    const response = await api.get(`/tracking/current/by-sos/${sosId}`, {
+      skipStaffJwt: !!opts.preferVictimToken,
+    });
+    return response;
+  } catch (err) {
+    console.error("❌ Error getting tracking by sosId:", err);
     throw err;
   }
 }
@@ -80,7 +98,7 @@ export async function getActiveMissions() {
   }
 }
 
-// 🤖 Simulation (Bot)
+// 🤖 Simulation
 export async function startSimulation(assignmentId, speedKmh = 70) {
   try {
     const response = await api.post("/tracking/simulate/start", {

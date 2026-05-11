@@ -1,18 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  Filter,
-  Map,
-  Search,
-} from 'lucide-react';
+import { Eye, Filter, Map, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getAdminPaginationItems } from '@/lib/adminPagination';
 import { cn } from '@/lib/utils';
 import { formatSosCode, getIncidentTypeDisplay } from '@/constants/incidentMeta';
 import { getAllSos } from '@/services/api/apiSos';
 import IncidentDetailModal from './IncidentDetailModal';
+import {
+  deriveIncidentPriority,
+  incidentPriorityTableBadgeClass,
+} from './incidentPriority';
 
 const STATUS_FILTER_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
@@ -23,11 +21,14 @@ const STATUS_FILTER_OPTIONS = [
   { value: 'CANCELLED', label: 'Đã hủy' },
 ];
 
+/** `value` = `deriveIncidentPriority(sos).key`; nhãn khớp thang AI (`priority_label`). */
 const PRIORITY_FILTER_OPTIONS = [
   { value: '', label: 'Tất cả mức độ' },
-  { value: 'urgent', label: 'Khẩn cấp' },
+  { value: 'urgent', label: 'Cực kì cao' },
   { value: 'high', label: 'Cao' },
   { value: 'medium', label: 'Trung bình' },
+  { value: 'low', label: 'Thấp' },
+  { value: 'unclassified', label: 'Chưa phân loại' },
 ];
 
 const TIME_FILTER_OPTIONS = [
@@ -54,17 +55,6 @@ function normalizeStatusKey(raw) {
     .replace(/[\s-]+/g, '_');
 }
 
-/** Mức độ: chỉ theo `ai_priority_score` từ backend — không suy từ PENDING. */
-function derivePriority(sos) {
-  const s = sos.ai_priority_score;
-  if (s != null && !Number.isNaN(Number(s))) {
-    const n = Number(s);
-    if (n >= 70) return { key: 'urgent', label: 'KHẨN CẤP' };
-    if (n >= 40) return { key: 'high', label: 'CAO' };
-    return { key: 'medium', label: 'TRUNG BÌNH' };
-  }
-  return { key: 'medium', label: 'TRUNG BÌNH' };
-}
 
 function statusRow(raw) {
   const s = normalizeStatusKey(raw);
@@ -83,12 +73,6 @@ function statusRow(raw) {
   }
 }
 
-function priorityBadgeClass(key) {
-  if (key === 'urgent') return 'bg-brand-red/10 text-brand-red ring-1 ring-brand-red/25';
-  if (key === 'high') return 'bg-brand-gray-bg text-brand-brown ring-1 ring-brand-muted/25';
-  return 'bg-white text-brand-muted ring-1 ring-[#E5E7EB]';
-}
-
 function inTimeRange(createdAt, range) {
   if (!range || !createdAt) return true;
   const t = new Date(createdAt).getTime();
@@ -101,12 +85,20 @@ function inTimeRange(createdAt, range) {
   return true;
 }
 
-function formatTimeShort(iso) {
+/** Ngày giờ gửi: dd/mm/yyyy, HH:mm */
+function formatIncidentDateTime(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleTimeString('vi-VN', {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+  const time = d.toLocaleTimeString('vi-VN', {
     hour: '2-digit',
     minute: '2-digit',
   });
+  return `${date}, ${time}`;
 }
 
 const PAGE_SIZE = 10;
@@ -146,7 +138,7 @@ export default function IncidentManagement() {
     const q = search.trim().toLowerCase();
     return rows.filter((sos) => {
       if (priorityFilter) {
-        const { key } = derivePriority(sos);
+        const { key } = deriveIncidentPriority(sos);
         if (key !== priorityFilter) return false;
       }
       if (!inTimeRange(sos.created_at, timeFilter)) return false;
@@ -181,6 +173,11 @@ export default function IncidentManagement() {
     const start = (safePage - 1) * PAGE_SIZE;
     return filtered.slice(start, start + PAGE_SIZE);
   }, [filtered, safePage]);
+
+  const pagesArr = useMemo(
+    () => getAdminPaginationItems(safePage, totalPages),
+    [safePage, totalPages],
+  );
 
   useEffect(() => {
     setPage(1);
@@ -335,7 +332,7 @@ export default function IncidentManagement() {
                       typeof sos.victim_id === 'object' && sos.victim_id?.full_name
                         ? sos.victim_id.full_name
                         : '—';
-                    const pr = derivePriority(sos);
+                    const pr = deriveIncidentPriority(sos);
                     const st = statusRow(sos.status);
                     return (
                       <tr
@@ -361,14 +358,14 @@ export default function IncidentManagement() {
                         <td className="max-w-[200px] truncate px-4 py-3 text-brand-muted" title={sos.address}>
                           {sos.address || '—'}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-brand-muted">
-                          {formatTimeShort(sos.created_at)}
+                        <td className="min-w-[180px] whitespace-nowrap px-4 py-3 text-brand-muted">
+                          {formatIncidentDateTime(sos.created_at)}
                         </td>
                         <td className="px-4 py-3">
                           <span
                             className={cn(
                               'inline-flex rounded-md px-2 py-0.5 text-xs font-semibold',
-                              priorityBadgeClass(pr.key)
+                              incidentPriorityTableBadgeClass(pr.key)
                             )}
                           >
                             {pr.label}
@@ -434,34 +431,40 @@ export default function IncidentManagement() {
                 type="button"
                 disabled={safePage <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="rounded-lg p-2 text-brand-muted hover:bg-brand-gray-bg disabled:opacity-40"
+                className="min-w-9 rounded-lg px-2 py-1.5 text-sm font-medium text-brand-muted hover:bg-brand-gray-bg disabled:opacity-40"
                 aria-label="Trang trước"
               >
-                <ChevronLeft className="size-4" />
+                {'<'}
               </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setPage(n)}
-                  className={cn(
-                    'min-w-9 rounded-lg px-2 py-1.5 text-sm font-medium transition',
-                    n === safePage
-                      ? 'bg-brand-red text-white'
-                      : 'text-brand-muted hover:bg-brand-gray-bg'
-                  )}
-                >
-                  {n}
-                </button>
-              ))}
+              {pagesArr.map((item, i) =>
+                item === 'ellipsis' ? (
+                  <span key={`ellipsis-${i}`} className="min-w-9 px-1 text-center text-sm text-brand-muted select-none">
+                    ...
+                  </span>
+                ) : (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setPage(item)}
+                    className={cn(
+                      'min-w-9 rounded-lg px-2 py-1.5 text-sm font-medium transition',
+                      item === safePage
+                        ? 'bg-brand-red text-white'
+                        : 'text-brand-muted hover:bg-brand-gray-bg',
+                    )}
+                  >
+                    {item}
+                  </button>
+                ),
+              )}
               <button
                 type="button"
                 disabled={safePage >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="rounded-lg p-2 text-brand-muted hover:bg-brand-gray-bg disabled:opacity-40"
+                className="min-w-9 rounded-lg px-2 py-1.5 text-sm font-medium text-brand-muted hover:bg-brand-gray-bg disabled:opacity-40"
                 aria-label="Trang sau"
               >
-                <ChevronRight className="size-4" />
+                {'>'}
               </button>
             </div>
           </div>

@@ -1,40 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
-import { getIncidentTypeDisplay } from "@/constants/incidentMeta";
+import { useState, useMemo } from "react";
+import { ChevronDown, Filter, MapPin, Zap, Flame, Droplets, Wind, HelpCircle, User } from "lucide-react";
 
 const PAGE_SIZE = 5;
 
-function buildPageItems(totalPages, currentPage) {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1);
+function resolveIncidentDisplay(incidentType) {
+  const type = String(incidentType || "").toLowerCase();
+  if (type.includes("fire") || type.includes("cháy") || type.includes("hỏa hoạn")) {
+    return { Icon: Flame, emoji: "🔥", label: "Hỏa hoạn" };
   }
-
-  if (currentPage <= 4) {
-    return [1, 2, 3, 4, 5, "ellipsis-right", totalPages];
+  if (type.includes("flood") || type.includes("lụt") || type.includes("ngập")) {
+    return { Icon: Droplets, emoji: "🌊", label: "Ngập lụt" };
   }
-
-  if (currentPage >= totalPages - 3) {
-    return [
-      1,
-      "ellipsis-left",
-      totalPages - 4,
-      totalPages - 3,
-      totalPages - 2,
-      totalPages - 1,
-      totalPages,
-    ];
+  if (type.includes("storm") || type.includes("bão")) {
+    return { Icon: Wind, emoji: "🌀", label: "Bão" };
   }
-
-  return [1, "ellipsis-left", currentPage - 1, currentPage, currentPage + 1, "ellipsis-right", totalPages];
-}
-
-const PAGE_STORAGE_KEY = "responder_request_page";
-
-function readStoredPage() {
-  if (typeof sessionStorage === "undefined") return 1;
-  const raw = sessionStorage.getItem(PAGE_STORAGE_KEY);
-  const value = Number(raw);
-  if (!Number.isFinite(value) || value < 1) return 1;
-  return Math.floor(value);
+  if (type.includes("medical") || type.includes("y tế") || type.includes("thương")) {
+    return { Icon: Zap, emoji: "🚑", label: "Cấp cứu y tế" };
+  }
+  return { Icon: HelpCircle, emoji: "🆘", label: "Khác" };
 }
 
 export default function ResponderRequestList({
@@ -46,44 +29,207 @@ export default function ResponderRequestList({
   onSelectRequest,
   onAcceptRequest,
   acceptLoading,
+  currentUserId,
+  proximitySort,
+  urgencyLevel,
+  onProximitySortChange,
+  onUrgencyLevelChange,
 }) {
-  const [currentPage, setCurrentPage] = useState(() => readStoredPage());
+  const [openMenu, setOpenMenu] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const totalPages = Math.max(1, Math.ceil(requests.length / PAGE_SIZE));
+  const proximityLabelMap = {
+    nearest: "Gần nhất",
+    farthest: "Xa nhất",
+    latest: "Mới nhất",
+  };
 
-  const pagedRequests = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return requests.slice(start, start + PAGE_SIZE);
-  }, [requests, currentPage]);
+  const urgencyLabelMap = {
+    all: "Tất cả mức độ",
+    high: "Mức độ: Cao",
+    medium: "Mức độ: Trung bình",
+    low: "Mức độ: Thấp",
+  };
 
-  const pageItems = useMemo(
-    () => buildPageItems(totalPages, currentPage),
-    [totalPages, currentPage],
-  );
+  // Reset pagination when list or filters change
+  useMemo(() => {
+    setCurrentPage(1);
+  }, [requests.length, proximitySort, urgencyLevel]);
 
-  useEffect(() => {
-    if (!requests.length) return;
-    const stored = readStoredPage();
-    const next = Math.min(stored, totalPages);
-    if (next !== currentPage) {
-      setCurrentPage(next);
-      return;
+  const totalPages = Math.ceil(requests.length / PAGE_SIZE);
+  const pagedRequests = requests.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  function isRequestAlreadyAccepted(item) {
+    // If the SOS already has an assigned_rescue_id and it's not the current user, or if status is not PENDING
+    if (item.source?.assigned_rescue_id && String(item.source.assigned_rescue_id) !== String(currentUserId)) {
+      return true;
     }
-    setCurrentPage((prev) => Math.min(prev, totalPages));
-  }, [requests.length, totalPages]);
+    const status = String(item.source?.status || "PENDING").toUpperCase();
+    return status !== "PENDING";
+  }
 
-  useEffect(() => {
-    if (typeof sessionStorage === "undefined") return;
-    sessionStorage.setItem(PAGE_STORAGE_KEY, String(currentPage));
-  }, [currentPage]);
+  function handleAcceptRequest(item) {
+    if (isRequestAlreadyAccepted(item)) return;
+    onAcceptRequest?.(item);
+  }
+
+  // Generate pagination items: [1, 2, '...', total]
+  const pageItems = useMemo(() => {
+    const items = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) items.push(i);
+    } else {
+      if (currentPage <= 4) {
+        items.push(1, 2, 3, 4, 5, "...", totalPages);
+      } else if (currentPage >= totalPages - 3) {
+        items.push(1, "...", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        items.push(1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages);
+      }
+    }
+    return items;
+  }, [currentPage, totalPages]);
 
   return (
     <div className="responder-list-col">
       <div className="responder-list-heading">
-        <h1>NHẬN YÊU CẦU CỨU TRỢ</h1>
-        <p>
-          <span className="live-dot" /> Đang giám sát thời gian thực
-        </p>
+        <div className="responder-heading-main">
+          <h1>NHẬN YÊU CẦU CỨU TRỢ</h1>
+          <p>
+            <span className="live-dot" /> Đang giám sát thời gian thực
+          </p>
+        </div>
+
+        <div className="responder-list-filters">
+          <div className="responder-filter-dropdown">
+            <button
+              type="button"
+              className="responder-filter-trigger"
+              onClick={() => setOpenMenu((prev) => (prev === "proximity" ? null : "proximity"))}
+              aria-expanded={openMenu === "proximity"}
+              aria-haspopup="menu"
+            >
+              <Filter size={12} style={{ marginRight: 4 }} />
+              {proximityLabelMap[proximitySort] || "Gần nhất"}
+              <ChevronDown size={14} className={`responder-filter-chevron ${openMenu === "proximity" ? "is-open" : ""}`} />
+            </button>
+
+            {openMenu === "proximity" ? (
+              <ul className="responder-filter-menu" role="menu" aria-label="Sắp xếp khoảng cách">
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`responder-filter-menu-item ${proximitySort === "nearest" ? "is-selected" : ""}`}
+                    onClick={() => {
+                      onProximitySortChange?.("nearest");
+                      setOpenMenu(null);
+                    }}
+                  >
+                    Gần nhất
+                  </button>
+                </li>
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`responder-filter-menu-item ${proximitySort === "farthest" ? "is-selected" : ""}`}
+                    onClick={() => {
+                      onProximitySortChange?.("farthest");
+                      setOpenMenu(null);
+                    }}
+                  >
+                    Xa nhất
+                  </button>
+                </li>
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`responder-filter-menu-item ${proximitySort === "latest" ? "is-selected" : ""}`}
+                    onClick={() => {
+                      onProximitySortChange?.("latest");
+                      setOpenMenu(null);
+                    }}
+                  >
+                    Mới nhất
+                  </button>
+                </li>
+              </ul>
+            ) : null}
+          </div>
+
+          <div className="responder-filter-dropdown">
+            <button
+              type="button"
+              className="responder-filter-trigger"
+              onClick={() => setOpenMenu((prev) => (prev === "urgency" ? null : "urgency"))}
+              aria-expanded={openMenu === "urgency"}
+              aria-haspopup="menu"
+            >
+              {urgencyLabelMap[urgencyLevel] || "Mức độ khẩn cấp"}
+              <ChevronDown size={14} className={`responder-filter-chevron ${openMenu === "urgency" ? "is-open" : ""}`} />
+            </button>
+
+            {openMenu === "urgency" ? (
+              <ul className="responder-filter-menu" role="menu" aria-label="Lọc mức độ khẩn cấp">
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`responder-filter-menu-item ${urgencyLevel === "all" ? "is-selected" : ""}`}
+                    onClick={() => {
+                      onUrgencyLevelChange?.("all");
+                      setOpenMenu(null);
+                    }}
+                  >
+                    Tất cả
+                  </button>
+                </li>
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`responder-filter-menu-item ${urgencyLevel === "high" ? "is-selected" : ""}`}
+                    onClick={() => {
+                      onUrgencyLevelChange?.("high");
+                      setOpenMenu(null);
+                    }}
+                  >
+                    Cao
+                  </button>
+                </li>
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`responder-filter-menu-item ${urgencyLevel === "medium" ? "is-selected" : ""}`}
+                    onClick={() => {
+                      onUrgencyLevelChange?.("medium");
+                      setOpenMenu(null);
+                    }}
+                  >
+                    Trung bình
+                  </button>
+                </li>
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`responder-filter-menu-item ${urgencyLevel === "low" ? "is-selected" : ""}`}
+                    onClick={() => {
+                      onUrgencyLevelChange?.("low");
+                      setOpenMenu(null);
+                    }}
+                  >
+                    Thấp
+                  </button>
+                </li>
+              </ul>
+            ) : null}
+          </div>
+        </div>
+
         {apiMessage ? <p className="responder-api-note">{apiMessage}</p> : null}
       </div>
 
@@ -92,7 +238,7 @@ export default function ResponderRequestList({
           <article className="responder-request-empty">{emptyMessage || "Chưa có yêu cầu SOS để hiển thị"}</article>
         ) : pagedRequests.map((item) => {
           const meta = levelMeta[item.level] || levelMeta.high;
-          const incidentDisplay = getIncidentTypeDisplay(item.incidentType);
+          const incidentDisplay = resolveIncidentDisplay(item.incidentType);
           const selected = String(item.id) === String(selectedRequestId);
           return (
             <article
@@ -127,14 +273,16 @@ export default function ResponderRequestList({
                 <button type="button" onClick={() => onSelectRequest?.(String(item.id))}>
                   Xem chi tiết
                 </button>
-                <button
-                  type="button"
-                  className="responder-accept-btn"
-                  disabled={!onAcceptRequest || acceptLoading}
-                  onClick={() => onAcceptRequest?.(item)}
-                >
-                  {acceptLoading ? "ĐANG XỬ LÝ..." : "Nhận"}
-                </button>
+                {!isRequestAlreadyAccepted(item) && (
+                  <button
+                    type="button"
+                    className="responder-accept-btn"
+                    disabled={!onAcceptRequest || acceptLoading}
+                    onClick={() => handleAcceptRequest(item)}
+                  >
+                    {acceptLoading ? "ĐANG XỬ LÝ..." : "Nhận"}
+                  </button>
+                )}
               </div>
             </article>
           );

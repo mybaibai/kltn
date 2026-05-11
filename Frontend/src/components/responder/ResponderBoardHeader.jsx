@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, ChevronDown, LogOut } from "lucide-react";
-import rescueLogo from "@/assets/logo.svg";
+import rescueLogo from "@/assets/rescue.svg";
 import { clearAllAuth } from "@/services/auth/session";
 
 function initialsFromName(name) {
@@ -9,21 +9,21 @@ function initialsFromName(name) {
   const chunks = String(name).trim().split(/\s+/).filter(Boolean);
   if (!chunks.length) return "RT";
   if (chunks.length === 1) return chunks[0].slice(0, 2).toUpperCase();
-  return `${chunks[0][0] || ""}${chunks[chunks.length - 1][0] || ""}`.toUpperCase();
+  return `${chunks[0][0] || ""}${
+    chunks[chunks.length - 1][0] || ""
+  }`.toUpperCase();
 }
 
 export default function ResponderBoardHeader({
   user,
-  proximitySort,
-  urgencyLevel,
-  onProximitySortChange,
-  onUrgencyLevelChange,
+  notifications: externalNotifications = [],
+  onDismissNotification,
 }) {
   const navigate = useNavigate();
   const [openMenu, setOpenMenu] = useState(null);
   const topbarRef = useRef(null);
 
-  const notificationItems = [
+  const [mockNotifications] = useState([
     {
       id: "n1",
       title: "Nhiệm vụ mới gần bạn",
@@ -45,21 +45,10 @@ export default function ResponderBoardHeader({
       time: "12 phút trước",
       unread: false,
     },
-  ];
-  const unreadCount = notificationItems.filter((item) => item.unread).length;
+  ]);
 
-  const proximityLabelMap = {
-    nearest: "Gần nhất",
-    farthest: "Xa nhất",
-    latest: "Mới nhất",
-  };
-
-  const urgencyLabelMap = {
-    all: "Mức độ khẩn cấp: Tất cả",
-    high: "Mức độ khẩn cấp: Cao",
-    medium: "Mức độ khẩn cấp: Trung bình",
-    low: "Mức độ khẩn cấp: Thấp",
-  };
+  const allNotifications = [...externalNotifications, ...mockNotifications];
+  const unreadCount = allNotifications.filter((item) => item.unread).length;
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -86,6 +75,10 @@ export default function ResponderBoardHeader({
     setOpenMenu((prev) => (prev === menuName ? null : menuName));
   }
 
+  function handleToggleNotifications() {
+    setOpenMenu((prev) => (prev === "notifications" ? null : "notifications"));
+  }
+
   async function handleLogout() {
     try {
       await clearAllAuth();
@@ -103,136 +96,11 @@ export default function ResponderBoardHeader({
   return (
     <header className="responder-topbar" ref={topbarRef}>
       <div className="responder-brand">
-        <img className="responder-brand-logo" src={rescueLogo} alt="Logo Sentinel Rescue" />
-      </div>
-
-      <div className="responder-toolbar">
-        <div className="responder-filter-dropdown">
-          <button
-            type="button"
-            className="responder-filter-trigger"
-            onClick={() => toggleMenu("proximity")}
-            aria-expanded={openMenu === "proximity"}
-            aria-haspopup="menu"
-          >
-            {proximityLabelMap[proximitySort] || "Gần nhất"}
-            <ChevronDown size={14} className={`responder-filter-chevron ${openMenu === "proximity" ? "is-open" : ""}`} />
-          </button>
-
-          {openMenu === "proximity" ? (
-            <ul className="responder-filter-menu" role="menu" aria-label="Sắp xếp khoảng cách">
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${proximitySort === "nearest" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onProximitySortChange?.("nearest");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Gần nhất
-                </button>
-              </li>
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${proximitySort === "farthest" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onProximitySortChange?.("farthest");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Xa nhất
-                </button>
-              </li>
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${proximitySort === "latest" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onProximitySortChange?.("latest");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Mới nhất
-                </button>
-              </li>
-            </ul>
-          ) : null}
-        </div>
-
-        <div className="responder-filter-dropdown">
-          <button
-            type="button"
-            className="responder-filter-trigger"
-            onClick={() => toggleMenu("urgency")}
-            aria-expanded={openMenu === "urgency"}
-            aria-haspopup="menu"
-          >
-            {urgencyLabelMap[urgencyLevel] || "Mức độ khẩn cấp: Tất cả"}
-            <ChevronDown size={14} className={`responder-filter-chevron ${openMenu === "urgency" ? "is-open" : ""}`} />
-          </button>
-
-          {openMenu === "urgency" ? (
-            <ul className="responder-filter-menu" role="menu" aria-label="Lọc mức độ khẩn cấp">
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${urgencyLevel === "all" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onUrgencyLevelChange?.("all");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Mức độ khẩn cấp: Tất cả
-                </button>
-              </li>
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${urgencyLevel === "high" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onUrgencyLevelChange?.("high");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Mức độ khẩn cấp: Cao
-                </button>
-              </li>
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${urgencyLevel === "medium" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onUrgencyLevelChange?.("medium");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Mức độ khẩn cấp: Trung bình
-                </button>
-              </li>
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`responder-filter-menu-item ${urgencyLevel === "low" ? "is-selected" : ""}`}
-                  onClick={() => {
-                    onUrgencyLevelChange?.("low");
-                    setOpenMenu(null);
-                  }}
-                >
-                  Mức độ khẩn cấp: Thấp
-                </button>
-              </li>
-            </ul>
-          ) : null}
-        </div>
+        <img
+          className="responder-brand-logo"
+          src={rescueLogo}
+          alt="Logo Sentinel Rescue"
+        />
       </div>
 
       <div className="responder-userbox">
@@ -241,25 +109,42 @@ export default function ResponderBoardHeader({
             type="button"
             className="responder-bell-btn"
             aria-label="Thông báo"
-            onClick={() => toggleMenu("notifications")}
+            onClick={handleToggleNotifications}
             aria-expanded={openMenu === "notifications"}
             aria-haspopup="menu"
           >
             <Bell size={16} />
-            {unreadCount > 0 ? <span className="responder-bell-dot">{unreadCount}</span> : null}
+            {unreadCount > 0 ? (
+              <span className="responder-bell-dot">{unreadCount}</span>
+            ) : null}
           </button>
 
           {openMenu === "notifications" ? (
-            <ul className="responder-notification-menu" role="menu" aria-label="Thông báo mới">
-              {notificationItems.map((item) => (
-                <li key={item.id} className={`responder-notification-item ${item.unread ? "is-unread" : ""}`}>
-                  <div className="responder-notification-head">
-                    <strong>{item.title}</strong>
-                    <span>{item.time}</span>
-                  </div>
-                  <p>{item.description}</p>
+            <ul
+              className="responder-notification-menu"
+              role="menu"
+              aria-label="Thông báo mới"
+            >
+              {allNotifications.length > 0 ? (
+                allNotifications.map((item) => (
+                  <li
+                    key={item.id}
+                    className={`responder-notification-item ${
+                      item.unread ? "is-unread" : ""
+                    }`}
+                  >
+                    <div className="responder-notification-head">
+                      <strong>{item.title}</strong>
+                      <span>{item.time}</span>
+                    </div>
+                    {item.description ? <p>{item.description}</p> : null}
+                  </li>
+                ))
+              ) : (
+                <li className="responder-notification-empty">
+                  <p>Không có thông báo mới</p>
                 </li>
-              ))}
+              )}
             </ul>
           ) : null}
         </div>
@@ -272,11 +157,23 @@ export default function ResponderBoardHeader({
             aria-expanded={openMenu === "avatar"}
             aria-haspopup="menu"
           >
-            {initialsFromName(user?.full_name)}
+            {user?.profile?.avatar_url ? (
+              <img
+                src={user.profile.avatar_url}
+                alt={user?.full_name || "Avatar đội cứu trợ"}
+                className="responder-avatar-img"
+              />
+            ) : (
+              initialsFromName(user?.full_name)
+            )}
           </button>
 
           {openMenu === "avatar" ? (
-            <ul className="responder-user-menu" role="menu" aria-label="Tùy chọn đội cứu trợ">
+            <ul
+              className="responder-user-menu"
+              role="menu"
+              aria-label="Tùy chọn đội cứu trợ"
+            >
               <li role="none">
                 <button
                   type="button"

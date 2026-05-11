@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   Bell,
+  Clock3,
   Lock,
   Mail,
   MapPin,
@@ -12,10 +13,11 @@ import {
   Shield,
   UploadCloud,
 } from "lucide-react";
-import rescueLogo from "@/assets/logo.svg";
+import ResponderSidebar from "@/components/responder/ResponderSidebar";
 import { getAllTeams, getTeamDetail, updateTeam } from "@/services/api/apiTeam";
 import { getAuthUser } from "@/services/auth/session";
 import "./team-edit-page.css";
+
 
 function initialsFromName(name) {
   if (!name) return "RT";
@@ -57,9 +59,11 @@ export default function ResponderTeamEditPage() {
   const [loadingTeam, setLoadingTeam] = useState(true);
   const [teamError, setTeamError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [submitMessage, setSubmitMessage] = useState("");
+  const [toastAlerts, setToastAlerts] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const toastTimersRef = useRef(new Map());
 
   const [form, setForm] = useState({
     name: "",
@@ -68,6 +72,7 @@ export default function ResponderTeamEditPage() {
     email: "",
     address: "",
     emergencyContact: "",
+    avatarUrl: "",
   });
 
   useEffect(() => {
@@ -122,6 +127,7 @@ export default function ResponderTeamEditPage() {
             email: resolvedTeam?.auth?.email || "",
             address: resolvedTeam?.profile?.address || resolvedTeam?.address || "",
             emergencyContact: resolvedTeam?.profile?.emergency_contact || "",
+            avatarUrl: resolvedTeam?.profile?.avatar_url || "",
           });
         }
       } catch (error) {
@@ -161,23 +167,83 @@ export default function ResponderTeamEditPage() {
       document.removeEventListener("keydown", handleEscape);
     };
   }, []);
+  function dismissToast(toastId) {
+    setToastAlerts((prev) => prev.filter((item) => item.toastId !== toastId));
+    const activeTimer = toastTimersRef.current.get(toastId);
+    if (activeTimer) {
+      window.clearTimeout(activeTimer);
+      toastTimersRef.current.delete(toastId);
+    }
+  }
+
+  function pushToast(message, type = "error") {
+    const toastId = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const alert = {
+      toastId,
+      message,
+      type,
+    };
+    setToastAlerts((prev) => [alert, ...prev].slice(0, 3));
+    const timer = window.setTimeout(() => {
+      dismissToast(toastId);
+    }, 4500);
+    toastTimersRef.current.set(toastId, timer);
+  }
 
   function updateField(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
-    if (submitMessage) setSubmitMessage("");
   }
+
+  function handleAvatarSelect(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const maxSize = 3 * 1024 * 1024;
+    if (file.size > maxSize) {
+      pushToast("Ảnh quá lớn. Vui lòng chọn file dưới 3MB.", "error");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = String(reader.result || "");
+      setForm((prev) => ({ ...prev, avatarUrl: url }));
+    };
+    reader.readAsDataURL(file);
+  }
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
 
   async function handleSubmit(event) {
     event.preventDefault();
     if (!team?._id || saving) return;
 
+    const teamNameValue = String(form.name || "").trim();
+    if (!teamNameValue) {
+      pushToast("Vui lòng nhập tên đội.", "error");
+      return;
+    }
+
+    if (teamNameValue.length > 100) {
+      pushToast("Tên đội không được vượt quá 100 ký tự.", "error");
+      return;
+    }
+
+    const teamNamePattern = /^[\p{L}\d\s]+$/u;
+    if (!teamNamePattern.test(teamNameValue)) {
+      pushToast("Tên đội không được chứa ký tự đặc biệt.", "error");
+      return;
+    }
+
     setSaving(true);
-    setSubmitMessage("");
     try {
       const nextProfile = {
         ...(team?.profile || {}),
         address: form.address,
         emergency_contact: form.emergencyContact,
+        avatar_url: form.avatarUrl,
       };
 
       const payload = {
@@ -196,16 +262,19 @@ export default function ResponderTeamEditPage() {
           /* ignore */
         }
       }
-      setSubmitMessage("Đã lưu thay đổi thông tin đội.");
-      navigate("/responder/team-info", { replace: true });
+      pushToast("Đã lưu thay đổi thông tin đội.", "success");
+      setTimeout(() => {
+        navigate("/responder/team-info");
+      }, 500);
     } catch (error) {
-      setSubmitMessage(readApiMessage(error));
+      pushToast(readApiMessage(error), "error");
     } finally {
       setSaving(false);
     }
   }
 
-  const teamName = form.name || "Đội cứu hộ";
+  const avatarUrl = form.avatarUrl || team?.profile?.avatar_url || "";
+  const teamName = team?.full_name || "Đội cứu hộ";
   const normalizedStatus = String(team?.status || "").trim().toLowerCase();
   const statusSummary =
     normalizedStatus === "active" || normalizedStatus === "online"
@@ -215,7 +284,7 @@ export default function ResponderTeamEditPage() {
         : "Chưa có dữ liệu";
   const updatedSummary = formatLastUpdated(team?.updated_at || team?.updatedAt);
   const securitySummary = team?.auth?.email || authUser?.auth?.email || "Mã hóa chuẩn quốc tế";
-  const notifications = [
+  const [notifications, setNotifications] = useState([
     {
       id: "te-1",
       title: "Có nhiệm vụ mới",
@@ -237,21 +306,30 @@ export default function ResponderTeamEditPage() {
       time: "18 phút trước",
       unread: false,
     },
-  ];
+  ]);
   const unreadCount = notifications.filter((item) => item.unread).length;
+
+  function handleToggleNotifications() {
+    setShowNotifications((prev) => {
+      const next = !prev;
+      if (next) {
+        setNotifications((items) => items.map((item) => ({ ...item, unread: false })));
+      }
+      return next;
+    });
+  }
 
   return (
     <div className="team-edit-page">
+      <ResponderSidebar active="team" />
+
       <div className="team-edit-shell">
-        <p className="team-edit-mini-title">Chỉnh sửa thông tin</p>
-
-        <header className="team-edit-topbar">
-          <Link to="/responder/team-info" className="team-edit-back-btn" aria-label="Quay lại thông tin đội">
-            <ArrowLeft size={16} />
-          </Link>
-
-          <div className="team-edit-brand">
-            <img className="team-edit-brand-logo" src={rescueLogo} alt="Logo Sentinel Rescue" />
+        <header className="team-edit-topbar team-edit-topbar--simple">
+          <div className="team-edit-title-group">
+            <h1>Cài đặt Đội cứu hộ</h1>
+            <Link to="/responder/team-info" className="team-edit-back-btn" aria-label="Quay lại thông tin đội">
+              <ArrowLeft size={16} />
+            </Link>
           </div>
 
           <div className="team-edit-topbar-user">
@@ -260,7 +338,7 @@ export default function ResponderTeamEditPage() {
                 type="button"
                 className="team-edit-bell-btn"
                 aria-label="Thông báo"
-                onClick={() => setShowNotifications((prev) => !prev)}
+                onClick={handleToggleNotifications}
                 aria-expanded={showNotifications}
                 aria-haspopup="menu"
               >
@@ -286,30 +364,66 @@ export default function ResponderTeamEditPage() {
               <p>{team?.auth?.email || authUser?.auth?.email || "Sentinel Admin"}</p>
               <span>Đang trực</span>
             </div>
-            <div className="team-edit-avatar">{initialsFromName(teamName)}</div>
+            <div className="team-edit-avatar">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={teamName} className="team-edit-avatar-img" />
+              ) : (
+                initialsFromName(teamName)
+              )}
+            </div>
           </div>
         </header>
 
         <main className="team-edit-content">
-          <p className="team-edit-breadcrumb">Cấu hình &gt; <span>Chỉnh sửa thông tin đội</span></p>
-          <h1>Cài đặt Đội cứu hộ</h1>
           <p className="team-edit-subtitle">Cập nhật hồ sơ công khai và các thông tin liên hệ khẩn cấp.</p>
 
           {loadingTeam ? <p className="team-edit-loading">Đang tải dữ liệu đội...</p> : null}
           {teamError ? <p className="team-edit-error">{teamError}</p> : null}
-          {submitMessage ? <p className="team-edit-submit-msg">{submitMessage}</p> : null}
+
+          <div className="team-edit-toasts-container">
+            {toastAlerts.map((alert) => (
+              <div key={alert.toastId} className={`team-edit-toast team-edit-toast--${alert.type}`}>
+                <span>{alert.message}</span>
+                <button
+                  type="button"
+                  className="team-edit-toast-close"
+                  onClick={() => dismissToast(alert.toastId)}
+                  aria-label="Đóng thông báo"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
 
           <section className="team-edit-card">
             <div className="team-edit-card-banner" />
 
             <div className="team-edit-card-head">
-              <div className="team-badge-avatar">
-                <Shield size={38} />
+              <div className="team-badge-avatar-wrap">
+                <div className="team-badge-avatar">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt={teamName} className="team-badge-avatar-img" />
+                  ) : (
+                    <Shield size={38} />
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="team-avatar-edit"
+                  aria-label="Đổi ảnh đại diện"
+                  onClick={handleAvatarClick}
+                >
+                  <Pencil size={12} />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleAvatarSelect}
+                />
               </div>
-
-              <button type="button" className="team-avatar-edit" aria-label="Đổi ảnh đại diện">
-                <Pencil size={12} />
-              </button>
 
               <div className="team-head-meta">
                 <h2>{teamName}</h2>
@@ -340,8 +454,18 @@ export default function ResponderTeamEditPage() {
                 <label className="team-field">
                   <span>Email liên hệ</span>
                   <div className="field-with-icon is-readonly">
-                    <input type="text" value={form.email} readOnly />
                     <Mail size={13} />
+                    <input
+                      type="email"
+                      name="email"
+                      autoComplete="email"
+                      inputMode="email"
+                      required
+                      readOnly
+                      value={form.email}
+                      onChange={(event) => updateField("email", event.target.value)}
+                      placeholder="email@team.com"
+                    />
                   </div>
                 </label>
 
@@ -354,19 +478,6 @@ export default function ResponderTeamEditPage() {
                       value={form.phone}
                       onChange={(event) => updateField("phone", event.target.value)}
                       placeholder="090 123 4567"
-                    />
-                  </div>
-                </label>
-
-                <label className="team-field">
-                  <span>Liên hệ khẩn cấp</span>
-                  <div className="field-with-icon">
-                    <Shield size={13} />
-                    <input
-                      type="text"
-                      value={form.emergencyContact}
-                      onChange={(event) => updateField("emergencyContact", event.target.value)}
-                      placeholder="Người phụ trách / Hotline"
                     />
                   </div>
                 </label>
@@ -386,11 +497,11 @@ export default function ResponderTeamEditPage() {
 
                 <div className="team-field">
                   <span>Ảnh đại diện mới</span>
-                  <button type="button" className="upload-box-btn">
+                  <button type="button" className="upload-box-btn" onClick={handleAvatarClick}>
                     <UploadCloud size={16} />
                     <div>
                       <strong>Tải lên ảnh mới</strong>
-                      <p>PNG, JPG tối đa 5MB</p>
+                      <p>{avatarUrl ? "Ảnh đã chọn sẵn sàng lưu" : "PNG, JPG tối đa 5MB"}</p>
                     </div>
                   </button>
                 </div>

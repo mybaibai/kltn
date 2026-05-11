@@ -1,26 +1,30 @@
 import { auth } from '@/lib/firebase';
 import axios from "axios";
+import { onAuthStateChanged } from "firebase/auth";
+
+// Chờ Firebase Auth khởi tạo xong (không resolve sớm với null)
+function waitForUser() {
+  return new Promise((resolve) => {
+    // Nếu đã có user rồi thì trả về luôn
+    if (auth.currentUser !== null) {
+      return resolve(auth.currentUser);
+    }
+
+    // Chờ lần thay đổi đầu tiên (kể cả null = chưa đăng nhập)
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe();
+      resolve(user);
+    });
+  });
+}
 
 const api = axios.create({
   baseURL: "http://localhost:3001/api",
 });
-import { onAuthStateChanged } from "firebase/auth";
 
-function waitForUser() {
-  return new Promise((resolve) => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      unsubscribe(); // chỉ chạy 1 lần
-      resolve(user);
-    });
-  });
-
-}api.interceptors.request.use(async (config) => {
+api.interceptors.request.use(async (config) => {
   try {
-    let fbUser = auth.currentUser;
-
-    if (!fbUser) {
-      fbUser = await waitForUser();
-    }
+    const fbUser = await waitForUser(); // ✅ luôn chờ đủ
 
     if (fbUser) {
       const idToken = await fbUser.getIdToken();
@@ -33,18 +37,15 @@ function waitForUser() {
   return config;
 });
 
+// ✅ Sửa lại hàm bị lỗi - dùng nhất quán waitForUser
 async function withVictimAuthHeader(config = {}) {
   const headers = { ...(config.headers || {}) };
 
   try {
-    let fbUser = auth.currentUser;
+    const user = await waitForUser(); // bỏ waitForFirebaseAuth và fbUser undefined
 
-    if (!fbUser) {
-      fbUser = await waitForUser(); 
-    }
-
-    if (fbUser) {
-      const idToken = await fbUser.getIdToken();
+    if (user) {
+      const idToken = await user.getIdToken();
       if (idToken) headers.Authorization = `Bearer ${idToken}`;
     }
   } catch {}
@@ -56,7 +57,7 @@ export const sendSos = async (data) => {
   const config = await withVictimAuthHeader();
   return api.post('/sos', data, { ...config, skipStaffJwt: true });
 };
-/** @param {{ preferVictimToken?: boolean }} [opts] — dùng Firebase khi cùng lúc có JWT staff */
+
 export const getSosDetail = (id, opts = {}) =>
   api.get(`/sos/${id}`, { skipStaffJwt: !!opts.preferVictimToken });
 export const getSosByRequester = async (requesterId) => {
@@ -65,9 +66,9 @@ export const getSosByRequester = async (requesterId) => {
 };
 export const getSosByTeam = (teamId) => api.get(`/sos/team/${teamId}`);
 export const getAllSos = (status) => api.get('/sos', { params: status ? { status } : {} });
-export const updateSosStatus = (id, status) => api.patch(`/sos/${id}/status`, { status });
+export const updateSosStatus = (id, status, extra = {}) =>
+  api.patch(`/sos/${id}/status`, { status, ...extra });
 export const assignTeam = (sosId, teamId) => api.patch(`/sos/${sosId}/assign`, { team_id: teamId });
-
 export const patchVictimSosLocation = (sosId, latitude, longitude) =>
   api.patch(`/sos/${sosId}/victim-location`, { latitude, longitude }, { skipStaffJwt: true });
 
