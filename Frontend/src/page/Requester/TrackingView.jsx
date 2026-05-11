@@ -16,9 +16,11 @@ import {
   AlertTriangle, Ambulance, X, Brain, Lightbulb,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import CompletionPopup from "@/components/ui/CompletionPopup";
+
 
 import { getSosDetail } from "@/services/api/apiSos";
-import { getCurrentTracking } from "@/services/api/apiTracking";
+import { getCurrentTrackingBySosId } from "@/services/api/apiTracking";
 import { getSocket, reinitSocketForTrackingPersona } from "@/services/socket";
 import { getOSRMRoute } from "@/services/api/apiRouting";
 
@@ -205,6 +207,8 @@ export default function TrackingPage() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelCountdown, setCancelCountdown] = useState(CANCEL_WINDOW_SEC);
   const [canCancel, setCanCancel] = useState(true);
+  const [showCompletion, setShowCompletion] = useState(false);
+
 
   // Session: only victim profile matters on this page
   const victimUser = useMemo(() => {
@@ -214,11 +218,19 @@ export default function TrackingPage() {
 
   // ── Data loading ──────────────────────────────────────────────────────────
 
-  const loadTracking = useCallback(async (aid) => {
-    if (!aid) return;
+  const loadTracking = useCallback(async (currentSosId) => {
+    if (!currentSosId) return;
     try {
-      const res = await getCurrentTracking(aid, { preferVictimToken: true });
-      if (res?.success && res.data) setTracking(res.data);
+      const res = await getCurrentTrackingBySosId(currentSosId);
+      if (res?.data?.success && res.data.data) {
+        const d = res.data.data;
+        setTracking({
+          ...d,
+          // normalize: backend returns `stage`, map to `current_stage`
+          current_stage: d.stage ?? d.current_stage,
+        });
+        if (d.assignment_id) setAssignmentId(d.assignment_id);
+      }
     } catch (e) { console.error("Tracking load failed", e); }
   }, []);
 
@@ -233,8 +245,7 @@ export default function TrackingPage() {
         const data = res?.data?.data;
         if (!data) { setErr("Không tải được yêu cầu SOS"); setLoading(false); return; }
         setSos(data);
-        const aid = data.assignment?._id;
-        if (aid) { setAssignmentId(aid); await loadTracking(aid); }
+        await loadTracking(sosId);
         if (!active) return;
         setLoading(false);
       } catch (e) {
@@ -252,32 +263,68 @@ export default function TrackingPage() {
   // ── Socket: victim receives updates only ──────────────────────────────────
 
   useEffect(() => {
-    reinitSocketForTrackingPersona("victim");
-    const socket = getSocket();
-    if (!socket) return;
+    if (!sosId) return;
+    let socket = null;
 
-    socket.on("victim_tracking_update", (payload) => {
-      setTracking(prev => {
-        const stageChanged = payload.stage !== prev?.current_stage;
-        if (stageChanged) {
-          const msg =
-            payload.stage === "ARRIVED"   ? "Đội cứu hộ đã đến vị trí!" :
-            payload.stage === "RESCUING"  ? "Tiến trình cứu hộ đang bắt đầu..." :
-            payload.stage === "COMPLETED" ? "Nhiệm vụ cứu hộ hoàn thành!" : null;
-          if (msg) setToaster({ message: msg, type: payload.stage === "COMPLETED" ? "success" : "info" });
-        }
-        return {
-          ...prev,
-          current_stage:   payload.stage          ?? prev?.current_stage,
-          distance_km:     payload.distance_km    ?? prev?.distance_km,
-          eta_minutes:     payload.eta_minutes    ?? prev?.eta_minutes,
-          rescue_location: payload.rescue_location ?? prev?.rescue_location,
-        };
-      });
-    });
+    async function setupSocket() {
+      socket = await reinitSocketForTrackingPersona("victim");
+      if (!socket) socket = getSocket();
+      if (!socket) return;
 
-    return () => socket.off("victim_tracking_update");
-  }, []);
+      // Join SOS-specific room to get sos_room_update (rescue location live)
+      socket.emit("join_sos_room", { sos_id: sosId });
+
+      const onTrackingUpdate = (payload) => {
+        setTracking(prev => {
+          const prevStage = prev?.current_stage;
+          const newStage  = payload.stage ?? prevStage;
+          const stageChanged = newStage !== prevStage;
+          if (stageChanged) {
+            const msg =
+              newStage === "ARRIVED"   ? "Đội cứu hộ đã đến vị trí!" :
+              newStage === "RESCUING"  ? "Tiến trình cứu hộ đang bắt đầu..." :
+              newStage === "COMPLETED" ? "Nhiệm vụ cứu hộ hoàn thành!" : null;
+            if (msg) setToaster({ message: msg, type: newStage === "COMPLETED" ? "success" : "info" });
+            if (newStage === "COMPLETED") setShowCompletion(true);
+          }
+          return {
+            ...prev,
+            current_stage:   newStage,
+            distance_km:     payload.distance_km    ?? prev?.distance_km,
+            eta_minutes:     payload.eta_minutes    ?? prev?.eta_minutes,
+            rescue_location: payload.rescue_location ?? prev?.rescue_location,
+          };
+        });
+      };
+
+      const onSosRoomUpdate = (payload) => {
+        // broadcast from server for both rescue+victim in the same sos room
+        setTracking(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            current_stage:   payload.stage          ?? prev.current_stage,
+            distance_km:     payload.distance_km    ?? prev.distance_km,
+            eta_minutes:     payload.eta_minutes    ?? prev.eta_minutes,
+            rescue_location: payload.rescue_location ?? prev.rescue_location,
+          };
+        });
+      };
+
+      socket.on("victim_tracking_update", onTrackingUpdate);
+      socket.on("sos_room_update",        onSosRoomUpdate);
+
+      // cleanup keeps reference so .off is precise
+      socket._victimCleanup = () => {
+        socket.off("victim_tracking_update", onTrackingUpdate);
+        socket.off("sos_room_update",        onSosRoomUpdate);
+        socket.emit("leave_sos_room", { sos_id: sosId });
+      };
+    }
+
+    setupSocket();
+    return () => { if (socket?._victimCleanup) socket._victimCleanup(); };
+  }, [sosId]);
 
   // ── Socket: AI advice for victim ──────────────────────────────────────────
 
@@ -287,11 +334,7 @@ export default function TrackingPage() {
 
     const onAiAnalyzed = (payload) => {
       if (payload.request_id !== sosId) return;
-      setSos(prev => ({
-        ...prev,
-        // Only store what victim needs to see
-        ai_suggestion: payload.victim_advice,
-      }));
+      setSos(prev => ({ ...prev, ai_suggestion: payload.victim_advice }));
       setToaster({ message: "Có lời khuyên sơ cứu mới từ AI", type: "success" });
     };
 
@@ -303,16 +346,15 @@ export default function TrackingPage() {
     socket.on("sos_ai_analyzed", onAiAnalyzed);
     socket.on("sos_ai_advice",   onAiAdvice);
 
-    const timer = setTimeout(() => {
-      if (!sos?.ai_suggestion) setAiTimeout(true);
-    }, 15000);
+    // only set timeout once per sosId, not every time ai_suggestion changes
+    const timer = setTimeout(() => setAiTimeout(true), 15000);
 
     return () => {
       socket.off("sos_ai_analyzed", onAiAnalyzed);
       socket.off("sos_ai_advice",   onAiAdvice);
       clearTimeout(timer);
     };
-  }, [sosId, sos?.ai_suggestion]);
+  }, [sosId]);
 
   // ── Route victim ↔ rescue ─────────────────────────────────────────────────
 
@@ -391,6 +433,13 @@ export default function TrackingPage() {
         <AnimatePresence>
           {toaster && <Toast {...toaster} onClose={() => setToaster(null)} />}
         </AnimatePresence>
+
+        <CompletionPopup 
+          isOpen={showCompletion} 
+          onClose={() => setShowCompletion(false)} 
+          onBackHome={() => navigate("/")}
+        />
+
 
         {/* ── MAP (read-only for victim) ───────────────────────────────── */}
         <div className="flex-1 h-[45vh] lg:h-full relative">

@@ -45,10 +45,11 @@ export default function ResponderRequestList({
   };
 
   const urgencyLabelMap = {
-    all: "Tất cả mức độ",
-    high: "Mức độ: Cao",
-    medium: "Mức độ: Trung bình",
-    low: "Mức độ: Thấp",
+    all:      "Tất cả mức độ",
+    critical: "Mức độ: Cực cao",
+    high:     "Mức độ: Cao",
+    medium:   "Mức độ: Trung bình",
+    low:      "Mức độ: Thấp",
   };
 
   // Reset pagination when list or filters change
@@ -178,10 +179,7 @@ export default function ResponderRequestList({
                     type="button"
                     role="menuitem"
                     className={`responder-filter-menu-item ${urgencyLevel === "all" ? "is-selected" : ""}`}
-                    onClick={() => {
-                      onUrgencyLevelChange?.("all");
-                      setOpenMenu(null);
-                    }}
+                    onClick={() => { onUrgencyLevelChange?.("all"); setOpenMenu(null); }}
                   >
                     Tất cả
                   </button>
@@ -190,11 +188,18 @@ export default function ResponderRequestList({
                   <button
                     type="button"
                     role="menuitem"
+                    className={`responder-filter-menu-item ${urgencyLevel === "critical" ? "is-selected" : ""}`}
+                    onClick={() => { onUrgencyLevelChange?.("critical"); setOpenMenu(null); }}
+                  >
+                    🔴 Cực cao
+                  </button>
+                </li>
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
                     className={`responder-filter-menu-item ${urgencyLevel === "high" ? "is-selected" : ""}`}
-                    onClick={() => {
-                      onUrgencyLevelChange?.("high");
-                      setOpenMenu(null);
-                    }}
+                    onClick={() => { onUrgencyLevelChange?.("high"); setOpenMenu(null); }}
                   >
                     Cao
                   </button>
@@ -204,10 +209,7 @@ export default function ResponderRequestList({
                     type="button"
                     role="menuitem"
                     className={`responder-filter-menu-item ${urgencyLevel === "medium" ? "is-selected" : ""}`}
-                    onClick={() => {
-                      onUrgencyLevelChange?.("medium");
-                      setOpenMenu(null);
-                    }}
+                    onClick={() => { onUrgencyLevelChange?.("medium"); setOpenMenu(null); }}
                   >
                     Trung bình
                   </button>
@@ -217,10 +219,7 @@ export default function ResponderRequestList({
                     type="button"
                     role="menuitem"
                     className={`responder-filter-menu-item ${urgencyLevel === "low" ? "is-selected" : ""}`}
-                    onClick={() => {
-                      onUrgencyLevelChange?.("low");
-                      setOpenMenu(null);
-                    }}
+                    onClick={() => { onUrgencyLevelChange?.("low"); setOpenMenu(null); }}
                   >
                     Thấp
                   </button>
@@ -237,7 +236,8 @@ export default function ResponderRequestList({
         {!requests.length ? (
           <article className="responder-request-empty">{emptyMessage || "Chưa có yêu cầu SOS để hiển thị"}</article>
         ) : pagedRequests.map((item) => {
-          const meta = levelMeta[item.level] || levelMeta.high;
+          // Fallback: if level is unknown (e.g. not in levelMeta), treat as medium
+          const meta = levelMeta[item.level] || levelMeta.medium || levelMeta.high;
           const incidentDisplay = resolveIncidentDisplay(item.incidentType);
           const selected = String(item.id) === String(selectedRequestId);
           return (

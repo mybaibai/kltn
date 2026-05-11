@@ -17,6 +17,8 @@ import {
   Ambulance, X, ShieldCheck,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import CompletionPopup from "@/components/ui/CompletionPopup";
+
 
 import { getSosDetail } from "@/services/api/apiSos";
 import { getCurrentTracking, updateRescueLocation, updateRescueStage } from "@/services/api/apiTracking";
@@ -190,6 +192,8 @@ export default function TrackingView() {
   const [isMockMode,   setIsMockMode]  = useState(false); // dev: click map to set position
   // Stage update state
   const [isUpdatingStage, setIsUpdatingStage] = useState(false);
+  const [showCompletion,   setShowCompletion]   = useState(false);
+
 
   // GPS watcher ref
   const watchIdRef = useRef(null);
@@ -206,10 +210,14 @@ export default function TrackingView() {
     if (!aid) return;
     try {
       const res = await getCurrentTracking(aid, { preferVictimToken: false });
-      if (res?.success && res.data) {
-        setTracking(res.data);
-        // Seed initial rescue position from tracking data
-        const rp = parseCoord(res.data.rescue_location);
+      if (res?.data?.success && res.data.data) {
+        const d = res.data.data;
+        setTracking({
+          ...d,
+          // normalize: backend may return `stage` instead of `current_stage`
+          current_stage: d.stage ?? d.current_stage,
+        });
+        const rp = parseCoord(d.rescue_location);
         if (rp) setRescuePos(rp);
       }
     } catch (e) { console.error("Tracking load failed", e); }
@@ -282,43 +290,55 @@ export default function TrackingView() {
   // ── Socket: rescue receives mission_stage_update & mission_location_confirmed
 
   useEffect(() => {
+    if (!sosId) return;
     reinitSocketForTrackingPersona("rescue");
     const socket = getSocket();
     if (!socket) return;
 
-    socket.on("mission_stage_update", (payload) => {
-      setTracking(prev => ({ ...prev, current_stage: payload.stage ?? prev?.current_stage }));
-      const msg = payload.stage === "COMPLETED" ? "Đã hoàn thành cứu hộ!" : null;
-      if (msg) setToaster({ message: msg, type: "success" });
-    });
+    // Join SOS-specific room so rescue also receives sos_room_update
+    if (sosId) socket.emit("join_sos_room", { sos_id: sosId });
 
-    socket.on("mission_location_confirmed", (payload) => {
+    const onStageUpdate = (payload) => {
+      setTracking(prev => ({
+        ...prev,
+        current_stage: payload.stage ?? prev?.current_stage,
+      }));
+      if (payload.stage === "COMPLETED") {
+        setShowCompletion(true);
+      }
+    };
+
+    const onLocationConfirmed = (payload) => {
       setTracking(prev => ({
         ...prev,
         distance_km:   payload.distance_km   ?? prev?.distance_km,
         eta_minutes:   payload.eta_minutes   ?? prev?.eta_minutes,
         current_stage: payload.current_stage ?? prev?.current_stage,
       }));
-    });
+    };
 
-    // AI updates with rescue-specific fields
-    socket.on("sos_ai_analyzed", (payload) => {
+    const onAiAnalyzed = (payload) => {
       if (payload.request_id !== sosId) return;
       setSos(prev => ({
         ...prev,
-        ai_priority_label:   payload.ai_priority_label,
-        ai_priority_score:   payload.ai_priority,
-        ai_category:         payload.ai_category,
+        ai_priority_label:    payload.ai_priority_label,
+        ai_priority_score:    payload.ai_priority,
+        ai_category:          payload.ai_category,
         ai_situation_summary: payload.situation_summary,
-        ai_rescue_summary:   payload.rescue_summary,
+        ai_rescue_summary:    payload.rescue_summary,
       }));
       setToaster({ message: "AI đã hoàn tất phân tích sự cố", type: "info" });
-    });
+    };
+
+    socket.on("mission_stage_update",      onStageUpdate);
+    socket.on("mission_location_confirmed", onLocationConfirmed);
+    socket.on("sos_ai_analyzed",           onAiAnalyzed);
 
     return () => {
-      socket.off("mission_stage_update");
-      socket.off("mission_location_confirmed");
-      socket.off("sos_ai_analyzed");
+      socket.off("mission_stage_update",      onStageUpdate);
+      socket.off("mission_location_confirmed", onLocationConfirmed);
+      socket.off("sos_ai_analyzed",           onAiAnalyzed);
+      socket.emit("leave_sos_room", { sos_id: sosId });
     };
   }, [sosId]);
 
@@ -352,8 +372,13 @@ export default function TrackingView() {
     try {
       await updateRescueStage(assignmentId, nextStageKey);
       setTracking(prev => ({ ...prev, current_stage: nextStageKey }));
-      setToaster({ message: `Đã chuyển sang: ${STAGE_META[nextStageKey]?.label}`, type: "info" });
+      if (nextStageKey === "COMPLETED") {
+        setShowCompletion(true);
+      } else {
+        setToaster({ message: `Đã chuyển sang: ${STAGE_META[nextStageKey]?.label}`, type: "info" });
+      }
     } catch (e) {
+
       setToaster({ message: `Lỗi: ${e.message}`, type: "error" });
     } finally {
       setIsUpdatingStage(false);
@@ -393,6 +418,13 @@ export default function TrackingView() {
         <AnimatePresence>
           {toaster && <Toast {...toaster} onClose={() => setToaster(null)} />}
         </AnimatePresence>
+
+        <CompletionPopup 
+          isOpen={showCompletion} 
+          onClose={() => setShowCompletion(false)} 
+          onBackHome={() => navigate("/responder")}
+        />
+
 
         {/* ── MAP ───────────────────────────────────────────────────────── */}
         <div className="flex-1 h-[45vh] lg:h-full relative">

@@ -8,6 +8,7 @@ import Header from "@/components/requester/Header";
 import {
   logoutVictimFirebase,
   clearVictimProfile,
+  getVictimProfile,
 } from "@/services/auth/session";
 
 const HomeIcon = () => <img src={homeIcon} alt="home" className="w-4 h-4" />;
@@ -68,11 +69,19 @@ const DEFAULT_INCIDENT = {
 };
 
 const STATUS_CONFIG = {
-  completed: { label: "HOÀN THÀNH", className: "bg-green-100 text-green-600" },
-  pending:   { label: "CHỜ XỬ LÝ",  className: "bg-yellow-100 text-yellow-600" },
-  active:    { label: "ĐANG XỬ LÝ", className: "bg-blue-100 text-blue-600" },
-  cancelled: { label: "ĐÃ HỦY",     className: "bg-gray-100 text-gray-500" },
+  completed:   { label: "HOÀN THÀNH", className: "bg-green-100 text-green-600" },
+  resolved:    { label: "HOÀN THÀNH", className: "bg-green-100 text-green-600" },
+  pending:     { label: "CHỜ XỬ LÝ",  className: "bg-yellow-100 text-yellow-600" },
+  active:      { label: "ĐANG XỬ LÝ", className: "bg-blue-100 text-blue-600" },
+  assigned:    { label: "ĐANG XỬ LÝ", className: "bg-blue-100 text-blue-600" },
+  in_progress: { label: "ĐANG XỬ LÝ", className: "bg-blue-100 text-blue-600" },
+  cancelled:   { label: "ĐÃ HỦY",     className: "bg-gray-100 text-gray-500" },
 };
+
+/** Normalize backend status string → key in STATUS_CONFIG */
+function normalizeStatus(raw) {
+  return String(raw || "").toLowerCase().replace(/[-\s]/g, "_");
+}
 
 function formatDate(dateStr) {
   if (!dateStr) return "—";
@@ -97,7 +106,8 @@ function getIncidentConfig(typeName) {
 function HistoryDetailModal({ item, onClose }) {
   if (!item) return null;
   const cfg = getIncidentConfig(item.incident_type?.name || item.category);
-  const statusCfg = STATUS_CONFIG[item.status] || { label: item.status?.toUpperCase(), className: "bg-gray-100 text-gray-500" };
+  const statusKey = normalizeStatus(item.status);
+  const statusCfg = STATUS_CONFIG[statusKey] || { label: String(item.status || "").toUpperCase(), className: "bg-gray-100 text-gray-500" };
   const ai = item.ai_analysis || {};
 
   const priorityColor = {
@@ -216,6 +226,17 @@ export default function HistoryPage() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState(null);
+  // "all" | "completed" | "active"
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  /** Derived filtered list */
+  const filteredHistory = history.filter((item) => {
+    if (statusFilter === "all") return true;
+    const key = normalizeStatus(item.status);
+    if (statusFilter === "completed") return key === "completed" || key === "resolved";
+    if (statusFilter === "active")    return key !== "completed" && key !== "resolved" && key !== "cancelled";
+    return true;
+  });
 
   const handleLogoutVictim = async () => {
     try {
@@ -233,7 +254,9 @@ export default function HistoryPage() {
         return;
       }
       try {
-        const res = await getSosByRequester(fbUser.uid);
+        const profile = getVictimProfile();
+        const requesterId = profile?._id || fbUser.uid;
+        const res = await getSosByRequester(requesterId);
         if (res.data?.success) {
           // Sort newest first
           const sorted = [...(res.data.data || [])].sort(
@@ -309,7 +332,33 @@ export default function HistoryPage() {
         <div className="flex-1 overflow-y-auto" style={{ background: "rgb(244,251,244)" }}>
           <div className="max-w-3xl mx-auto px-8 py-7">
             <h1 className="text-lg font-bold text-gray-700 mb-1">Lịch sử cứu trợ</h1>
-            <p className="text-sm text-gray-400 mb-6">Danh sách các yêu cầu hỗ trợ khẩn cấp đã thực hiện.</p>
+            <p className="text-sm text-gray-400 mb-4">Danh sách các yêu cầu hỗ trợ khẩn cấp đã thực hiện.</p>
+
+            {/* Filter tabs */}
+            <div className="flex gap-2 mb-6">
+              {[
+                { key: "all",       label: "Tất cả",           count: history.length },
+                { key: "active",    label: "Chưa hoàn thành",  count: history.filter(i => { const k = normalizeStatus(i.status); return k !== "completed" && k !== "resolved" && k !== "cancelled"; }).length },
+                { key: "completed", label: "Đã hoàn thành",     count: history.filter(i => { const k = normalizeStatus(i.status); return k === "completed" || k === "resolved"; }).length },
+              ].map(({ key, label, count }) => (
+                <button
+                  key={key}
+                  onClick={() => setStatusFilter(key)}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                    statusFilter === key
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "bg-white text-gray-500 hover:bg-emerald-50 hover:text-emerald-700 border border-gray-200"
+                  }`}
+                >
+                  {label}
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
+                    statusFilter === key ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              ))}
+            </div>
 
             {loading ? (
               <div className="flex flex-col gap-3">
@@ -327,22 +376,27 @@ export default function HistoryPage() {
                   </div>
                 ))}
               </div>
-            ) : history.length === 0 ? (
+            ) : filteredHistory.length === 0 ? (
               <div className="bg-white rounded-2xl px-6 py-12 shadow-sm flex flex-col items-center gap-3 text-center">
                 <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center">
                   <img src={historyIcon} alt="history" className="w-7 h-7 opacity-40" />
                 </div>
-                <p className="text-gray-500 font-medium">Chưa có lịch sử cứu trợ</p>
+                <p className="text-gray-500 font-medium">
+                  {statusFilter === "completed" ? "Chưa có yêu cầu nào đã hoàn thành" :
+                   statusFilter === "active"    ? "Không có yêu cầu đang xử lý" :
+                                                 "Chưa có lịch sử cứu trợ"}
+                </p>
                 <p className="text-gray-400 text-sm">Các yêu cầu hỗ trợ của bạn sẽ xuất hiện tại đây.</p>
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                {history.map((item) => {
+                {filteredHistory.map((item) => {
                   const typeName = item.incident_type?.name || item.category || "Sự cố";
                   const cfg = getIncidentConfig(typeName);
+                  const statusKey = normalizeStatus(item.status);
                   const statusCfg =
-                    STATUS_CONFIG[item.status] ||
-                    { label: (item.status || "").toUpperCase(), className: "bg-gray-100 text-gray-500" };
+                    STATUS_CONFIG[statusKey] ||
+                    { label: String(item.status || "").toUpperCase(), className: "bg-gray-100 text-gray-500" };
 
                   return (
                     <div

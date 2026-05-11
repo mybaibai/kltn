@@ -551,6 +551,16 @@
   padding: 3px 9px;
 }
 
+.responder-level-badge.is-critical {
+  background: #7c0000;
+  animation: critical-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes critical-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+
 .responder-level-badge.is-high {
   background: #c71822;
 }

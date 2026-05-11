@@ -8,6 +8,7 @@ const router = express.Router();
 router.get('/me',                   requireAuth, attachAuthUser, getMe);
 router.put('/profile',              requireAuth, attachAuthUser, updateProfile);
 
+router.post('/',                      create);
 router.get('/',                     getAll);
 router.get('/:id',                  getDetail);
 router.put('/:id',                  update);

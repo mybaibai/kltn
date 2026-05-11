@@ -17,9 +17,10 @@ export const REQUESTS = [
 ];
 
 export const LEVEL_META = {
-  high: { label: "CAO", className: "is-high", leftBorder: "#c7161f" },
-  medium: { label: "TRUNG BÌNH", className: "is-medium", leftBorder: "#916111" },
-  low: { label: "THẤP", className: "is-low", leftBorder: "#0b8f70" },
+  critical: { label: "CỰC CAO", className: "is-critical", leftBorder: "#7c0000" },
+  high:     { label: "CAO",      className: "is-high",     leftBorder: "#c7161f" },
+  medium:   { label: "TRUNG BÌNH", className: "is-medium", leftBorder: "#916111" },
+  low:      { label: "THẤP",     className: "is-low",     leftBorder: "#0b8f70" },
 };
 
 export const FLOATING_ALERTS = [
@@ -91,10 +92,27 @@ function titleFromDescription(description, index) {
   return `Yêu cầu cứu trợ #${index + 1}`;
 }
 
-function levelFromStatus(status) {
-  const value = String(status || "").toLowerCase();
-  if (value === "pending") return "high";
-  if (value === "assigned" || value === "inprogress" || value === "in_progress") return "medium";
+/**
+ * Resolve urgency level from SOS object.
+ * Priority order: AI priority_label → status fallback.
+ */
+function levelFromSos(sos) {
+  // 1. Use AI priority label when available (most accurate)
+  const aiLabel = String(
+    sos?.ai_analysis?.priority_label ||
+    sos?.ai_priority_label ||
+    ""
+  ).trim();
+
+  if (aiLabel === "Cực kì cao" || aiLabel === "critical" || aiLabel === "Extremely High") return "critical";
+  if (aiLabel === "Cao"        || aiLabel === "high"     || aiLabel === "High")           return "high";
+  if (aiLabel === "Trung bình" || aiLabel === "medium"   || aiLabel === "Medium")         return "medium";
+  if (aiLabel === "Thấp"       || aiLabel === "low"      || aiLabel === "Low")            return "low";
+
+  // 2. Fallback: derive from status
+  const status = String(sos?.status || "").toLowerCase();
+  if (status === "pending") return "high";
+  if (status === "assigned" || status === "inprogress" || status === "in_progress") return "medium";
   return "low";
 }
 
@@ -165,7 +183,7 @@ export function mapSosToResponderRequests(sosList, gps) {
 
     return {
       id: requestId,
-      level: levelFromStatus(sos?.status),
+      level: levelFromSos(sos),
       distanceKm,
       receivedAt: formatReceivedAt(sos?.created_at || sos?.createdAt),
       title: "Yêu cầu cứu hộ",
