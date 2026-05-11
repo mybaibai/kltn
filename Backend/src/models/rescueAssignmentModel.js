@@ -10,7 +10,7 @@ const rescueAssignmentSchema = new mongoose.Schema({
   // ===== THÊM FIELDS =====
 stage: {
   type: String,
-  enum: ['ASSIGNED', 'MOVING', 'ARRIVED', 'RESCUING', 'COMPLETED'],
+  enum: ['ASSIGNED', 'MOVING', 'ARRIVED', 'RESCUING', 'COMPLETED', 'CANCELLED'],
   default: 'ASSIGNED'
 },
 stage_history: [{

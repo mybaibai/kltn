@@ -363,6 +363,7 @@ export default function TrackingView() {
 
   const currentStage   = tracking?.current_stage || "ASSIGNED";
   const isCompleted    = currentStage === "COMPLETED";
+  const isCancelled    = currentStage === "CANCELLED";
   const nextStageKey   = STAGE_FLOW[STAGE_FLOW.indexOf(currentStage) + 1];
   const nextStageMeta  = NEXT_STAGE_ACTION[currentStage];
 
@@ -382,6 +383,31 @@ export default function TrackingView() {
       setToaster({ message: `Lỗi: ${e.message}`, type: "error" });
     } finally {
       setIsUpdatingStage(false);
+    }
+  };
+
+  const [cancelling, setCancelling] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+
+  const handleCancelMission = async () => {
+    if (!tracking || isCompleted || cancelling) return;
+    try {
+      setCancelling(true);
+      const res = await updateRescueStage(assignmentId, "CANCELLED", cancelReason || "Lý do khác");
+      if (res.data?.success) {
+        setTracking(prev => ({ ...prev, current_stage: "CANCELLED" }));
+        setToaster({ message: "Đã huỷ nhiệm vụ", type: "success" });
+        setTimeout(() => navigate("/responder"), 1500);
+      }
+    } catch (err) {
+      setToaster({
+        message: err?.response?.data?.message || "Lỗi khi huỷ nhiệm vụ",
+        type: "error"
+      });
+    } finally {
+      setCancelling(false);
+      setShowCancelModal(false);
     }
   };
 
@@ -673,15 +699,82 @@ export default function TrackingView() {
 
           {/* Footer */}
           <div className="p-6 bg-[#F2F4F6] border-t border-gray-200 shrink-0">
-            <button
-              onClick={() => window.location.reload()}
-              className="w-full py-4 bg-gray-200 hover:bg-gray-300 text-slate-800 rounded-2xl font-bold text-xs transition-all uppercase tracking-widest"
-            >
-              Làm mới dữ liệu
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => window.location.reload()}
+                className="flex-1 py-4 bg-gray-200 hover:bg-gray-300 text-slate-800 rounded-2xl font-bold text-xs transition-all uppercase tracking-widest"
+              >
+                Làm mới
+              </button>
+              {!isDone && !isCancelled && (
+                <button
+                  onClick={() => setShowCancelModal(true)}
+                  className="px-6 py-4 border-2 border-rose-500 text-rose-600 rounded-2xl font-bold text-xs hover:bg-rose-50 transition-all uppercase tracking-widest"
+                >
+                  Huỷ bỏ
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Cancel Modal */}
+      <AnimatePresence>
+        {showCancelModal && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 backdrop-blur-sm p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white w-full max-w-[340px] rounded-[28px] p-6 shadow-2xl relative"
+            >
+              <button onClick={() => setShowCancelModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+              <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center">
+                <AlertTriangle size={28} className="text-rose-600" />
+              </div>
+              <h2 className="text-center text-lg font-bold text-slate-900 mb-2">Huỷ nhiệm vụ?</h2>
+              <p className="text-center text-sm text-gray-500 mb-4">Nhiệm vụ sẽ được trả lại cho các đội khác. Vui lòng chọn lý do.</p>
+              
+              <div className="mb-6 space-y-2">
+                {["Xe hỏng", "Kẹt xe nghiêm trọng", "Trang bị không đủ", "Lý do khác"].map((reason) => (
+                  <label key={reason} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50 cursor-pointer">
+                    <input 
+                      type="radio" 
+                      name="cancel_reason" 
+                      value={reason} 
+                      checked={cancelReason === reason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                      className="text-rose-600 focus:ring-rose-500" 
+                    />
+                    <span className="text-sm font-medium text-slate-700">{reason}</span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <button
+                  disabled={cancelling || !cancelReason}
+                  onClick={handleCancelMission}
+                  className="w-full py-3.5 rounded-2xl bg-rose-600 text-white font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {cancelling ? "Đang xử lý..." : "Xác nhận huỷ"}
+                </button>
+                <button
+                  disabled={cancelling}
+                  onClick={() => setShowCancelModal(false)}
+                  className="w-full py-3.5 rounded-2xl bg-gray-100 text-slate-900 font-bold text-sm"
+                >
+                  Quay lại
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

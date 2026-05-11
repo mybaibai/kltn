@@ -61,10 +61,11 @@ export default function ResponderRequestList({
   const pagedRequests = requests.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   function isRequestAlreadyAccepted(item) {
-    // If the SOS already has an assigned_rescue_id and it's not the current user, or if status is not PENDING
+    // If the SOS already has an assigned_rescue_id and it's not the current user
     if (item.source?.assigned_rescue_id && String(item.source.assigned_rescue_id) !== String(currentUserId)) {
       return true;
     }
+    // Only PENDING missions can be accepted — everything else is off-limits
     const status = String(item.source?.status || "PENDING").toUpperCase();
     return status !== "PENDING";
   }

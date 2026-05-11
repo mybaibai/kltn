@@ -221,6 +221,64 @@ export const updateStatus = async (req, res) => {
   }
 };
 
+// PATCH /api/sos/:id/cancel
+export const cancelSos = async (req, res) => {
+  try {
+    const sos = await sosService.getSosById(req.params.id);
+    if (!sos) return res.status(404).json({ success: false, message: 'Không tìm thấy SOS' });
+
+    // Validate permission
+    const victimId = sos.victim_id?._id || sos.victim_id;
+    if (String(victimId) !== String(req.user._id)) {
+      return res.status(403).json({ success: false, message: 'Không có quyền hủy SOS này' });
+    }
+
+    if (sos.status === 'COMPLETED' || sos.status === 'RESOLVED') {
+      return res.status(400).json({ success: false, message: 'Không thể hủy SOS đã hoàn thành' });
+    }
+
+    const updatedSos = await sosService.updateSosStatus(
+      req.params.id,
+      'CANCELLED',
+      req.user._id,
+      'Nạn nhân đã tự hủy yêu cầu'
+    );
+
+    // Cancel assignment if there is one
+    const assignment = await sosService.getLatestAssignmentForRequest(req.params.id);
+    if (assignment) {
+      const RescueAssignment = mongoose.model('RescueAssignment');
+      await RescueAssignment.findByIdAndUpdate(assignment._id, { stage: 'CANCELLED' });
+      const rescueId = assignment.rescue_id?._id || assignment.rescue_id;
+      io.to(`rescue-${rescueId}`).emit('sos_cancelled', {
+        request_id: sos._id,
+        message: 'Nạn nhân đã hủy yêu cầu cứu trợ',
+      });
+      io.to(`rescue-${rescueId}`).emit('mission_stage_update', {
+        stage: 'CANCELLED',
+        stage_changed: true,
+      });
+    }
+
+    io.to('admin-dashboard').emit('sos_cancelled', {
+      request_id: sos._id,
+    });
+    
+    // Xóa khỏi pending timer
+    const timer = pendingBroadcastTimers.get(String(req.params.id));
+    if (timer) {
+      clearTimeout(timer);
+      pendingBroadcastTimers.delete(String(req.params.id));
+    }
+    
+    io.to('rescue-all').emit('sos_cancelled', { request_id: sos._id });
+
+    res.status(200).json({ success: true, data: updatedSos });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 // PATCH /api/sos/:id/assign
 export const assign = async (req, res) => {
   try {

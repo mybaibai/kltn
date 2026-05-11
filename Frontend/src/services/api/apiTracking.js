@@ -45,7 +45,6 @@ export async function updateRescueStage(assignmentId, newStage, reason = "") {
   }
 }
 
-
 /**
  * Dùng cho RESCUE / ADMIN — biết assignmentId
  */
@@ -94,6 +93,25 @@ export async function getActiveMissions() {
     return response.data;
   } catch (err) {
     console.error("❌ Error getting active missions:", err);
+    throw err;
+  }
+}
+
+// Cancel mission/assignment (Rescue or Victim)
+export async function cancelMission(
+  assignmentId,
+  cancelledBy = "RESCUE",
+  reason = "",
+) {
+  try {
+    const response = await api.post("/tracking/cancel", {
+      assignment_id: assignmentId,
+      cancelled_by: cancelledBy,
+      reason,
+    });
+    return response.data;
+  } catch (err) {
+    console.error("❌ Error cancelling mission:", err);
     throw err;
   }
 }

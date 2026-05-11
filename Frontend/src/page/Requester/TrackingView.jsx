@@ -19,7 +19,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import CompletionPopup from "@/components/ui/CompletionPopup";
 
 
-import { getSosDetail } from "@/services/api/apiSos";
+import { getSosDetail, cancelSos } from "@/services/api/apiSos";
 import { getCurrentTrackingBySosId } from "@/services/api/apiTracking";
 import { getSocket, reinitSocketForTrackingPersona } from "@/services/socket";
 import { getOSRMRoute } from "@/services/api/apiRouting";
@@ -46,6 +46,14 @@ const STAGE_TO_STEP = {
   MOVING: 2, ARRIVED: 2, RESCUING: 2,
   COMPLETED: 3, RESOLVED: 3, CANCELLED: 1,
 };
+
+/** Higher number = further in the workflow. Never downgrade. */
+const STAGE_PRIORITY = {
+  SENT: 0, PENDING: 1, ASSIGNED: 2, MOVING: 3,
+  ARRIVED: 4, RESCUING: 5, COMPLETED: 6, RESOLVED: 7, CANCELLED: 99,
+};
+
+const TERMINAL_STAGES = new Set(["COMPLETED", "RESOLVED", "CANCELLED"]);
 
 const INCIDENT_META = {
   vehicle: { label: "Sự cố phương tiện", icon: Car },
@@ -208,6 +216,11 @@ export default function TrackingPage() {
   const [cancelCountdown, setCancelCountdown] = useState(CANCEL_WINDOW_SEC);
   const [canCancel, setCanCancel] = useState(true);
   const [showCompletion, setShowCompletion] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  // Ref to track whether mission has reached a terminal state — prevents polling & socket downgrades
+  const isFinishedRef = useRef(false);
+  const pollRef = useRef(null);
 
 
   // Session: only victim profile matters on this page
@@ -239,6 +252,11 @@ export default function TrackingPage() {
     let active = true;
 
     async function fetchAll() {
+      // If mission already finished, stop polling entirely
+      if (isFinishedRef.current) {
+        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+        return;
+      }
       try {
         const res  = await getSosDetail(sosId, { preferVictimToken: true });
         if (!active) return;
@@ -248,6 +266,13 @@ export default function TrackingPage() {
         await loadTracking(sosId);
         if (!active) return;
         setLoading(false);
+
+        // Check if mission reached terminal state from API data
+        const sosStatus = String(data.status || "").toUpperCase();
+        if (TERMINAL_STAGES.has(sosStatus)) {
+          isFinishedRef.current = true;
+          if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+        }
       } catch (e) {
         if (!active) return;
         setErr(e?.message || "Lỗi tải dữ liệu");
@@ -256,8 +281,8 @@ export default function TrackingPage() {
     }
 
     fetchAll();
-    const poll = setInterval(fetchAll, 8000);
-    return () => { active = false; clearInterval(poll); };
+    pollRef.current = setInterval(fetchAll, 8000);
+    return () => { active = false; if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
   }, [sosId, loadTracking]);
 
   // ── Socket: victim receives updates only ──────────────────────────────────
@@ -275,9 +300,24 @@ export default function TrackingPage() {
       socket.emit("join_sos_room", { sos_id: sosId });
 
       const onTrackingUpdate = (payload) => {
+        // Block updates if mission is already finished
+        if (isFinishedRef.current) return;
+
         setTracking(prev => {
           const prevStage = prev?.current_stage;
           const newStage  = payload.stage ?? prevStage;
+
+          // Never downgrade stage (e.g. COMPLETED → MOVING)
+          if ((STAGE_PRIORITY[newStage] ?? 0) < (STAGE_PRIORITY[prevStage] ?? 0)) {
+            // Still accept location updates even if stage is stale
+            return {
+              ...prev,
+              distance_km:     payload.distance_km    ?? prev?.distance_km,
+              eta_minutes:     payload.eta_minutes    ?? prev?.eta_minutes,
+              rescue_location: payload.rescue_location ?? prev?.rescue_location,
+            };
+          }
+
           const stageChanged = newStage !== prevStage;
           if (stageChanged) {
             const msg =
@@ -285,7 +325,11 @@ export default function TrackingPage() {
               newStage === "RESCUING"  ? "Tiến trình cứu hộ đang bắt đầu..." :
               newStage === "COMPLETED" ? "Nhiệm vụ cứu hộ hoàn thành!" : null;
             if (msg) setToaster({ message: msg, type: newStage === "COMPLETED" ? "success" : "info" });
-            if (newStage === "COMPLETED") setShowCompletion(true);
+            if (TERMINAL_STAGES.has(newStage)) {
+              isFinishedRef.current = true;
+              if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+              if (newStage === "COMPLETED") setShowCompletion(true);
+            }
           }
           return {
             ...prev,
@@ -298,12 +342,33 @@ export default function TrackingPage() {
       };
 
       const onSosRoomUpdate = (payload) => {
-        // broadcast from server for both rescue+victim in the same sos room
+        // Block updates if mission is already finished
+        if (isFinishedRef.current) return;
+
         setTracking(prev => {
           if (!prev) return prev;
+          const prevStage = prev.current_stage;
+          const newStage  = payload.stage ?? prevStage;
+
+          // Never downgrade stage
+          if ((STAGE_PRIORITY[newStage] ?? 0) < (STAGE_PRIORITY[prevStage] ?? 0)) {
+            return {
+              ...prev,
+              distance_km:     payload.distance_km    ?? prev.distance_km,
+              eta_minutes:     payload.eta_minutes    ?? prev.eta_minutes,
+              rescue_location: payload.rescue_location ?? prev.rescue_location,
+            };
+          }
+
+          if (TERMINAL_STAGES.has(newStage) && newStage !== prevStage) {
+            isFinishedRef.current = true;
+            if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+            if (newStage === "COMPLETED") setShowCompletion(true);
+          }
+
           return {
             ...prev,
-            current_stage:   payload.stage          ?? prev.current_stage,
+            current_stage:   newStage,
             distance_km:     payload.distance_km    ?? prev.distance_km,
             eta_minutes:     payload.eta_minutes    ?? prev.eta_minutes,
             rescue_location: payload.rescue_location ?? prev.rescue_location,
@@ -686,12 +751,28 @@ export default function TrackingPage() {
               <p className="text-center text-sm text-gray-500 mb-6">Hành động này sẽ dừng quá trình cứu trợ. Bạn có thể gửi lại sau.</p>
               <div className="flex flex-col gap-2">
                 <button
-                  onClick={() => { setShowCancelModal(false); navigate("/"); }}
-                  className="w-full py-3.5 rounded-2xl bg-rose-600 text-white font-bold text-sm"
+                  disabled={isCancelling}
+                  onClick={async () => { 
+                    try {
+                      setIsCancelling(true);
+                      await cancelSos(sosId);
+                      setToaster({ message: "Đã hủy yêu cầu", type: "success" });
+                      setTimeout(() => {
+                        setShowCancelModal(false);
+                        navigate("/");
+                      }, 1500);
+                    } catch (e) {
+                      setToaster({ message: e.response?.data?.message || "Lỗi khi hủy", type: "error" });
+                      setIsCancelling(false);
+                      setShowCancelModal(false);
+                    }
+                  }}
+                  className="w-full py-3.5 rounded-2xl bg-rose-600 text-white font-bold text-sm disabled:opacity-50"
                 >
-                  Xác nhận huỷ {canCancel && `(${cancelCountdown}s)`}
+                  {isCancelling ? "Đang xử lý..." : `Xác nhận huỷ ${canCancel ? `(${cancelCountdown}s)` : ""}`}
                 </button>
                 <button
+                  disabled={isCancelling}
                   onClick={() => setShowCancelModal(false)}
                   className="w-full py-3.5 rounded-2xl bg-gray-100 text-slate-900 font-bold text-sm"
                 >

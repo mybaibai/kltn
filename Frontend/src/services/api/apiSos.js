@@ -81,6 +81,11 @@ export const getSosDetail = async (id, opts = {}) => {
   return api.get(`/sos/${id}`);
 };
 
+export const cancelSos = async (id) => {
+  const config = await withVictimAuthHeader();
+  return api.patch(`/sos/${id}/cancel`, {}, config);
+};
+
 // ─── Victim Profile APIs ──────────────────────────────────────────────────────
 
 export const getVictimProfile = async () => {

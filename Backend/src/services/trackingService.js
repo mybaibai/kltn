@@ -37,7 +37,12 @@ export function determineStage(distanceKm, currentStage) {
 }
 
 // ===== 4. Cập nhật vị trí rescue =====
-export async function updateRescueLocation(assignmentId, latitude, longitude, rescueId) {
+export async function updateRescueLocation(
+  assignmentId,
+  latitude,
+  longitude,
+  rescueId,
+) {
   try {
     const assignment = await RescueAssignment.findById(assignmentId);
     if (!assignment) throw new Error("Assignment not found");
@@ -46,7 +51,12 @@ export async function updateRescueLocation(assignmentId, latitude, longitude, re
     if (!sos) throw new Error("SOS request not found");
 
     const [victimLng, victimLat] = sos.location.coordinates;
-    const distanceKm = calculateDistance(latitude, longitude, victimLat, victimLng);
+    const distanceKm = calculateDistance(
+      latitude,
+      longitude,
+      victimLat,
+      victimLng,
+    );
     const etaMinutes = calculateETA(distanceKm);
     const newStage = determineStage(distanceKm, assignment.stage);
     const stageChanged = newStage !== assignment.stage;
@@ -57,7 +67,8 @@ export async function updateRescueLocation(assignmentId, latitude, longitude, re
     };
     assignment.current_distance_km = distanceKm;
     assignment.eta_minutes = etaMinutes;
-    assignment.total_distance_km = (assignment.total_distance_km || 0) + distanceKm;
+    assignment.total_distance_km =
+      (assignment.total_distance_km || 0) + distanceKm;
 
     if (stageChanged) {
       const prevStage = assignment.stage;
@@ -77,7 +88,14 @@ export async function updateRescueLocation(assignmentId, latitude, longitude, re
         event_type: "STAGE_CHANGE",
         actor_role: "RESCUE",
         actor_id: rescueId,
-        payload: { from: prevStage, to: newStage, distance_km: distanceKm, latitude, longitude, eta_minutes: etaMinutes },
+        payload: {
+          from: prevStage,
+          to: newStage,
+          distance_km: distanceKm,
+          latitude,
+          longitude,
+          eta_minutes: etaMinutes,
+        },
       });
     } else {
       await createTrackingLog({
@@ -86,7 +104,12 @@ export async function updateRescueLocation(assignmentId, latitude, longitude, re
         event_type: "LOCATION_UPDATE",
         actor_role: "RESCUE",
         actor_id: rescueId,
-        payload: { distance_km: distanceKm, latitude, longitude, eta_minutes: etaMinutes },
+        payload: {
+          distance_km: distanceKm,
+          latitude,
+          longitude,
+          eta_minutes: etaMinutes,
+        },
       });
     }
 
@@ -107,7 +130,13 @@ export async function updateRescueLocation(assignmentId, latitude, longitude, re
 }
 
 // ===== 5. Manual update stage =====
-export async function updateRescueStage(assignmentId, newStage, reason = "", actorId = null, actorRole = "ADMIN") {
+export async function updateRescueStage(
+  assignmentId,
+  newStage,
+  reason = "",
+  actorId = null,
+  actorRole = "ADMIN",
+) {
   try {
     const assignment = await RescueAssignment.findById(assignmentId);
     if (!assignment) throw new Error("Assignment not found");
@@ -139,10 +168,27 @@ export async function updateRescueStage(assignmentId, newStage, reason = "", act
     });
 
     if (newStage === "ARRIVED") assignment.arrived_at = new Date();
-    else if (newStage === "RESCUING") assignment.rescuing_started_at = new Date();
+    else if (newStage === "RESCUING")
+      assignment.rescuing_started_at = new Date();
     else if (newStage === "COMPLETED") assignment.completed_at = new Date();
 
     await assignment.save();
+
+    // If rescue cancels, reset SOS to PENDING
+    if (newStage === "CANCELLED") {
+      const sos = await SosRequest.findById(assignment.request_id);
+      if (sos && sos.status !== "CANCELLED") {
+        sos.status = "PENDING";
+        sos.assigned_rescue_id = null;
+        sos.status_history.push({
+          status: "PENDING",
+          updated_by: actorId,
+          updated_at: new Date(),
+          note: `Đội cứu hộ đã hủy nhiệm vụ: ${reason}`,
+        });
+        await sos.save();
+      }
+    }
 
     await createTrackingLog({
       assignment_id: assignmentId,
@@ -159,7 +205,12 @@ export async function updateRescueStage(assignmentId, newStage, reason = "", act
       },
     });
 
-    return { success: true, assignment, prev_stage: prevStage, new_stage: newStage };
+    return {
+      success: true,
+      assignment,
+      prev_stage: prevStage,
+      new_stage: newStage,
+    };
   } catch (err) {
     console.error("❌ Error updating stage:", err.message);
     return { success: false, message: err.message };
@@ -169,8 +220,10 @@ export async function updateRescueStage(assignmentId, newStage, reason = "", act
 // ===== 6. Lấy tracking info theo assignmentId =====
 export async function getCurrentTracking(assignmentId, isVictim = false) {
   try {
-    const assignment = await RescueAssignment.findById(assignmentId)
-      .populate("rescue_id", "full_name phone");
+    const assignment = await RescueAssignment.findById(assignmentId).populate(
+      "rescue_id",
+      "full_name phone",
+    );
 
     if (!assignment) {
       return { success: false, message: "Assignment not found" };
@@ -178,7 +231,7 @@ export async function getCurrentTracking(assignmentId, isVictim = false) {
 
     const sos = await SosRequest.findById(assignment.request_id).populate(
       "victim_id",
-      "full_name phone"
+      "full_name phone",
     );
 
     if (!sos) {
@@ -213,7 +266,12 @@ export async function getCurrentTracking(assignmentId, isVictim = false) {
     if (hasRescueLocation && sos.location?.coordinates?.length === 2) {
       const [victimLng, victimLat] = sos.location.coordinates;
       const [rescueLng, rescueLat] = rescueLocation.coordinates;
-      distanceKm = calculateDistance(rescueLat, rescueLng, victimLat, victimLng);
+      distanceKm = calculateDistance(
+        rescueLat,
+        rescueLng,
+        victimLat,
+        victimLng,
+      );
       etaMinutes = calculateETA(distanceKm);
     }
 
@@ -255,16 +313,20 @@ export async function getCurrentTracking(assignmentId, isVictim = false) {
 export async function getCurrentTrackingBySosId(sosId, isVictim = false) {
   try {
     // Tìm assignment active của SOS này
+    // Find the latest assignment for this SOS (active OR completed, but not cancelled)
     const assignment = await RescueAssignment.findOne({
       request_id: sosId,
-      stage: { $nin: ["CANCELLED", "COMPLETED"] },
+      stage: { $nin: ["CANCELLED"] },
     })
-      .sort({ assigned_at: -1 }) // lấy assignment mới nhất nếu có nhiều
+      .sort({ assigned_at: -1 })
       .populate("rescue_id", "full_name phone");
 
     if (!assignment) {
       // Chưa có đội nào nhận → trả về empty tracking (không throw)
-      const sos = await SosRequest.findById(sosId).populate("victim_id", "full_name phone");
+      const sos = await SosRequest.findById(sosId).populate(
+        "victim_id",
+        "full_name phone",
+      );
       if (!sos) return { success: false, message: "SOS not found" };
 
       return {
@@ -331,7 +393,7 @@ export async function getActiveMissions() {
     for (const assignment of assignments) {
       const sos = await SosRequest.findById(assignment.request_id).populate(
         "victim_id",
-        "full_name phone"
+        "full_name phone",
       );
       missions.push({
         assignment_id: assignment._id,
@@ -352,6 +414,91 @@ export async function getActiveMissions() {
     return { success: true, data: missions };
   } catch (err) {
     console.error("❌ Error getting active missions:", err.message);
+    return { success: false, message: err.message };
+  }
+}
+
+// ===== 9. Cancel assignment + update SOS status =====
+export async function cancelMission(
+  assignmentId,
+  cancelledBy = "RESCUE",
+  reason = "",
+) {
+  try {
+    const assignment = await RescueAssignment.findById(assignmentId);
+    if (!assignment) {
+      return { success: false, message: "Assignment not found" };
+    }
+
+    if (assignment.stage === "COMPLETED" || assignment.stage === "CANCELLED") {
+      return {
+        success: false,
+        message: `Cannot cancel mission in ${assignment.stage} stage`,
+      };
+    }
+
+    const sos = await SosRequest.findById(assignment.request_id);
+    if (!sos) {
+      return { success: false, message: "SOS not found" };
+    }
+
+    // Mark assignment as cancelled
+    const prevStage = assignment.stage;
+    assignment.stage = "CANCELLED";
+    assignment.stage_history.push({
+      stage: "CANCELLED",
+      started_at: new Date(),
+      cancelled_reason: reason,
+      cancelled_by: cancelledBy,
+    });
+    await assignment.save();
+
+    // Update SOS status based on who cancelled
+    let newSosStatus;
+    if (cancelledBy === "VICTIM") {
+      newSosStatus = "CANCELLED";
+    } else if (cancelledBy === "RESCUE") {
+      newSosStatus = "PENDING";
+    } else {
+      newSosStatus = "PENDING";
+    }
+
+    sos.status = newSosStatus;
+    sos.assigned_rescue_id = null;
+    sos.status_history = Array.isArray(sos.status_history)
+      ? sos.status_history
+      : [];
+    sos.status_history.push({
+      status: newSosStatus,
+      updated_by: null,
+      updated_at: new Date(),
+      note: `Cancelled by ${cancelledBy}: ${reason}`,
+    });
+    await sos.save();
+
+    // Create tracking log
+    await createTrackingLog({
+      assignment_id: assignmentId,
+      request_id: assignment.request_id,
+      event_type: "MISSION_CANCELLED",
+      actor_role: cancelledBy,
+      actor_id: null,
+      payload: {
+        from_stage: prevStage,
+        cancelled_by: cancelledBy,
+        reason,
+        new_sos_status: newSosStatus,
+      },
+    });
+
+    return {
+      success: true,
+      assignment,
+      sos,
+      message: `Mission cancelled by ${cancelledBy}. SOS status: ${newSosStatus}`,
+    };
+  } catch (err) {
+    console.error("❌ Error cancelling mission:", err.message);
     return { success: false, message: err.message };
   }
 }
