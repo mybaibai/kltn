@@ -1,7 +1,12 @@
 import { useState, useEffect, useRef  } from "react";
 import { auth } from "@/lib/firebase";
 import { useNavigate, useLocation } from "react-router-dom";
-import api from "@/services/api/apiSos";
+import {
+  getVictimProfile,
+  updateVictimProfile,
+  addEmergencyContact,
+  deleteEmergencyContact,
+} from "@/services/api/apiSos";
 import contactList from "@/assets/contact_list.svg";
 import call from "@/assets/call.svg";
 import contactIcon from "@/assets/contact.svg";
@@ -77,7 +82,7 @@ export default function ProfilePage() {
 
   const handleSave = async () => {
     try {
-      const res = await api.put("/api/user/profile", {
+      const res = await updateVictimProfile({
         full_name: editForm.full_name,
         profile: {
           date_of_birth: editForm.date_of_birth || null,
@@ -98,17 +103,7 @@ export default function ProfilePage() {
       console.error("Update error:", err.response?.data || err.message);
     }
   };
-  // console.log("FORM DATA:", editForm);
 
-  // const addTag = (val) => {
-  //   const v = val.trim();
-  //   if (v && !editForm.medical_history.includes(v))
-  //     setEditForm((f) => ({
-  //       ...f,
-  //       medical_history: [...f.medical_history, v],
-  //     }));
-  //   setTagInput("");
-  // };
   const [diseaseInput, setDiseaseInput] = useState("");
 
   const handleAddDisease = () => {
@@ -127,6 +122,7 @@ export default function ProfilePage() {
   
     setDiseaseInput("");
   };
+
   const removeTag = (tag) =>
     setEditForm((f) => ({
       ...f,
@@ -140,7 +136,7 @@ export default function ProfilePage() {
         return;
       }
       try {
-        const res = await api.get("/user/me");
+        const res = await getVictimProfile();
         if (res.data.success) {
           const d = res.data.data;
           setUser(d);
@@ -158,7 +154,6 @@ export default function ProfilePage() {
             medical_history: d.profile?.medical_history || [],
           });
           console.log("medical history:", d.profile?.medical_history);
-
         }
       } catch (err) {
         console.error("Fetch user error:", err.response?.data || err.message);
@@ -168,19 +163,20 @@ export default function ProfilePage() {
     });
     return () => unsubscribe();
   }, []);
-  // Thêm state cho form liên hệ
+
   const [contactForm, setContactForm] = useState({ name: "", phone: "", relation: "" });
   const [contactLoading, setContactLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [contactToDelete, setContactToDelete] = useState(null);
+
   const handleAddContact = async () => {
     if (!contactForm.name || !contactForm.phone) return;
     setContactLoading(true);
     try {
-      const res = await api.post("/api/users/profile/emergency-contact", contactForm);
+      const res = await addEmergencyContact(contactForm);
       if (res.data.success) {
         setUser(res.data.data);                     
-        setContactForm({ name: "", phone: "", relation: "" }); // reset form
+        setContactForm({ name: "", phone: "", relation: "" });
         setOpen(false);
       }
     } catch (err) {
@@ -189,10 +185,10 @@ export default function ProfilePage() {
       setContactLoading(false);
     }
   };
+
   const fileInputRef = useRef(null);
   const [avatar, setAvatar] = useState(() => localStorage.getItem('userAvatar') || null);
 
-  // Hàm set avatar kèm lưu localStorage
   const handleSetAvatar = (url) => {
     if (url) {
       localStorage.setItem('userAvatar', url);
@@ -201,6 +197,7 @@ export default function ProfilePage() {
     }
     setAvatar(url);
   };
+
   const [selectedContact, setSelectedContact] = useState(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -213,7 +210,8 @@ export default function ProfilePage() {
       navigate('/', { state: { toast: 'Đã đăng xuất' } });
     }
   };  
-return (
+
+  return (
   <div className="h-screen overflow-hidden flex flex-col" style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}>
 
     {/* HEADER */}
@@ -475,7 +473,7 @@ return (
                         </div>
                       </div>
                       <button
-                        onClick={(e) => { e.stopPropagation(); /* gọi điện */ }}
+                        onClick={(e) => { e.stopPropagation(); }}
                         className="w-9 h-9">
                         <img src={call} alt="call" className="w-9 h-9"/>
                       </button>
@@ -563,7 +561,7 @@ return (
           {/* Actions */}
           <div className="px-5 pb-5 flex gap-3">
             <button
-              onClick={() => { /* tel link */ window.location.href = `tel:${selectedContact.phone}`; }}
+              onClick={() => { window.location.href = `tel:${selectedContact.phone}`; }}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#1C6E1B] hover:bg-emerald-700 text-white rounded-xl font-semibold text-sm transition">
               <img src={call} alt="call" className="w-5 h-5 mt-1"/>
               Gọi ngay
@@ -575,61 +573,44 @@ return (
               }}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-semibold text-sm transition border border-red-100"
             >
-              {/* icon */}
               Xoá liên hệ
             </button>
-            {showConfirm && (
-              <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-                <div className="bg-white rounded-2xl p-6 w-80 shadow-xl">
-                  <h3 className="text-lg font-semibold mb-3 text-gray-800">
-                    Xác nhận xoá
-                  </h3>
+          </div>
+        </div>
+      </div>
+    )}
 
-                  <p className="text-sm text-gray-600 mb-5">
-                    Bạn có chắc muốn xoá liên hệ{" "}
-                    <span className="font-semibold text-red-500">
-                      "{contactToDelete?.name}"
-                    </span>
-                    ?
-                  </p>
-
-                  <div className="flex gap-3">
-                    {/* Cancel */}
-                    <button
-                      onClick={() => setShowConfirm(false)}
-                      className="flex-1 py-2 rounded-xl border text-gray-600 hover:bg-gray-100"
-                    >
-                      Huỷ
-                    </button>
-
-                    {/* Confirm */}
-                    <button
-                      onClick={async () => {
-                        try {
-                          const res = await api.delete(
-                            `/api/users/profile/emergency-contact/${contactToDelete.index}`
-                          );
-
-                          if (res.data.success) {
-                            setUser(res.data.data);
-                            setSelectedContact(null);
-                            setShowConfirm(false);
-                          }
-                        } catch (err) {
-                          console.error(
-                            "Delete contact error:",
-                            err.response?.data || err.message
-                          );
-                        }
-                      }}
-                      className="flex-1 py-2 rounded-xl bg-red-500 text-white hover:bg-red-600"
-                    >
-                      Xoá
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+    {/* CONFIRM XOÁ LIÊN HỆ */}
+    {showConfirm && (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="bg-white rounded-2xl p-6 w-80 shadow-xl">
+          <h3 className="text-lg font-semibold mb-3 text-gray-800">Xác nhận xoá</h3>
+          <p className="text-sm text-gray-600 mb-5">
+            Bạn có chắc muốn xoá liên hệ{" "}
+            <span className="font-semibold text-red-500">"{contactToDelete?.name}"</span>?
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowConfirm(false)}
+              className="flex-1 py-2 rounded-xl border text-gray-600 hover:bg-gray-100">
+              Huỷ
+            </button>
+            <button
+              onClick={async () => {
+                try {
+                  const res = await deleteEmergencyContact(contactToDelete.index);
+                  if (res.data.success) {
+                    setUser(res.data.data);
+                    setSelectedContact(null);
+                    setShowConfirm(false);
+                  }
+                } catch (err) {
+                  console.error("Delete contact error:", err.response?.data || err.message);
+                }
+              }}
+              className="flex-1 py-2 rounded-xl bg-red-500 text-white hover:bg-red-600">
+              Xoá
+            </button>
           </div>
         </div>
       </div>

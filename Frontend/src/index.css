@@ -262,3 +262,54 @@ button {
     opacity: 0; 
   }
 }
+
+
+.rescue-marker-wrapper {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rescue-ping {
+  position: absolute;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.35);
+  animation: rescuePulse 2s infinite;
+}
+
+.rescue-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2563eb, #60a5fa);
+  border: 3px solid white;
+  box-shadow:
+    0 4px 14px rgba(0,0,0,0.25),
+    0 0 0 4px rgba(59,130,246,.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.rescue-inner {
+  font-size: 18px;
+  line-height: 1;
+}
+
+@keyframes rescuePulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}

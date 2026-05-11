@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import SosPage from "@/page/Requester";
-import TrackingPage from "@/page/TrackingPage";
+import RequesterTrackingPage from "@/page/Requester/TrackingView";
+import RescueTrackingPage from "@/page/TrackingPage_Rescue/index";
 import AdminLayout from "@/layouts/AdminLayout";
 import IncidentManagement from "@/page/AdminPage/IncidentManagement";
 import AdminTrackingPage from "@/page/AdminPage/AdminTrackingPage";
@@ -16,6 +17,7 @@ import {
   StaffHomeRedirect,
 } from "@/components/auth/AuthGuards";
 import { STAFF_ROLE_ADMIN, STAFF_ROLE_RESCUE } from "@/services/auth/session";
+import HistoryPage from "./page/Requester/History";
 
 export default function App() {
   return (
@@ -25,8 +27,9 @@ export default function App() {
         <Route path="/sos" element={<SosPage />} />
         <Route path="/profile" element={<RequesterProfile />} />
         <Route path="/sospage" element={<Navigate to="/sos" replace />} />
-        <Route path="/tracking/:sosId" element={<TrackingPage />} />
+        <Route path="/tracking/:sosId" element={<RequesterTrackingPage  />} />
         <Route path="/profile" element={<Navigate to="/profile" replace />} />
+        <Route path="/history" element={<HistoryPage />} />
         <Route
           path="/staff-login"
           element={
@@ -75,7 +78,7 @@ export default function App() {
           path="/responder/tracking/:sosId"
           element={
             <StaffRoleGuard allowRoles={[STAFF_ROLE_RESCUE]}>
-              <TrackingPage />
+              <RescueTrackingPage />
             </StaffRoleGuard>
           }
         />

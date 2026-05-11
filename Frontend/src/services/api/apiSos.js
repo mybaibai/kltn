@@ -2,12 +2,10 @@ import { auth } from '@/lib/firebase';
 import axios from "axios";
 import { onAuthStateChanged } from "firebase/auth";
 
-// ─── Firebase token (chỉ dùng cho victim) ───────────────────────────────────
+// ─── Firebase token helper (victim) ─────────────────────────────────────────
 function waitForFirebaseUser() {
   return new Promise((resolve) => {
-    if (auth.currentUser !== null) {
-      return resolve(auth.currentUser);
-    }
+    if (auth.currentUser !== null) return resolve(auth.currentUser);
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       unsubscribe();
       resolve(user);
@@ -15,16 +13,12 @@ function waitForFirebaseUser() {
   });
 }
 
-async function withVictimAuthHeader(config = {}) {
-  const headers = { ...(config.headers || {}) };
+async function getFirebaseToken() {
   try {
     const user = await waitForFirebaseUser();
-    if (user) {
-      const idToken = await user.getIdToken();
-      if (idToken) headers.Authorization = `Bearer ${idToken}`;
-    }
+    if (user) return await user.getIdToken();
   } catch {}
-  return { ...config, headers };
+  return null;
 }
 
 // ─── Axios instance ──────────────────────────────────────────────────────────
@@ -32,41 +26,87 @@ const api = axios.create({
   baseURL: "http://localhost:3001/api",
 });
 
-// ✅ Interceptor: dùng staff JWT từ localStorage cho các call của staff
-//    Nếu skipStaffJwt = true thì bỏ qua (victim tự gắn Firebase token riêng)
+// Interceptor: gắn staff JWT mặc định, trừ khi skipStaffJwt = true
 api.interceptors.request.use((config) => {
-  if (config.skipStaffJwt) return config;
+  console.log("REQUEST:", config.url);
 
-  try {
-    const token = localStorage.getItem("auth_token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  } catch {}
+  if (config.skipStaffJwt) {
+    console.log("Using Firebase token");
+    return config;
+  }
+
+  const token = localStorage.getItem("auth_token");
+
+  console.log("Staff token:", token);
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
 
   return config;
 });
 
-// ─── Victim APIs (dùng Firebase token) ──────────────────────────────────────
+// ─── Auth header builders ─────────────────────────────────────────────────────
+
+/** Dùng cho victim: gắn Firebase ID token */
+async function withVictimAuthHeader(config = {}) {
+  const headers = { ...(config.headers || {}) };
+  const token = await getFirebaseToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return { ...config, headers, skipStaffJwt: true };
+}
+
+// ─── Victim APIs ──────────────────────────────────────────────────────────────
+
 export const sendSos = async (data) => {
   const config = await withVictimAuthHeader();
-  return api.post('/sos', data, { ...config, skipStaffJwt: true });
+  return api.post('/sos', data, config);
 };
 
 export const getSosByRequester = async (requesterId) => {
   const config = await withVictimAuthHeader();
-  return api.get(`/sos/requester/${requesterId}`, { ...config, skipStaffJwt: true });
+  return api.get(`/sos/requester/${requesterId}`, config);
 };
 
-export const patchVictimSosLocation = (sosId, latitude, longitude) =>
-  api.patch(`/sos/${sosId}/victim-location`, { latitude, longitude }, { skipStaffJwt: true });
+export const patchVictimSosLocation = async (sosId, latitude, longitude) => {
+  const config = await withVictimAuthHeader();
+  return api.patch(`/sos/${sosId}/victim-location`, { latitude, longitude }, config);
+};
 
-// ─── Staff / Responder APIs (dùng staff JWT từ localStorage) ────────────────
+export const getSosDetail = async (id, opts = {}) => {
+  if (opts.preferVictimToken) {
+    const config = await withVictimAuthHeader();
+    return api.get(`/sos/${id}`, config);
+  }
+  return api.get(`/sos/${id}`);
+};
+
+// ─── Victim Profile APIs ──────────────────────────────────────────────────────
+
+export const getVictimProfile = async () => {
+  const config = await withVictimAuthHeader();
+  return api.get('/user/me', config);
+};
+
+export const updateVictimProfile = async (data) => {
+  const config = await withVictimAuthHeader();
+  return api.put('/user/profile', data, config);
+};
+
+export const addEmergencyContact = async (data) => {
+  const config = await withVictimAuthHeader();
+  return api.post('/users/profile/emergency-contact', data, config);
+};
+
+export const deleteEmergencyContact = async (index) => {
+  const config = await withVictimAuthHeader();
+  return api.delete(`/users/profile/emergency-contact/${index}`, config);
+};
+
+// ─── Staff / Responder APIs ───────────────────────────────────────────────────
+
 export const getAllSos = (status) =>
   api.get('/sos', { params: status ? { status } : {} });
-
-export const getSosDetail = (id, opts = {}) =>
-  api.get(`/sos/${id}`, { skipStaffJwt: !!opts.preferVictimToken });
 
 export const getSosByTeam = (teamId) =>
   api.get(`/sos/team/${teamId}`);
