@@ -31,13 +31,12 @@ export default function ResponderMissionBoard({ user }) {
   const [requestStats, setRequestStats] = useState({ total: 0, pending: 0 });
   const [acceptLoading, setAcceptLoading] = useState(false);
   const [floatingAlerts, setFloatingAlerts] = useState([]);
-  // New states for filters and notifications
   const [proximitySort, setProximitySort] = useState("nearest");
   const [urgencyLevel, setUrgencyLevel] = useState("all");
   const [notifications, setNotifications] = useState([]);
   const [toastAlerts, setToastAlerts] = useState([]);
   const requestsRef = useRef([]);
-  const toastTimersRef = useRef(new Set()); 
+  const toastTimersRef = useRef(new Set());
 
   useEffect(() => {
     requestsRef.current = requests;
@@ -74,12 +73,10 @@ export default function ResponderMissionBoard({ user }) {
   const visibleRequests = useMemo(() => {
     let list = [...requests];
 
-    // 1. Filter by urgency
     if (urgencyLevel !== "all") {
       list = list.filter((r) => String(r.level).toLowerCase() === urgencyLevel);
     }
 
-    // 2. Sort by proximity or time
     list.sort((a, b) => {
       if (proximitySort === "nearest") return (a.distanceKm || 999) - (b.distanceKm || 999);
       if (proximitySort === "farthest") return (b.distanceKm || 0) - (a.distanceKm || 0);
@@ -99,14 +96,18 @@ export default function ResponderMissionBoard({ user }) {
       visibleRequests.find((item) => String(item.id) === String(selectedId)) || visibleRequests[0] || null,
     [visibleRequests, selectedId],
   );
-  
+
   function syncRequests(newList, { notifyNew = false } = {}) {
     setRequests(newList);
     if (notifyNew) {
       pushNotification("Yêu cầu SOS mới", "Có một sự cố vừa được báo cáo gần bạn");
     }
   }
+
+  // ✅ Fix: chờ userId có giá trị mới load SOS
   useEffect(() => {
+    if (!userId) return;
+
     let cancelled = false;
 
     async function loadSosRequests() {
@@ -114,7 +115,7 @@ export default function ResponderMissionBoard({ user }) {
         const res = await getAllSos();
         const rawList = res?.data?.data || [];
         const sosList = rawList;
-        const mapped = hideLowLevelRequests(mapSosToResponderRequests(sosList, gps));
+        const mapped = mapSosToResponderRequests(sosList, gps);
         if (cancelled) return;
 
         if (!mapped.length) {
@@ -197,13 +198,11 @@ export default function ResponderMissionBoard({ user }) {
     };
   }, []);
 
-  // Lấy vị trí đội rescue: ưu tiên DB (khi test mode) hoặc GPS trình duyệt
   useEffect(() => {
     const isTestMode = import.meta.env.VITE_USE_FIXED_LOCATIONS === "true";
     let cancelled = false;
 
     async function loadGps() {
-      // Nếu FIXED_LOCATIONS mode: lấy vị trí từ DB (UserLocation / findNearestTeams)
       if (isTestMode && userId) {
         try {
           const nearestRes = await findNearestTeams(16.0544, 108.2022, 50000);
@@ -221,7 +220,6 @@ export default function ResponderMissionBoard({ user }) {
         }
       }
 
-      // fallback: GPS trình duyệt
       if (!navigator.geolocation) {
         setApiMessage((prev) => prev || "Trình duyệt không hỗ trợ GPS");
         return;
@@ -258,7 +256,6 @@ export default function ResponderMissionBoard({ user }) {
     let cancelled = false;
     async function syncTeamLocationAndNearest() {
       try {
-        // Use fixed locations for testing — skip real-time GPS update
         const isTestMode = import.meta.env.VITE_USE_FIXED_LOCATIONS === "true";
         if (userId && !isTestMode) {
           await updateTeamLocation(userId, gps.lat, gps.lng);
@@ -286,7 +283,6 @@ export default function ResponderMissionBoard({ user }) {
     }
     if (!socket) return;
 
-
     function syncStatsFromRequests(list) {
       setRequestStats({
         total: list.length,
@@ -294,7 +290,9 @@ export default function ResponderMissionBoard({ user }) {
       });
     }
 
+    // ✅ Fix: chờ userId có giá trị mới gọi API trong socket handler
     async function refreshRealtimeSosList() {
+      if (!userId) return;
       try {
         const res = await getAllSos();
         const rawList = res?.data?.data || [];
@@ -333,7 +331,7 @@ export default function ResponderMissionBoard({ user }) {
       if (!requestId) return;
 
       const alreadyExists = requestsRef.current.some((item) => String(item.id) === String(requestId));
-      
+
       try {
         const detailRes = await getSosDetail(requestId);
         const fullSos = detailRes?.data?.data;
@@ -342,7 +340,7 @@ export default function ResponderMissionBoard({ user }) {
           return;
         }
       } catch { /* fallback */ }
-      
+
       await refreshRealtimeSosList();
     }
 
