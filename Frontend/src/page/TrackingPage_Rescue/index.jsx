@@ -364,6 +364,7 @@ export default function TrackingView() {
   const currentStage   = tracking?.current_stage || "ASSIGNED";
   const isCompleted    = currentStage === "COMPLETED";
   const isCancelled    = currentStage === "CANCELLED";
+  const isTerminalStage = isCompleted || isCancelled;
   const nextStageKey   = STAGE_FLOW[STAGE_FLOW.indexOf(currentStage) + 1];
   const nextStageMeta  = NEXT_STAGE_ACTION[currentStage];
 
@@ -395,7 +396,7 @@ export default function TrackingView() {
     try {
       setCancelling(true);
       const res = await updateRescueStage(assignmentId, "CANCELLED", cancelReason || "Lý do khác");
-      if (res.data?.success) {
+      if (res?.success) {
         setTracking(prev => ({ ...prev, current_stage: "CANCELLED" }));
         setToaster({ message: "Đã huỷ nhiệm vụ", type: "success" });
         setTimeout(() => navigate("/responder"), 1500);
@@ -706,7 +707,7 @@ export default function TrackingView() {
               >
                 Làm mới
               </button>
-              {!isDone && !isCancelled && (
+              {!isTerminalStage && (
                 <button
                   onClick={() => setShowCancelModal(true)}
                   className="px-6 py-4 border-2 border-rose-500 text-rose-600 rounded-2xl font-bold text-xs hover:bg-rose-50 transition-all uppercase tracking-widest"

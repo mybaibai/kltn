@@ -234,14 +234,16 @@ export default function TrackingPage() {
   const loadTracking = useCallback(async (currentSosId) => {
     if (!currentSosId) return;
     try {
-      const res = await getCurrentTrackingBySosId(currentSosId);
+      const res = await getCurrentTrackingBySosId(currentSosId, { preferVictimToken: true });
       if (res?.data?.success && res.data.data) {
         const d = res.data.data;
-        setTracking({
+        setTracking((prev) => ({
+          ...prev,
           ...d,
+          rescue_location: d.rescue_location ?? prev?.rescue_location ?? null,
           // normalize: backend returns `stage`, map to `current_stage`
-          current_stage: d.stage ?? d.current_stage,
-        });
+          current_stage: d.stage ?? d.current_stage ?? prev?.current_stage,
+        }));
         if (d.assignment_id) setAssignmentId(d.assignment_id);
       }
     } catch (e) { console.error("Tracking load failed", e); }
@@ -304,6 +306,14 @@ export default function TrackingPage() {
         if (isFinishedRef.current) return;
 
         setTracking(prev => {
+          if (!prev) {
+            return {
+              current_stage: payload.stage ?? null,
+              distance_km: payload.distance_km ?? null,
+              eta_minutes: payload.eta_minutes ?? null,
+              rescue_location: payload.rescue_location ?? null,
+            };
+          }
           const prevStage = prev?.current_stage;
           const newStage  = payload.stage ?? prevStage;
 
@@ -529,9 +539,11 @@ export default function TrackingPage() {
               </Marker>
             )}
 
-            <SmoothMarker position={rescuePt} icon={rescueIcon}>
-              <Popup>Đội cứu hộ: {tracking?.rescue_name}</Popup>
-            </SmoothMarker>
+            {rescuePt && (
+              <SmoothMarker position={rescuePt} icon={rescueIcon}>
+                <Popup>Đội cứu hộ: {tracking?.rescue_name || "Đội cứu hộ gần nhất"}</Popup>
+              </SmoothMarker>
+            )}
 
             {routeCoords.length > 1 && (
               <Polyline positions={routeCoords} color="#6366f1" weight={5} opacity={0.6} lineCap="round" lineJoin="round" />
@@ -645,7 +657,7 @@ export default function TrackingPage() {
                       <Ambulance size={14} />
                     </div>
                     <span className="text-xs font-bold text-slate-800 truncate max-w-[80px]">
-                      {tracking?.rescue_name || "Đang tìm..."}
+                      {tracking?.rescue_name || (rescuePt ? "Đội gần nhất" : "Đang tìm...")}
                     </span>
                   </div>
                 </div>

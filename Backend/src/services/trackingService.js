@@ -2,6 +2,7 @@ import RescueAssignment from "../models/rescueAssignmentModel.js";
 import SosRequest from "../models/sosRequestModel.js";
 import TrackingLog from "../models/trackingLogModel.js";
 import UserLocation from "../models/userLocationModel.js";
+import { findNearestTeam } from "./teamService.js";
 
 // ===== 1. HAVERSINE FORMULA =====
 export function calculateDistance(lat1, lng1, lat2, lng2) {
@@ -329,20 +330,41 @@ export async function getCurrentTrackingBySosId(sosId, isVictim = false) {
       );
       if (!sos) return { success: false, message: "SOS not found" };
 
+      const [victimLng, victimLat] = sos.location?.coordinates || [];
+      let nearestRescue = null;
+      let distanceKm = null;
+      let etaMinutes = null;
+
+      if (typeof victimLat === "number" && typeof victimLng === "number") {
+        const [candidate] = await findNearestTeam(victimLat, victimLng, 100000);
+        if (candidate?.location?.coordinates?.length === 2) {
+          nearestRescue = candidate;
+          const [rescueLng, rescueLat] = candidate.location.coordinates;
+          distanceKm = calculateDistance(
+            rescueLat,
+            rescueLng,
+            victimLat,
+            victimLng,
+          );
+          etaMinutes = calculateETA(distanceKm);
+        }
+      }
+
       return {
         success: true,
         data: {
           assignment_id: null,
           request_id: sosId,
-          rescue_id: null,
-          rescue_name: null,
-          rescue_location: null,
+          rescue_id: nearestRescue?._id ?? null,
+          rescue_name: nearestRescue?.full_name ?? null,
+          rescue_phone: isVictim ? undefined : nearestRescue?.phone ?? null,
+          rescue_location: nearestRescue?.location ?? null,
           victim_location: sos.location,
           victim_id: sos.victim_id?._id,
           victim_name: sos.victim_id?.full_name,
-          stage: null, // chưa có đội
-          distance_km: null,
-          eta_minutes: null,
+          stage: sos.status || null,
+          distance_km: distanceKm,
+          eta_minutes: etaMinutes,
           stage_history: [],
         },
       };
