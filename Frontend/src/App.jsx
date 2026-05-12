@@ -6,13 +6,14 @@ import AdminLayout from "@/layouts/AdminLayout";
 import IncidentManagement from "@/page/AdminPage/IncidentManagement";
 import AdminTrackingPage from "@/page/AdminPage/AdminTrackingPage";
 import DashboardPage from "@/page/AdminPage/DashboardPage";
+import AdminPlaceholder from "@/page/AdminPage/AdminPlaceholder";
 import UsersPage from "@/page/AdminPage/UsersPage";
 import AdminHistoryPage from "@/page/AdminPage/HistoryPage";
-import AdminPlaceholder from "@/page/AdminPage/AdminPlaceholder";
 import StaffLoginPage from "@/page/StaffLoginPage";
 import ResponderPage from "@/page/ResponderPage";
 import ResponderTeamInfoPage from "@/page/ResponderTeamInfoPage";
 import ResponderTeamEditPage from "@/page/ResponderTeamEditPage";
+import ResponderActivityHistoryPage from "@/page/ResponderActivityHistoryPage";
 import RequesterProfile from "@/components/requester/RequesterProfile";
 import {
   StaffLoginGate,
@@ -20,13 +21,19 @@ import {
   StaffHomeRedirect,
 } from "@/components/auth/AuthGuards";
 import { STAFF_ROLE_ADMIN, STAFF_ROLE_RESCUE } from "@/services/auth/session";
-import HistoryPage from "@/page/Requester/History";
+import HistoryPage from "./page/Requester/History";
 import { Toaster } from "react-hot-toast";
 
 export default function App() {
   return (
     <BrowserRouter>
-      <Toaster position="top-right" />
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: { fontSize: "14px" },
+        }}
+      />
       <Routes>
         <Route path="/" element={<SosPage />} />
         <Route path="/sos" element={<SosPage />} />
@@ -52,20 +59,11 @@ export default function App() {
           }
         >
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
-          <Route
-            path="dashboard"
-            element={<DashboardPage />}
-          />
+          <Route path="dashboard" element={<DashboardPage />} />
           <Route path="incidents" element={<IncidentManagement />} />
           <Route path="tracking/:sosId" element={<AdminTrackingPage />} />
-          <Route
-            path="users"
-            element={<UsersPage />}
-          />
-          <Route
-            path="history"
-            element={<AdminHistoryPage />}
-          />
+          <Route path="users" element={<UsersPage />} />
+          <Route path="history" element={<AdminHistoryPage />} />
           <Route
             path="settings"
             element={<AdminPlaceholder title="Cài đặt" />}
@@ -100,6 +98,14 @@ export default function App() {
           element={
             <StaffRoleGuard allowRoles={[STAFF_ROLE_RESCUE]}>
               <ResponderTeamEditPage />
+            </StaffRoleGuard>
+          }
+        />
+        <Route
+          path="/responder/history"
+          element={
+            <StaffRoleGuard allowRoles={[STAFF_ROLE_RESCUE]}>
+              <ResponderActivityHistoryPage />
             </StaffRoleGuard>
           }
         />

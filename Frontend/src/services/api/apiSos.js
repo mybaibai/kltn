@@ -108,6 +108,13 @@ export const deleteEmergencyContact = async (index) => {
   return api.delete(`/users/profile/emergency-contact/${index}`, config);
 };
 
+// ─── Victim SOS Feed (news) ───────────────────────────────────────────────────
+
+export const getAllSosForVictim = async (params = {}) => {
+  const config = await withVictimAuthHeader({ params });
+  return api.get('/sos', config);
+};
+
 // ─── Staff / Responder APIs ───────────────────────────────────────────────────
 
 export const getAllSos = (status) =>

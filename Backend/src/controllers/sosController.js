@@ -70,7 +70,19 @@ export const create = async (req, res) => {
       created_at: fullSos?.created_at || new Date(),
     });
 
-    // Notify đội gần nhất ngay lập tức
+    // 🚨 Broadcast NGAY LẬP TỨC cho TẤT CẢ rescue (không chờ 60s)
+    io.to('rescue-all').emit('sos_broadcast_all', {
+      request_id:  fullSos?._id,
+      status:      'PENDING',
+      address:     fullSos?.address || '',
+      created_at:  fullSos?.created_at || new Date(),
+      victim_name: fullSos?.victim_id?.full_name || '',
+      location:    fullSos?.location,
+      priority:    true,
+    });
+    console.log(`📢 SOS ${sos._id} — broadcast to all rescue teams (IMMEDIATE)`);
+
+    // Notify đội gần nhất ngay lập tức với priority flag
     try {
       const nearRescues = await teamService.findNearestTeam(Number(resolvedLat), Number(resolvedLng));
       if (nearRescues.length > 0) {
@@ -88,21 +100,6 @@ export const create = async (req, res) => {
     } catch (e) {
       console.warn('⚠️ Could not find nearest rescue teams:', e.message);
     }
-
-    // Sau 60 giây: broadcast cho TẤT CẢ rescue
-    const broadcastTimer = setTimeout(() => {
-      io.to('rescue-all').emit('sos_broadcast_all', {
-        request_id:  fullSos?._id,
-        status:      'PENDING',
-        address:     fullSos?.address || '',
-        created_at:  fullSos?.created_at || new Date(),
-        victim_name: fullSos?.victim_id?.full_name || '',
-        location:    fullSos?.location,
-      });
-      console.log(`📢 SOS ${sos._id} — broadcast to all rescue teams (60s)`);
-      pendingBroadcastTimers.delete(String(sos._id));
-    }, 60_000);
-    pendingBroadcastTimers.set(String(sos._id), broadcastTimer);
 
     // Trả response cho victim NGAY — không chờ AI
     res.status(201).json({ success: true, data: fullSos });

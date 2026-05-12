@@ -28,6 +28,16 @@ const io = new Server(httpServer, {
   transports: ["websocket", "polling"],
 });
 
+function normalizeSocketRole(role) {
+  const value = String(role || "").trim().toUpperCase();
+  if (!value) return "";
+  if (value === "ADMIN") return "ADMIN";
+  if (value === "STAFF") return "STAFF";
+  if (value === "RESCUE" || value === "RESPONDER") return "RESCUE";
+  if (value === "VICTIM") return "VICTIM";
+  return value;
+}
+
 app.use(
   cors({
     origin: (origin, cb) => {
@@ -68,7 +78,7 @@ io.use(async (socket, next) => {
   if (!token) {
     console.log("⚠️ Socket connected without token");
     socket.userId = userId;
-    socket.userRole = userRole;
+    socket.userRole = normalizeSocketRole(userRole);
     return next();
   }
 
@@ -78,7 +88,7 @@ io.use(async (socket, next) => {
       const decodedToken = await firebaseAdminAuth.verifyIdToken(token);
       // Ưu tiên dùng MongoDB _id từ handshake, fallback về Firebase UID
       socket.userId = userId || decodedToken.uid;
-      socket.userRole = userRole || "VICTIM";
+      socket.userRole = normalizeSocketRole(userRole || "VICTIM");
       return next();
     } catch (fbErr) {
       // Không phải Firebase token, chuyển sang thử JWT
@@ -90,7 +100,7 @@ io.use(async (socket, next) => {
       try {
         const decoded = jwt.verify(token, secret);
         socket.userId = decoded.sub || userId;
-        socket.userRole = decoded.role || userRole;
+        socket.userRole = normalizeSocketRole(decoded.role || userRole);
         return next();
       } catch (jwtErr) {
         // Token không hợp lệ
@@ -99,7 +109,7 @@ io.use(async (socket, next) => {
 
     // Fallback nếu verify thất bại nhưng vẫn cho kết nối (hoặc có thể block tùy security)
     socket.userId = userId;
-    socket.userRole = userRole;
+    socket.userRole = normalizeSocketRole(userRole);
     next();
   } catch (err) {
     console.error("❌ Socket auth middleware error:", err.message);

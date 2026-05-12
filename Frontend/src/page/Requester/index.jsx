@@ -6,7 +6,8 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import markerIconUrl from 'leaflet/dist/images/marker-icon.png';
 import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png';
-import { sendSos } from '@/services/api/apiSos';
+import { sendSos, getAllSosForVictim } from '@/services/api/apiSos';
+import { getAllTeams } from '@/services/api/apiTeam';
 import LoginRequester from './LoginRequester';
 import SOSForm from './SOSform';  
 import Logo from "@/assets/logo.svg";
@@ -105,6 +106,95 @@ function RecenterMap({ lat, lng }) {
   return null;
 }
 
+function PopupShell({ title, onClose, children }) {
+  return (
+    <div className="fixed inset-0 z-[100000] bg-black/40 flex items-center justify-center p-4">
+      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-gray-50">
+          <div className="font-bold text-lg text-gray-900">{title}</div>
+          <button
+            onClick={onClose}
+            className="w-9 h-9 rounded-lg hover:bg-gray-100 flex items-center justify-center"
+            aria-label="Đóng"
+          >
+            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="px-6 py-5 max-h-[70vh] overflow-y-auto">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const normalizeText = (value) => String(value || '').toLowerCase();
+
+const resolveTeamStatus = (raw) => {
+  const value = normalizeText(raw);
+  if (value === 'available' || value === 'online') return 'available';
+  if (value === 'busy') return 'busy';
+  if (value === 'offline') return 'offline';
+  return '';
+};
+
+const isHighPrioritySos = (sos) => {
+  const label = normalizeText(sos?.ai_priority_label);
+  const score = Number(sos?.ai_priority_score || 0);
+  if (score >= 7) return true;
+  if (!label) return false;
+  return label.includes('cao');
+};
+
+const getPriorityLabel = (sos) => {
+  const score = Number(sos?.ai_priority_score || 0);
+  const label = String(sos?.ai_priority_label || '').trim();
+  if (label) return label;
+  if (score >= 9) return 'Cực kì cao';
+  if (score >= 7) return 'Cao';
+  if (score >= 4) return 'Trung bình';
+  return 'Thấp';
+};
+
+const formatNewsTime = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+  }).format(date);
+};
+
+const clipText = (text, max = 200) => {
+  const value = String(text || '').trim();
+  if (value.length <= max) return value;
+  return `${value.slice(0, Math.max(0, max - 3))}...`;
+};
+
+const buildNewsTitle = (sos) => {
+  const category = sos?.ai_category || sos?.incident_type?.name || 'Sự cố';
+  const location = sos?.address ? ` tại ${sos.address}` : ' tại khu vực báo tin';
+  const label = normalizeText(sos?.ai_priority_label).includes('cực') || Number(sos?.ai_priority_score || 0) >= 9
+    ? 'Báo động đỏ'
+    : 'Báo động';
+  return `${label}: ${category}${location}`;
+};
+
+const buildNewsBody = (sos) => {
+  const situation = sos?.ai_situation_summary || sos?.description || 'Tình huống khẩn cấp đang được ghi nhận tại hiện trường.';
+  const rescueRaw = sos?.ai_rescue_summary || 'triển khai tiếp cận nhanh, sơ cứu và khoanh vùng rủi ro.';
+  const rescue = /^đội\s*cứu\s*hộ/i.test(rescueRaw)
+    ? rescueRaw
+    : `Đội cứu hộ ${rescueRaw}`;
+  const headline = `Tình huống căng thẳng: ${situation}`;
+  return clipText(`${headline} ${rescue}`.trim(), 240);
+};
+
 export default function SosPage() {
   const [position, setPosition] = useState(() => {
     try {
@@ -138,6 +228,15 @@ export default function SosPage() {
   const DEFAULT_CENTER = [16.0544, 108.2022];
   const [open, setOpen] = useState(false);
   const menuRef = useRef();
+  const [supportOpen, setSupportOpen] = useState(false);
+  const [newsOpen, setNewsOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [teams, setTeams] = useState([]);
+  const [teamsLoading, setTeamsLoading] = useState(false);
+  const [teamsError, setTeamsError] = useState('');
+  const [newsItems, setNewsItems] = useState([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+  const [newsError, setNewsError] = useState('');
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -193,6 +292,64 @@ export default function SosPage() {
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [showUserMenu]);
+
+  useEffect(() => {
+    if (!supportOpen) return;
+    let active = true;
+
+    const loadTeams = async () => {
+      setTeamsLoading(true);
+      setTeamsError('');
+      try {
+        const res = await getAllTeams();
+        const list = Array.isArray(res?.data?.data) ? res.data.data : [];
+        if (!active) return;
+        setTeams(list);
+      } catch (err) {
+        if (!active) return;
+        setTeamsError('Không tải được danh sách đội cứu hộ.');
+      } finally {
+        if (active) setTeamsLoading(false);
+      }
+    };
+
+    loadTeams();
+    return () => { active = false; };
+  }, [supportOpen]);
+
+  useEffect(() => {
+    if (!newsOpen) return;
+    let active = true;
+
+    const loadNews = async () => {
+      setNewsLoading(true);
+      setNewsError('');
+      if (!user) {
+        setNewsLoading(false);
+        setNewsItems([]);
+        setNewsError('Vui lòng đăng nhập để xem tin SOS ưu tiên.');
+        return;
+      }
+      try {
+        const res = await getAllSosForVictim();
+        const list = Array.isArray(res?.data?.data) ? res.data.data : [];
+        const filtered = list.filter(isHighPrioritySos).slice(0, 6);
+        if (!active) return;
+        setNewsItems(filtered);
+        if (!filtered.length) {
+          setNewsError('Chưa có tin SOS mức độ cao/cực kì cao.');
+        }
+      } catch (err) {
+        if (!active) return;
+        setNewsError('Không tải được tin tức SOS.');
+      } finally {
+        if (active) setNewsLoading(false);
+      }
+    };
+
+    loadNews();
+    return () => { active = false; };
+  }, [newsOpen, user]);
 
   // Lấy GPS
   const handleGetLocation = () => {
@@ -315,6 +472,49 @@ export default function SosPage() {
       window.history.replaceState({}, '');
     }
   }, [location.state]);
+
+  function looksLikeSupportUser(team) {
+    return !!(team?.full_name || team?.name);
+  }
+
+  function supportDisplayName(team) {
+    return String(team?.name || team?.full_name || 'Đội cứu hộ').trim() || 'Đội cứu hộ';
+  }
+
+  function supportPhone(team) {
+    const p =
+      team?.phone_contact ||
+      team?.phone ||
+      team?.auth?.phone ||
+      '';
+    return String(p).trim();
+  }
+
+  function supportArea(team) {
+    return String(team?.area || team?.profile?.address || team?.profile?.district || '').trim() || 'Khu vực trực';
+  }
+
+  function supportStatusLabel(team) {
+    const st = resolveTeamStatus(team?.status || '');
+    if (st === 'available') return 'Sẵn sàng';
+    if (st === 'busy') return 'Đang bận';
+    const u = String(team?.status || '').trim().toLowerCase();
+    if (u === 'active' || looksLikeSupportUser(team)) return 'Đang online';
+    return 'Đang offline';
+  }
+
+  /** /api/teams trả về User cứu hộ (full_name, phone, status: Active...) */
+  const onlineTeams = teams.filter((entry) => {
+    const raw = String(entry?.status || '').trim();
+    if (/^(blocked|inactive|banned)$/i.test(raw)) return false;
+    const st = resolveTeamStatus(entry?.status || '');
+    if (st === 'offline') return false;
+    if (st === 'available' || st === 'busy') return entry?.is_active !== false;
+    const u = raw.toLowerCase();
+    if (u === 'active' || u === '') return true;
+    if (looksLikeSupportUser(entry)) return u !== 'blocked';
+    return false;
+  });
   return (
     <div className="relative h-screen w-full overflow-hidden font-sans">
       {showLogin && (
@@ -335,8 +535,8 @@ export default function SosPage() {
           {/* MENU + AVATAR */}
           <div className="flex items-center gap-6">
             {/* <button className="text-sm">Bản đồ</button> */}
-            <button className="text-sm">Tin tức</button>
-            <button className="text-sm">Hướng dẫn</button>
+            <button className="text-sm" onClick={() => setNewsOpen(true)}>Tin tức</button>
+            <button className="text-sm" onClick={() => setGuideOpen(true)}>Hướng dẫn</button>
   
             <div className="relative" ref={menuRef}>
             <button
@@ -520,7 +720,10 @@ export default function SosPage() {
               <span className="bg-gray-100 px-2 py-1 rounded-full">8 phút</span>
             </div>
   
-            <button className="w-full py-2 rounded-lg bg-gray-100 hover:bg-gray-200">
+            <button
+              className="w-full py-2 rounded-lg bg-gray-100 hover:bg-gray-200"
+              onClick={() => setSupportOpen(true)}
+            >
               Gọi hỗ trợ trực tiếp
             </button>
           </div>
@@ -586,6 +789,124 @@ export default function SosPage() {
       </div>
 
   
+      {supportOpen && (
+        <PopupShell title="Gọi hỗ trợ trực tiếp" onClose={() => setSupportOpen(false)}>
+          <p className="text-sm text-gray-600 mb-4">
+            Danh sách đội cứu hộ đang trực tuyến. Hãy gọi khi bạn cần trợ giúp ngay.
+          </p>
+          <div className="space-y-3">
+            {teamsLoading && (
+              <div className="text-sm text-gray-500">Đang tải danh sách đội cứu hộ...</div>
+            )}
+            {!teamsLoading && teamsError && (
+              <div className="text-sm text-red-500">{teamsError}</div>
+            )}
+            {!teamsLoading && !teamsError && onlineTeams.length === 0 && (
+              <div className="text-sm text-gray-500">Hiện chưa có đội cứu hộ trực tuyến.</div>
+            )}
+            {!teamsLoading && !teamsError && onlineTeams.map((team) => {
+              const statusLabel = supportStatusLabel(team);
+              const phone = supportPhone(team);
+              return (
+                <div key={team?._id || `${supportDisplayName(team)}-${phone}`} className="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+                  <div>
+                    <div className="font-semibold text-gray-900">{supportDisplayName(team)}</div>
+                    <div className="text-xs text-gray-500">{supportArea(team)}</div>
+                    <div className="text-xs text-gray-400 mt-1">Trạng thái: {statusLabel}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-gray-400">SĐT trực</div>
+                    <div className="font-semibold text-gray-900">{phone || 'Đang cập nhật'}</div>
+                    {phone && (
+                      <a
+                        href={`tel:${phone}`}
+                        className="mt-2 inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-red-500 text-white text-xs font-semibold hover:bg-red-600"
+                      >
+                        Gọi ngay
+                      </a>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </PopupShell>
+      )}
+
+      {newsOpen && (
+        <PopupShell title="Tin tức SOS ưu tiên cao" onClose={() => setNewsOpen(false)}>
+          <p className="text-sm text-gray-600 mb-4">
+            AI tổng hợp từ các tin SOS mức độ cao - cực kì cao, ưu tiên cập nhật nhanh và rõ tình hình cứu hộ.
+          </p>
+          {newsLoading && (
+            <div className="text-sm text-gray-500">Đang tải tin tức...</div>
+          )}
+          {!newsLoading && newsError && (
+            <div className="text-sm text-amber-600">{newsError}</div>
+          )}
+          {!newsLoading && !newsError && (
+            <div className="space-y-4">
+              {newsItems.map((sos) => {
+                const priorityLabel = getPriorityLabel(sos);
+                const score = Number(sos?.ai_priority_score || 0);
+                const isCritical = normalizeText(priorityLabel).includes('cực') || score >= 9;
+                const badgeClass = isCritical ? 'bg-red-600 text-white' : 'bg-amber-500 text-white';
+                return (
+                  <div key={sos?._id} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="text-sm font-semibold text-gray-900">{buildNewsTitle(sos)}</div>
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${badgeClass}`}>
+                        {priorityLabel}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-sm text-gray-600">{buildNewsBody(sos)}</div>
+                    <div className="mt-3 flex items-center justify-between text-xs text-gray-400">
+                      <span>AI tổng hợp • {formatNewsTime(sos?.created_at) || 'Vừa xong'}</span>
+                      <span className="font-semibold text-red-500">Đội cứu hộ đã vào cuộc</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </PopupShell>
+      )}
+
+      {guideOpen && (
+        <PopupShell title="Hướng dẫn & quy định" onClose={() => setGuideOpen(false)}>
+          <div className="space-y-6 text-sm text-gray-700">
+            <div>
+              <div className="font-semibold text-gray-900 mb-2">Quy định bắt buộc</div>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Không gửi SOS giả mạo. Vi phạm có thể bị khóa tài khoản.</li>
+                <li>Luôn bật GPS để hệ thống định vị chính xác.</li>
+                <li>Mô tả đúng sự thật, ngắn gọn, tránh thông tin gây nhiễu.</li>
+                <li>Nếu tình huống đã an toàn, hãy hủy SOS để giảm tải cho hệ thống.</li>
+              </ul>
+            </div>
+            <div>
+              <div className="font-semibold text-gray-900 mb-2">Cách sử dụng nhanh</div>
+              <ol className="list-decimal pl-5 space-y-1">
+                <li>Nhấn "Lấy vị trí" để cập nhật tọa độ chính xác.</li>
+                <li>Chọn nút SOS và điền loại sự cố + mô tả chi tiết.</li>
+                <li>Gửi yêu cầu, hệ thống sẽ phân công đội cứu hộ gần nhất.</li>
+                <li>Theo dõi tiến trình cứu hộ ở trang theo dõi.</li>
+              </ol>
+            </div>
+            <div>
+              <div className="font-semibold text-gray-900 mb-2">Workflow xử lý cho nạn nhân</div>
+              <ol className="list-decimal pl-5 space-y-1">
+                <li>Đảm bảo an toàn cá nhân trước, tránh khu vực nguy hiểm.</li>
+                <li>Gửi SOS và giữ liên lạc với đội cứu hộ nếu cần.</li>
+                <li>Cập nhật vị trí nếu bạn di chuyển bắt buộc.</li>
+                <li>Mở pop-up "Gọi hỗ trợ trực tiếp" khi cần giải quyết nhanh.</li>
+                <li>Khi tình huống ổn định, thông báo để đóng kết vụ việc.</li>
+              </ol>
+            </div>
+          </div>
+        </PopupShell>
+      )}
+
       {/* MODAL */}
       {showModal && (
         <SOSForm

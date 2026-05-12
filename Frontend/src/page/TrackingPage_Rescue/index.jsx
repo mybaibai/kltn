@@ -185,6 +185,7 @@ export default function TrackingView() {
   const [err,         setErr]         = useState("");
   const [assignmentId, setAssignmentId] = useState(null);
   const [toaster,     setToaster]     = useState(null);
+  const [showVictimPopup, setShowVictimPopup] = useState(false);
 
   // Map / location state
   const [rescuePos,    setRescuePos]   = useState(null); // current rescue position (lat/lng)
@@ -197,7 +198,7 @@ export default function TrackingView() {
 
   // GPS watcher ref
   const watchIdRef = useRef(null);
-  const isFinishedRef = useRef(false);
+  const redirectTimerRef = useRef(null);
   const gpsSendRef = useRef({
     lastSentAt: 0,
     lastSentPos: null,
@@ -209,6 +210,25 @@ export default function TrackingView() {
   const staffUser = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("auth_user") ?? "null"); }
     catch { return null; }
+  }, []);
+
+  const scheduleReturnToHome = useCallback((message) => {
+    setToaster({ message: message || "Nhiệm vụ đã bị hủy", type: "info" });
+    if (redirectTimerRef.current) {
+      window.clearTimeout(redirectTimerRef.current);
+    }
+    redirectTimerRef.current = window.setTimeout(() => {
+      navigate("/responder", { replace: true });
+    }, 1200);
+  }, [navigate]);
+
+  useEffect(() => {
+    return () => {
+      if (redirectTimerRef.current) {
+        window.clearTimeout(redirectTimerRef.current);
+        redirectTimerRef.current = null;
+      }
+    };
   }, []);
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -235,7 +255,6 @@ export default function TrackingView() {
     let active = true;
 
     async function fetchAll() {
-      if (isFinishedRef.current) return;
       try {
         const res  = await getSosDetail(sosId, { preferVictimToken: false });
         if (!active) return;
@@ -254,16 +273,13 @@ export default function TrackingView() {
     }
 
     fetchAll();
-    const poll = setInterval(() => {
-      if (!isFinishedRef.current) fetchAll();
-    }, 10000);
+    const poll = setInterval(fetchAll, 10000);
     return () => { active = false; clearInterval(poll); };
   }, [sosId, loadTracking]);
 
   // ── GPS: watch rescue position & push to server ───────────────────────────
 
   useEffect(() => {
-    // Khi rescue đã ARRIVED trở đi thì ngừng gửi GPS để giảm tải backend/socket/DB.
     const stage = tracking?.current_stage || "ASSIGNED";
     const stopRealtime =
       stage === "ARRIVED" ||
@@ -280,7 +296,6 @@ export default function TrackingView() {
         const nextPos = { lat, lng };
         setRescuePos(nextPos);
 
-        // Throttle: gửi tối đa mỗi ~8s hoặc khi di chuyển đáng kể
         const now = Date.now();
         const state = gpsSendRef.current;
         const last = state.lastSentPos;
@@ -292,7 +307,6 @@ export default function TrackingView() {
 
         if (!due && !movedEnough) return;
 
-        // Coalesce: nếu đang in-flight thì queue vị trí mới nhất
         if (state.inFlight) {
           state.queuedPos = nextPos;
           return;
@@ -312,7 +326,6 @@ export default function TrackingView() {
             if (state.queuedPos) {
               const queued = state.queuedPos;
               state.queuedPos = null;
-              // fire-and-forget next send; still respects coalescing
               void send(queued);
             }
           }
@@ -364,11 +377,16 @@ export default function TrackingView() {
     if (sosId) socket.emit("join_sos_room", { sos_id: sosId });
 
     const onStageUpdate = (payload) => {
+      const nextStage = payload?.stage;
       setTracking(prev => ({
         ...prev,
-        current_stage: payload.stage ?? prev?.current_stage,
+        current_stage: nextStage ?? prev?.current_stage,
       }));
-      if (payload.stage === "COMPLETED") {
+      if (nextStage === "CANCELLED") {
+        scheduleReturnToHome(payload?.message || "Nhiệm vụ đã bị hủy");
+        return;
+      }
+      if (nextStage === "COMPLETED") {
         setShowCompletion(true);
       }
     };
@@ -396,23 +414,28 @@ export default function TrackingView() {
     };
 
     const onMissionCancelled = (payload) => {
-      setErr(`Nhiệm vụ đã bị huỷ: ${payload.message || "Nạn nhân đã huỷ yêu cầu"}`);
-      setIsFinishedRef.current = true;
+      scheduleReturnToHome(payload?.message || "Nhiệm vụ đã bị hủy");
+    };
+
+    const onSosCancelled = (payload) => {
+      scheduleReturnToHome(payload?.message || "Yêu cầu đã bị hủy");
     };
 
     socket.on("mission_stage_update",      onStageUpdate);
     socket.on("mission_location_confirmed", onLocationConfirmed);
     socket.on("sos_ai_analyzed",           onAiAnalyzed);
     socket.on("mission_cancelled",         onMissionCancelled);
+    socket.on("sos_cancelled",             onSosCancelled);
 
     return () => {
       socket.off("mission_stage_update",      onStageUpdate);
       socket.off("mission_location_confirmed", onLocationConfirmed);
       socket.off("sos_ai_analyzed",           onAiAnalyzed);
       socket.off("mission_cancelled",         onMissionCancelled);
+      socket.off("sos_cancelled",             onSosCancelled);
       socket.emit("leave_sos_room", { sos_id: sosId });
     };
-  }, [sosId]);
+  }, [sosId, scheduleReturnToHome]);
 
   // ── Route rescue → victim ─────────────────────────────────────────────────
 
@@ -435,8 +458,6 @@ export default function TrackingView() {
 
   const currentStage   = tracking?.current_stage || "ASSIGNED";
   const isCompleted    = currentStage === "COMPLETED";
-  const isCancelled    = currentStage === "CANCELLED";
-  const isTerminalStage = isCompleted || isCancelled;
   const nextStageKey   = STAGE_FLOW[STAGE_FLOW.indexOf(currentStage) + 1];
   const nextStageMeta  = NEXT_STAGE_ACTION[currentStage];
 
@@ -456,31 +477,6 @@ export default function TrackingView() {
       setToaster({ message: `Lỗi: ${e.message}`, type: "error" });
     } finally {
       setIsUpdatingStage(false);
-    }
-  };
-
-  const [cancelling, setCancelling] = useState(false);
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancelReason, setCancelReason] = useState("");
-
-  const handleCancelMission = async () => {
-    if (!tracking || isCompleted || cancelling) return;
-    try {
-      setCancelling(true);
-      const res = await updateRescueStage(assignmentId, "CANCELLED", cancelReason || "Lý do khác");
-      if (res?.success) {
-        setTracking(prev => ({ ...prev, current_stage: "CANCELLED" }));
-        setToaster({ message: "Đã huỷ nhiệm vụ", type: "success" });
-        setTimeout(() => navigate("/responder"), 1500);
-      }
-    } catch (err) {
-      setToaster({
-        message: err?.response?.data?.message || "Lỗi khi huỷ nhiệm vụ",
-        type: "error"
-      });
-    } finally {
-      setCancelling(false);
-      setShowCancelModal(false);
     }
   };
 
@@ -510,12 +506,152 @@ export default function TrackingView() {
   const requestCode  = sos._id ? `#SOS-${String(sos._id).slice(-4).toUpperCase()}` : "#SOS-????";
   const victimName   = sos.victim_id?.full_name || "—";
   const victimPhone  = sos.victim_id?.phone || sos.victim_id?.profile?.phone || "—";
+  const victimProfile = sos.victim_id?.profile || {};
+  const bloodType = victimProfile.blood_type || "—";
+  const height = victimProfile.height ? `${victimProfile.height} cm` : "—";
+  const weight = victimProfile.weight ? `${victimProfile.weight} kg` : "—";
+  const allergies = Array.isArray(victimProfile.allergies)
+    ? victimProfile.allergies.filter(Boolean)
+    : typeof victimProfile.allergies === "string"
+      ? victimProfile.allergies.split(",").map((item) => item.trim()).filter(Boolean)
+      : [];
+  const medicalWarning = victimProfile.medical_alert || victimProfile.health_warning || victimProfile.medical_condition || (Array.isArray(victimProfile.medical_conditions) ? victimProfile.medical_conditions[0] : null);
+  const emergencyContacts = Array.isArray(victimProfile.emergency_contacts)
+    ? victimProfile.emergency_contacts
+    : [];
 
   return (
     <div className="h-screen w-full bg-gray-50 flex flex-col overflow-hidden font-sans">
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         <AnimatePresence>
           {toaster && <Toast {...toaster} onClose={() => setToaster(null)} />}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showVictimPopup && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[1200] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-3"
+            >
+              <motion.div
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 20, opacity: 0 }}
+                className="w-full max-w-[380px] rounded-[24px] bg-white shadow-2xl overflow-hidden border border-slate-200 max-h-[90vh] overflow-y-auto"
+              >
+                <div className="flex items-center justify-between gap-3 p-3 border-b border-slate-100 sticky top-0 bg-white">
+                  <div className="flex items-center gap-2">
+                    <div className="h-12 w-12 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-500 text-lg font-bold">
+                      {victimName ? victimName.charAt(0).toUpperCase() : "?"}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{victimName}</p>
+                      <span className="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.2em] text-rose-600">
+                        Nạn nhân
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowVictimPopup(false)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition flex-shrink-0"
+                    aria-label="Đóng thông tin nạn nhân"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="space-y-3 p-3">
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-3 text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-500">
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                        <User size={12} />
+                      </span>
+                       Thông tin y tế
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-[16px] border border-slate-200 bg-slate-50 p-2.5 text-center">
+                        <p className="text-[9px] uppercase tracking-[0.2em] text-slate-500 font-bold">Máu</p>
+                        <p className="mt-1.5 text-lg font-bold text-rose-600">{bloodType}</p>
+                      </div>
+                      <div className="rounded-[16px] border border-slate-200 bg-slate-50 p-2.5 text-center">
+                        <p className="text-[9px] uppercase tracking-[0.2em] text-slate-500 font-bold">Cao</p>
+                        <p className="mt-1.5 text-lg font-bold text-slate-900">{height}</p>
+                      </div>
+                      <div className="rounded-[16px] border border-slate-200 bg-slate-50 p-2.5 text-center">
+                        <p className="text-[9px] uppercase tracking-[0.2em] text-slate-500 font-bold">Cân</p>
+                        <p className="mt-1.5 text-lg font-bold text-slate-900">{weight}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-sm font-semibold text-slate-900 mb-1.5">Dị ứng</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {allergies.length > 0 ? allergies.map((item, idx) => (
+                        <span key={idx} className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+                          {item}
+                        </span>
+                      )) : (
+                        <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500">Không</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[20px] border border-rose-200 bg-rose-50 p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-rose-100 text-rose-700 flex-shrink-0">
+                        <AlertTriangle size={14} />
+                      </span>
+                      <div>
+                        <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-rose-700">⚠ Cảnh báo</p>
+                        <h3 className="text-sm font-bold text-slate-900">{medicalWarning || "An toàn"}</h3>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-600 ml-10">{medicalWarning ? "Cần theo dõi nhịp tim." : "Không có cảnh báo."}</p>
+                    {medicalWarning && (
+                      <span className="mt-2 inline-flex rounded-full bg-white px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-rose-700 border border-rose-200">
+                        CARDIAC
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="rounded-[20px] border border-slate-200 bg-white p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="text-[9px] uppercase tracking-[0.2em] text-slate-500 font-semibold">Khẩn cấp</p>
+                        <h3 className="text-sm font-bold text-slate-900">Liên hệ</h3>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {emergencyContacts.length > 0 ? emergencyContacts.slice(0, 2).map((contact, index) => (
+                        <div key={index} className="flex items-center gap-2 rounded-[18px] border border-slate-200 bg-slate-50 p-2.5">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-700 shadow-sm text-xs font-bold flex-shrink-0">
+                            {String(contact.name || "?").slice(0, 1).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-slate-900 truncate">{contact.name || "N/A"}</p>
+                            <p className="text-[11px] text-slate-500 truncate">{contact.phone || "N/A"}</p>
+                          </div>
+                          <a
+                            href={`tel:${contact.phone || ""}`}
+                            className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-900 hover:bg-slate-100 flex-shrink-0"
+                          >
+                            <Phone size={12} />
+                          </a>
+                        </div>
+                      )) : (
+                        <p className="text-xs text-slate-500">Chưa có.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
         </AnimatePresence>
 
         <CompletionPopup 
@@ -700,6 +836,14 @@ export default function TrackingView() {
                     <div className="flex items-center gap-2 mb-1">
                       <User size={12} className="text-gray-400 shrink-0" />
                       <span className="text-sm font-bold text-slate-900 truncate">{victimName}</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowVictimPopup(true)}
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-rose-500 text-white hover:bg-rose-600 transition-shadow shadow-sm"
+                        aria-label="Xem thông tin nạn nhân"
+                      >
+                        <AlertTriangle size={14} />
+                      </button>
                     </div>
                     <div className="flex items-center gap-2">
                       <Phone size={12} className="text-gray-400 shrink-0" />
@@ -772,83 +916,15 @@ export default function TrackingView() {
 
           {/* Footer */}
           <div className="p-6 bg-[#F2F4F6] border-t border-gray-200 shrink-0">
-            <div className="flex gap-3">
-              <button
-                onClick={() => window.location.reload()}
-                className="flex-1 py-4 bg-gray-200 hover:bg-gray-300 text-slate-800 rounded-2xl font-bold text-xs transition-all uppercase tracking-widest"
-              >
-                Làm mới
-              </button>
-              
-              {!isTerminalStage && (
-                <button
-                  onClick={() => setShowCancelModal(true)}
-                  className="flex-1 py-4 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-2xl font-bold text-xs transition-all uppercase tracking-widest border border-rose-200"
-                >
-                  Huỷ nhiệm vụ
-                </button>
-              )}
-            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full py-4 bg-gray-200 hover:bg-gray-300 text-slate-800 rounded-2xl font-bold text-xs transition-all uppercase tracking-widest"
+            >
+              Làm mới dữ liệu
+            </button>
           </div>
         </div>
       </div>
-
-      {/* Cancel Modal */}
-      <AnimatePresence>
-        {showCancelModal && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 backdrop-blur-sm p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white w-full max-w-[340px] rounded-[28px] p-6 shadow-2xl relative"
-            >
-              <button onClick={() => setShowCancelModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
-                <X size={20} />
-              </button>
-              <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center">
-                <AlertTriangle size={28} className="text-rose-600" />
-              </div>
-              <h2 className="text-center text-lg font-bold text-slate-900 mb-2">Huỷ nhiệm vụ?</h2>
-              <p className="text-center text-sm text-gray-500 mb-4">Nhiệm vụ sẽ được trả lại cho các đội khác. Vui lòng chọn lý do.</p>
-              
-              <div className="mb-6 space-y-2">
-                {["Xe hỏng", "Kẹt xe nghiêm trọng", "Trang bị không đủ", "Lý do khác"].map((reason) => (
-                  <label key={reason} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50 cursor-pointer">
-                    <input 
-                      type="radio" 
-                      name="cancel_reason" 
-                      value={reason} 
-                      checked={cancelReason === reason}
-                      onChange={(e) => setCancelReason(e.target.value)}
-                      className="text-rose-600 focus:ring-rose-500" 
-                    />
-                    <span className="text-sm font-medium text-slate-700">{reason}</span>
-                  </label>
-                ))}
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <button
-                  disabled={cancelling || !cancelReason}
-                  onClick={handleCancelMission}
-                  className="w-full py-3.5 rounded-2xl bg-rose-600 text-white font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {cancelling ? "Đang xử lý..." : "Xác nhận huỷ"}
-                </button>
-                <button
-                  disabled={cancelling}
-                  onClick={() => setShowCancelModal(false)}
-                  className="w-full py-3.5 rounded-2xl bg-gray-100 text-slate-900 font-bold text-sm"
-                >
-                  Quay lại
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

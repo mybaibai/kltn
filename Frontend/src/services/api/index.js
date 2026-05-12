@@ -10,12 +10,7 @@ const api = axios.create({
 api.interceptors.request.use(async (config) => {
   config.headers = config.headers || {};
   const url = config.url || "";
-  // Các route auth không cần token — trả về sớm, tránh block vì waitForFirebaseAuth
-  if (
-    url.includes("/auth/firebase") ||
-    url.includes("/auth/login-email") ||
-    url.includes("/auth/register-email")
-  ) return config;
+  if (url.includes("/auth/firebase")) return config;
 
   if (config.skipStaffJwt) {
     const user = await waitForFirebaseAuth();

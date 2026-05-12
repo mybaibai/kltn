@@ -9,14 +9,14 @@ function readApiMessage(error) {
 
 export async function loginWithEmailPassword({ email, password }) {
   try {
-    const res = await api.post("/auth/login-email", {
-      email: String(email || "").trim(),
-      password,
-    }, {
-      // Đăng nhập staff có thể chậm hơn khi backend đang bận realtime/socket.
-      // Giữ timeout global 10s cho API thường, nhưng nới riêng cho login để tránh false-timeout.
-      timeout: 30000,
-    });
+    const res = await api.post(
+      "/auth/login-email",
+      {
+        email: String(email || "").trim(),
+        password,
+      },
+      { timeout: 30000 },
+    );
     return res.data;
   } catch (error) {
     throw new Error(readApiMessage(error));

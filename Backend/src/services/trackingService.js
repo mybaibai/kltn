@@ -83,7 +83,6 @@ export async function updateRescueLocation(
       if (newStage === "ARRIVED") assignment.arrived_at = new Date();
       if (newStage === "RESCUING") assignment.rescuing_started_at = new Date();
 
-      // Fire-and-forget: tránh block API vì ghi log (DB) quá dày khi GPS update liên tục
       void createTrackingLog({
         assignment_id: assignmentId,
         request_id: assignment.request_id,
@@ -100,7 +99,6 @@ export async function updateRescueLocation(
         },
       });
     } else {
-      // Fire-and-forget: giảm tải DB, tăng tốc độ phản hồi
       void createTrackingLog({
         assignment_id: assignmentId,
         request_id: assignment.request_id,
@@ -173,24 +171,29 @@ export async function updateRescueStage(
     if (newStage === "ARRIVED") assignment.arrived_at = new Date();
     else if (newStage === "RESCUING")
       assignment.rescuing_started_at = new Date();
-    else if (newStage === "COMPLETED") {
-      assignment.completed_at = new Date();
+    else if (newStage === "COMPLETED") assignment.completed_at = new Date();
 
-      // Cập nhật trạng thái SOS gốc thành RESOLVED
+    await assignment.save();
+
+    let updatedSos = null;
+
+    if (newStage === "COMPLETED") {
       const sos = await SosRequest.findById(assignment.request_id);
-      if (sos) {
+      if (sos && sos.status !== "RESOLVED") {
         sos.status = "RESOLVED";
+        sos.status_history = Array.isArray(sos.status_history)
+          ? sos.status_history
+          : [];
         sos.status_history.push({
           status: "RESOLVED",
           updated_by: actorId,
           updated_at: new Date(),
-          note: "Nhiệm vụ đã hoàn thành",
+          note: "Nhiệm vụ hoàn thành",
         });
         await sos.save();
       }
+      updatedSos = sos;
     }
-
-    await assignment.save();
 
     // If rescue cancels, reset SOS to PENDING
     if (newStage === "CANCELLED") {
@@ -208,7 +211,6 @@ export async function updateRescueStage(
       }
     }
 
-    // Fire-and-forget: log không nên làm chậm stage change
     void createTrackingLog({
       assignment_id: assignmentId,
       request_id: assignment.request_id,
@@ -229,6 +231,7 @@ export async function updateRescueStage(
       assignment,
       prev_stage: prevStage,
       new_stage: newStage,
+      sos: updatedSos,
     };
   } catch (err) {
     console.error("❌ Error updating stage:", err.message);

@@ -1,4 +1,4 @@
-import { Ambulance, MapPin, X } from "lucide-react";
+import { Ambulance, MapPin, CheckCircle2, Ban } from "lucide-react";
 
 export default function ResponderDetailPanel({
   selectedRequest,
@@ -9,10 +9,22 @@ export default function ResponderDetailPanel({
   onSelectToastRequest,
   onAcceptMission,
   acceptLoading,
-  onCancelMission,
-  cancelLoading,
+  primaryActionLabel,
+  onPrimaryAction,
+  primaryActionDisabled,
 }) {
   const alerts = Array.isArray(toastAlerts) ? toastAlerts : [];
+  const actionLabel =
+    acceptLoading ? "ĐANG XỬ LÝ..." : (primaryActionLabel || "NHẬN NHIỆM VỤ");
+
+  function PrimaryIcon() {
+    if (/ĐÃ HOÀN THÀNH|ĐÃ ĐÓNG CASE/i.test(actionLabel))
+      return <CheckCircle2 size={18} aria-hidden />;
+    if (/HỦY/i.test(actionLabel)) return <Ban size={18} aria-hidden />;
+    if (/XEM KẾT QUẢ/i.test(actionLabel))
+      return <CheckCircle2 size={18} className="text-emerald-200" aria-hidden />;
+    return <Ambulance size={18} aria-hidden />;
+  }
 
   const detailContent = !selectedRequest ? (
     <aside className="responder-detail-col responder-detail-empty-wrap">
@@ -38,9 +50,7 @@ export default function ResponderDetailPanel({
       </div>
 
       <div className="responder-detail-body">
-        <p className="responder-receive-time">
-          Yêu cầu lúc: {selectedRequest.receivedAt}
-        </p>
+        <p className="responder-receive-time">Yêu cầu lúc: {selectedRequest.receivedAt}</p>
         <h2>{selectedRequest.title}</h2>
         <p className="responder-detail-address">
           <MapPin size={14} /> {selectedRequest.address}
@@ -50,197 +60,66 @@ export default function ResponderDetailPanel({
         <p className="responder-detail-text">{selectedRequest.description}</p>
 
         <p className="responder-nearest-line">
-          Đội gần nhất (10km):{" "}
-          {nearestTeams.length > 0
-            ? nearestTeams[0].full_name
-            : "Chưa có dữ liệu"}
+          Đội gần nhất (10km): {nearestTeams.length > 0 ? nearestTeams[0].full_name : "Chưa có dữ liệu"}
         </p>
 
         <div className="responder-kpi-grid">
           <div>
             <p>KHOẢNG CÁCH</p>
-            <strong>
-              {selectedRequest.distanceKm != null
-                ? `${selectedRequest.distanceKm} km`
-                : "—"}
-            </strong>
+            <strong>{selectedRequest.distanceKm != null ? `${selectedRequest.distanceKm} km` : "—"}</strong>
           </div>
           <div>
             <p>THỜI GIAN TỚI</p>
-            <strong>
-              {selectedRequest.etaMinutes != null
-                ? `~${selectedRequest.etaMinutes} phút`
-                : "—"}
-            </strong>
+            <strong>{selectedRequest.etaMinutes != null ? `~${selectedRequest.etaMinutes} phút` : "—"}</strong>
           </div>
         </div>
       </div>
 
       <button
         type="button"
-        className="responder-main-action"
-        disabled={acceptLoading || !onAcceptMission}
-        onClick={() => onAcceptMission?.(selectedRequest)}
+        className={`responder-main-action${/^ĐÃ HOÀN THÀNH|ĐÃ ĐÓNG CASE|NHIỆM VỤ ĐÃ HỦY/.test(actionLabel) ? " is-terminal-state" : ""}`}
+        disabled={acceptLoading || primaryActionDisabled || (!onPrimaryAction && !onAcceptMission)}
+        onClick={() => (onPrimaryAction ? onPrimaryAction(selectedRequest) : onAcceptMission?.(selectedRequest))}
       >
-        <Ambulance size={18} />{" "}
-        {acceptLoading ? "ĐANG XỬ LÝ..." : "NHẬN NHIỆM VỤ"}
+        <PrimaryIcon />{" "}
+        {actionLabel}
       </button>
     </aside>
   );
-
-  // Check if mission is accepted (has assignment_id)
-  const hasAcceptedMission = selectedRequest?.assignment_id;
-  const isAcceptedMission =
-    hasAcceptedMission && selectedRequest?.source?.status !== "PENDING";
-
-  // Modify render for accepted missions
-  if (isAcceptedMission && selectedRequest) {
-    return (
-      <>
-        <aside className="responder-detail-col">
-          <div className="responder-team-state">
-            <span>TRẠNG THÁI NHIỆM VỤ</span>
-            <strong>{selectedRequest.source?.stage || "ĐANG THỰC HIỆN"}</strong>
-          </div>
-
-          <div className="responder-map-box">
-            <div className="map-overlay-grid" aria-hidden="true" />
-            <p className="map-label">VỊ TRÍ NẠN NHÂN</p>
-            <p className="map-coords">{selectedRequest.coords}</p>
-          </div>
-
-          <div className="responder-detail-body">
-            <p className="responder-receive-time">
-              Yêu cầu lúc: {selectedRequest.receivedAt}
-            </p>
-            <h2>{selectedRequest.title}</h2>
-            <p className="responder-detail-address">
-              <MapPin size={14} /> {selectedRequest.address}
-            </p>
-
-            <p className="responder-section-title">CHI TIẾT</p>
-            <p className="responder-detail-text">
-              {selectedRequest.description}
-            </p>
-
-            <div className="responder-kpi-grid">
-              <div>
-                <p>KHOẢNG CÁCH</p>
-                <strong>
-                  {selectedRequest.distanceKm != null
-                    ? `${selectedRequest.distanceKm} km`
-                    : "—"}
-                </strong>
-              </div>
-              <div>
-                <p>THỜI GIAN TỚI</p>
-                <strong>
-                  {selectedRequest.etaMinutes != null
-                    ? `~${selectedRequest.etaMinutes} phút`
-                    : "—"}
-                </strong>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="responder-action-group"
-            style={{ display: "flex", gap: "12px" }}
-          >
-            <button
-              type="button"
-              className="responder-main-action"
-              disabled={cancelLoading || !onCancelMission}
-              onClick={() =>
-                onCancelMission?.(
-                  selectedRequest.assignment_id,
-                  "RESCUE",
-                  "Rescue team cancelled the mission",
-                )
-              }
-              style={{
-                flex: 1,
-                background: "#dc2626",
-                border: "none",
-              }}
-            >
-              <X size={18} /> {cancelLoading ? "ĐANG HỦY..." : "HỦY NHIỆM VỤ"}
-            </button>
-          </div>
-        </aside>
-        {toastAlerts.length ? (
-          <div className="responder-floating-alerts">
-            {toastAlerts.map((alert) => (
-              <article
-                key={alert.popupId}
-                className={`floating-alert ${alert.level}`}
-              >
-                <button
-                  type="button"
-                  className="floating-close-btn"
-                  onClick={() => onDismissToast?.(alert.popupId)}
-                  aria-label="Đóng thông báo"
-                >
-                  ×
-                </button>
-                <div className="floating-topline">
-                  <span className="floating-tag">{alert.tag}</span>
-                  <span>{alert.ago}</span>
-                </div>
-                <h4>{alert.title}</h4>
-                <p>{alert.description}</p>
-                <button
-                  type="button"
-                  className="floating-action-btn"
-                  onClick={() => {
-                    onSelectToastRequest?.(alert.requestId);
-                    onDismissToast?.(alert.popupId);
-                  }}
-                >
-                  {alert.actionLabel}
-                </button>
-              </article>
-            ))}
-          </div>
-        ) : null}
-      </>
-    );
-  }
 
   return (
     <>
       {detailContent}
       {alerts.length ? (
-        <div className="responder-floating-alerts">
+        <div className="responder-toast-alerts">
           {alerts.map((alert) => (
-            <article
-              key={alert.popupId}
-              className={`floating-alert ${alert.level}`}
-            >
-              <button
-                type="button"
-                className="floating-close-btn"
-                onClick={() => onDismissToast?.(alert.popupId)}
-                aria-label="Đóng thông báo"
-              >
-                ×
-              </button>
-              <div className="floating-topline">
-                <span className="floating-tag">{alert.tag}</span>
-                <span>{alert.ago}</span>
+            <article key={alert.id} className={`toast-alert toast-${alert.level}`}>
+              <div className="toast-head">
+                <span className="toast-tag">{alert.level === "high" ? "CAO" : alert.level === "critical" ? "CỰC CAO" : alert.level === "medium" ? "TRUNG BÌNH" : alert.level === "low" ? "THẤP" : "THÔNG BÁO"}</span>
+                <span className="toast-time">{alert.ago}</span>
               </div>
               <h4>{alert.title}</h4>
               <p>{alert.description}</p>
-              <button
-                type="button"
-                className="floating-action-btn"
-                onClick={() => {
-                  onSelectToastRequest?.(alert.requestId);
-                  onDismissToast?.(alert.popupId);
-                }}
-              >
-                {alert.actionLabel}
-              </button>
+              <div className="toast-actions">
+                <button
+                  type="button"
+                  className="toast-action-btn"
+                  onClick={() => {
+                    onSelectToastRequest?.(alert.requestId);
+                    onDismissToast?.(alert.id);
+                  }}
+                >
+                  {alert.actionLabel}
+                </button>
+                <button
+                  type="button"
+                  className="toast-close-btn"
+                  onClick={() => onDismissToast?.(alert.id)}
+                  aria-label="Đóng"
+                >
+                  ×
+                </button>
+              </div>
             </article>
           ))}
         </div>

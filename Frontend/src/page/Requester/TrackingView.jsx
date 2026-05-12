@@ -221,8 +221,6 @@ export default function TrackingPage() {
   // Ref to track whether mission has reached a terminal state — prevents polling & socket downgrades
   const isFinishedRef = useRef(false);
   const pollRef = useRef(null);
-  const trackingRequestRef = useRef({ inFlight: false, lastStartedAt: 0 });
-  const sosRequestRef = useRef(false);
 
 
   // Session: only victim profile matters on this page
@@ -233,21 +231,8 @@ export default function TrackingPage() {
 
   // ── Data loading ──────────────────────────────────────────────────────────
 
-  const loadTracking = useCallback(async (currentSosId, options = {}) => {
-    if (!currentSosId) return null;
-
-    const { force = false } = options;
-    const now = Date.now();
-    if (
-      !force &&
-      trackingRequestRef.current.inFlight &&
-      now - trackingRequestRef.current.lastStartedAt < 7000
-    ) {
-      return null;
-    }
-
-    trackingRequestRef.current = { inFlight: true, lastStartedAt: now };
-
+  const loadTracking = useCallback(async (currentSosId) => {
+    if (!currentSosId) return;
     try {
       const res = await getCurrentTrackingBySosId(currentSosId, { preferVictimToken: true });
       if (res?.data?.success && res.data.data) {
@@ -260,13 +245,8 @@ export default function TrackingPage() {
           current_stage: d.stage ?? d.current_stage ?? prev?.current_stage,
         }));
         if (d.assignment_id) setAssignmentId(d.assignment_id);
-        return d;
       }
-      return null;
     } catch (e) { console.error("Tracking load failed", e); }
-    finally {
-      trackingRequestRef.current.inFlight = false;
-    }
   }, []);
 
   useEffect(() => {
@@ -279,29 +259,18 @@ export default function TrackingPage() {
         if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
         return;
       }
-      if (sosRequestRef.current) return;
-      sosRequestRef.current = true;
       try {
         const res  = await getSosDetail(sosId, { preferVictimToken: true });
         if (!active) return;
         const data = res?.data?.data;
         if (!data) { setErr("Không tải được yêu cầu SOS"); setLoading(false); return; }
         setSos(data);
-        const sosStatus = String(data.status || "").toUpperCase();
-        const assignmentFromSos = data.assignment?._id || null;
-        if (assignmentFromSos) setAssignmentId(assignmentFromSos);
-
-        // Chỉ gọi tracking fallback khi đã có assignment hoặc đang thực sự in-progress.
-        if (
-          assignmentFromSos ||
-          ["ASSIGNED", "MOVING", "ARRIVED", "RESCUING", "IN_PROGRESS", "COMPLETED", "RESOLVED"].includes(sosStatus)
-        ) {
-          await loadTracking(sosId);
-        }
+        await loadTracking(sosId);
         if (!active) return;
         setLoading(false);
 
         // Check if mission reached terminal state from API data
+        const sosStatus = String(data.status || "").toUpperCase();
         if (TERMINAL_STAGES.has(sosStatus)) {
           isFinishedRef.current = true;
           if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
@@ -310,8 +279,6 @@ export default function TrackingPage() {
         if (!active) return;
         setErr(e?.message || "Lỗi tải dữ liệu");
         setLoading(false);
-      } finally {
-        sosRequestRef.current = false;
       }
     }
 
@@ -419,35 +386,15 @@ export default function TrackingPage() {
         });
       };
 
-      const onMissionCancelled = (payload) => {
-      // Nếu là nạn nhân tự hủy -> đóng trang
-      if (payload.cancelled_by === "VICTIM") {
-        setErr("Yêu cầu đã được huỷ bởi bạn.");
-        setIsFinishedRef.current = true;
-        return;
-      }
-      
-      // Nếu cứu hộ hủy -> Reset state để tìm đội mới
-      if (payload.cancelled_by === "RESCUE") {
-        setTracking(null); // Xoá info rescue cũ (mất icon xe)
-        setToaster({ 
-          message: "Đội cứu hộ đã huỷ tiếp nhận. Hệ thống đang điều phối đội khác.", 
-          type: "info" 
-        });
-      }
-    };
+      socket.on("victim_tracking_update", onTrackingUpdate);
+      socket.on("sos_room_update",        onSosRoomUpdate);
 
-    socket.on("victim_tracking_update",   onTrackingUpdate);
-    socket.on("sos_room_update",          onSosRoomUpdate);
-    socket.on("mission_cancelled",        onMissionCancelled);
-
-    // cleanup keeps reference so .off is precise
-    socket._victimCleanup = () => {
-      socket.off("victim_tracking_update", onTrackingUpdate);
-      socket.off("sos_room_update",        onSosRoomUpdate);
-      socket.off("mission_cancelled",      onMissionCancelled);
-      socket.emit("leave_sos_room", { sos_id: sosId });
-    };
+      // cleanup keeps reference so .off is precise
+      socket._victimCleanup = () => {
+        socket.off("victim_tracking_update", onTrackingUpdate);
+        socket.off("sos_room_update",        onSosRoomUpdate);
+        socket.emit("leave_sos_room", { sos_id: sosId });
+      };
     }
 
     setupSocket();

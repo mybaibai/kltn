@@ -1,23 +1,38 @@
-import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Filter, MapPin, Zap, Flame, Droplets, Wind, HelpCircle, User } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { ChevronDown, Filter } from "lucide-react";
+import FireIcon from "@/assets/fire.svg?react";
+import WaveIcon from "@/assets/wave.svg?react";
+import MedicalIcon from "@/assets/medical.svg?react";
+import LostIcon from "@/assets/lost.svg?react";
+import CarIcon from "@/assets/car.svg?react";
+import MoreIcon from "@/assets/more.svg?react";
 
 const PAGE_SIZE = 5;
 
 function resolveIncidentDisplay(incidentType) {
   const type = String(incidentType || "").toLowerCase();
+  if (type.includes("vehicle") || type.includes("xe") || type.includes("tai nạn")) {
+    return { Icon: CarIcon, label: "Sự cố phương tiện" };
+  }
   if (type.includes("fire") || type.includes("cháy") || type.includes("hỏa hoạn")) {
-    return { Icon: Flame, emoji: "🔥", label: "Hỏa hoạn" };
+    return { Icon: FireIcon, label: "Hỏa hoạn" };
   }
   if (type.includes("flood") || type.includes("lụt") || type.includes("ngập")) {
-    return { Icon: Droplets, emoji: "🌊", label: "Ngập lụt" };
+    return { Icon: WaveIcon, label: "Ngập lụt" };
   }
   if (type.includes("storm") || type.includes("bão")) {
-    return { Icon: Wind, emoji: "🌀", label: "Bão" };
+    return { Icon: WaveIcon, label: "Bão" };
   }
-  if (type.includes("medical") || type.includes("y tế") || type.includes("thương")) {
-    return { Icon: Zap, emoji: "🚑", label: "Cấp cứu y tế" };
+  if (type.includes("natural") || type.includes("thiên tai")) {
+    return { Icon: WaveIcon, label: "Thiên tai" };
   }
-  return { Icon: HelpCircle, emoji: "🆘", label: "Khác" };
+  if (type.includes("medical") || type.includes("y tế") || type.includes("thương") || type.includes("cấp cứu")) {
+    return { Icon: MedicalIcon, label: "Cấp cứu y tế" };
+  }
+  if (type.includes("lost") || type.includes("lạc") || type.includes("mất tích")) {
+    return { Icon: LostIcon, label: "Lạc đường" };
+  }
+  return { Icon: MoreIcon, label: "Khác" };
 }
 
 export default function ResponderRequestList({
@@ -61,11 +76,10 @@ export default function ResponderRequestList({
   const pagedRequests = requests.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   function isRequestAlreadyAccepted(item) {
-    // If the SOS already has an assigned_rescue_id and it's not the current user
+    // If the SOS already has an assigned_rescue_id and it's not the current user, or if status is not PENDING
     if (item.source?.assigned_rescue_id && String(item.source.assigned_rescue_id) !== String(currentUserId)) {
       return true;
     }
-    // Only PENDING missions can be accepted — everything else is off-limits
     const status = String(item.source?.status || "PENDING").toUpperCase();
     return status !== "PENDING";
   }
@@ -255,11 +269,7 @@ export default function ResponderRequestList({
                 <div className="responder-time-stack">
                   <span className="responder-time">{item.receivedAt}</span>
                   <span className="responder-incident-icon" aria-label={incidentDisplay.label}>
-                    {incidentDisplay.emoji ? (
-                      <span aria-hidden="true">{incidentDisplay.emoji}</span>
-                    ) : (
-                      <incidentDisplay.Icon size={16} aria-hidden="true" />
-                    )}
+                    <incidentDisplay.Icon className="w-4 h-4" aria-hidden="true" />
                   </span>
                 </div>
               </div>

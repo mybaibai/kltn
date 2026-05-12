@@ -10,13 +10,8 @@ export async function acceptMission(assignmentId) {
   try {
     const response = await api.post(
       "/tracking/accept-mission",
-      {
-        assignment_id: assignmentId,
-      },
-      {
-        // Accept mission có thể chậm nếu backend đang phải ghi DB + emit socket nhiều kênh.
-        timeout: 30000,
-      },
+      { assignment_id: assignmentId },
+      { timeout: 30000 },
     );
     return response.data;
   } catch (err) {
@@ -35,10 +30,7 @@ export async function updateRescueLocation(assignmentId, latitude, longitude) {
         latitude,
         longitude,
       },
-      {
-        // GPS update có thể chậm khi backend bận emit socket + ghi log.
-        timeout: 30000,
-      },
+      { timeout: 30000 },
     );
     return response.data;
   } catch (err) {
@@ -57,10 +49,7 @@ export async function updateRescueStage(assignmentId, newStage, reason = "") {
         new_stage: newStage,
         reason,
       },
-      {
-        // Stage change có thể kèm cập nhật SOS + ghi log.
-        timeout: 30000,
-      },
+      { timeout: 30000 },
     );
     return response.data;
   } catch (err) {
@@ -100,6 +89,7 @@ export async function getCurrentTrackingBySosId(sosId, opts = {}) {
 
   const promise = api.get(`/tracking/current/by-sos/${sosId}`, {
     skipStaffJwt: !!opts.preferVictimToken,
+    timeout: 30000,
   });
 
   trackingBySosInflight.set(requestKey, { promise, startedAt: now });

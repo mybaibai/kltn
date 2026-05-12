@@ -12,8 +12,10 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import toast from 'react-hot-toast';
 import { getAllSos } from '@/services/api/apiSos';
 import { getIncidentTypeDisplay } from '@/constants/incidentMeta';
+import { downloadDashboardPdf } from '@/page/AdminPage/dashboardPdfExport';
 
 function normalizeStatus(s) {
   const x = String(s ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_');
@@ -374,6 +376,7 @@ function ReportRow({ title, date, size, onDownload }) {
 export default function DashboardPage() {
   const [allSos, setAllSos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [pdfExporting, setPdfExporting] = useState(false);
   const [trendWindow, setTrendWindow] = useState('current');
   const [dateRangePreset, setDateRangePreset] = useState('7d');
 
@@ -672,9 +675,42 @@ export default function DashboardPage() {
     const now = new Date();
     const thisMonth = `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
     return [
-      { title: `Báo cáo tháng ${thisMonth}.pdf`, date: `${String(now.getDate()).padStart(2, '0')}/${thisMonth}`, size: '4.2 MB' },
+      {
+        title: 'Báo cáo thống kê (PDF)',
+        date: `${String(now.getDate()).padStart(2, '0')}/${thisMonth}`,
+        size: 'Theo bộ lọc hiện tại',
+      },
     ];
   }, []);
+
+  const dateRangeLabel =
+    DATE_RANGE_PRESETS.find((o) => o.value === dateRangePreset)?.label ?? dateRangePreset;
+
+  const handleExportPdf = useCallback(async () => {
+    setPdfExporting(true);
+    const id = toast.loading('Đang tạo file PDF…');
+    try {
+      await downloadDashboardPdf({
+        dateRangeLabel,
+        stats,
+        distribution,
+        rescueTeamDistribution,
+        filteredSos,
+      });
+      toast.success('Đã tải báo cáo PDF', { id });
+    } catch (e) {
+      console.error('dashboard PDF export', e);
+      toast.error('Không xuất được PDF. Thử lại sau.', { id });
+    } finally {
+      setPdfExporting(false);
+    }
+  }, [
+    dateRangeLabel,
+    stats,
+    distribution,
+    rescueTeamDistribution,
+    filteredSos,
+  ]);
 
   return (
     <div className="w-full space-y-6 px-6 py-8">
@@ -708,10 +744,12 @@ export default function DashboardPage() {
           </div>
           <button
             type="button"
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+            onClick={handleExportPdf}
+            disabled={loading || pdfExporting}
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Download className="size-4 shrink-0" />
-            Xuất báo cáo PDF
+            {pdfExporting ? 'Đang xuất…' : 'Xuất báo cáo PDF'}
           </button>
         </div>
       </div>
@@ -1007,7 +1045,7 @@ export default function DashboardPage() {
               title={r.title}
               date={r.date}
               size={r.size}
-              onDownload={() => alert('Chức năng đang phát triển')}
+              onDownload={handleExportPdf}
             />
           ))}
         </div>

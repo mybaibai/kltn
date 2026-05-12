@@ -241,6 +241,17 @@ export const updateStage = async (req, res) => {
 
     io.to("admin-dashboard").emit("stage_changed", stageChangeData);
 
+    if (result.new_stage === "COMPLETED") {
+      const statusPayload = {
+        request_id: assignment.request_id,
+        status: "RESOLVED",
+        timestamp: new Date(),
+      };
+      io.to("rescue-all").emit("sos_status_updated", statusPayload);
+      io.to(`rescue-${assignment.rescue_id}`).emit("sos_status_updated", statusPayload);
+      io.to("admin-dashboard").emit("sos_status_updated", statusPayload);
+    }
+
     res.status(200).json({
       success: true,
       data: stageChangeData,
@@ -287,7 +298,6 @@ export const getCurrentTracking = async (req, res) => {
       assignmentId,
       isVictim,
     );
-
     // Service giờ trả về { success, data } hoặc { success: false, message }
     // Không throw nữa → không bao giờ ECONNRESET
     if (!result.success) {
