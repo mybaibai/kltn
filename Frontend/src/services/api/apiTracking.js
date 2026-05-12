@@ -8,9 +8,16 @@ const TRACKING_BY_SOS_COALESCE_MS = 1200;
 // Accept mission
 export async function acceptMission(assignmentId) {
   try {
-    const response = await api.post("/tracking/accept-mission", {
-      assignment_id: assignmentId,
-    });
+    const response = await api.post(
+      "/tracking/accept-mission",
+      {
+        assignment_id: assignmentId,
+      },
+      {
+        // Accept mission có thể chậm nếu backend đang phải ghi DB + emit socket nhiều kênh.
+        timeout: 30000,
+      },
+    );
     return response.data;
   } catch (err) {
     console.error("❌ Error accepting mission:", err);
@@ -21,11 +28,18 @@ export async function acceptMission(assignmentId) {
 // Update rescue location (mỗi 5-10s)
 export async function updateRescueLocation(assignmentId, latitude, longitude) {
   try {
-    const response = await api.post("/tracking/location", {
-      assignment_id: assignmentId,
-      latitude,
-      longitude,
-    });
+    const response = await api.post(
+      "/tracking/location",
+      {
+        assignment_id: assignmentId,
+        latitude,
+        longitude,
+      },
+      {
+        // GPS update có thể chậm khi backend bận emit socket + ghi log.
+        timeout: 30000,
+      },
+    );
     return response.data;
   } catch (err) {
     console.error("❌ Error updating location:", err);
@@ -36,11 +50,18 @@ export async function updateRescueLocation(assignmentId, latitude, longitude) {
 // Update stage (MOVING → ARRIVED → RESCUING → COMPLETED)
 export async function updateRescueStage(assignmentId, newStage, reason = "") {
   try {
-    const response = await api.patch("/tracking/stage", {
-      assignment_id: assignmentId,
-      new_stage: newStage,
-      reason,
-    });
+    const response = await api.patch(
+      "/tracking/stage",
+      {
+        assignment_id: assignmentId,
+        new_stage: newStage,
+        reason,
+      },
+      {
+        // Stage change có thể kèm cập nhật SOS + ghi log.
+        timeout: 30000,
+      },
+    );
     return response.data;
   } catch (err) {
     console.error("❌ Error updating stage:", err);
@@ -53,7 +74,9 @@ export async function updateRescueStage(assignmentId, newStage, reason = "") {
  */
 export async function getCurrentTracking(assignmentId) {
   try {
-    const response = await api.get(`/tracking/current/${assignmentId}`);
+    const response = await api.get(`/tracking/current/${assignmentId}`, {
+      timeout: 30000,
+    });
     return response;
   } catch (err) {
     console.error("❌ Error getting current tracking:", err);

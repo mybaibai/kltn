@@ -55,26 +55,6 @@ export const acceptMission = async (req, res) => {
 
     await assignment.save();
 
-    if (!assignment.accepted_at) {
-      assignment.accepted_at = new Date();
-    }
-
-    // Khi rescue bấm nhận: chuyển ngay sang MOVING để UI không còn hiển thị "Chờ nhận".
-    if (assignment.stage === "ASSIGNED") {
-      assignment.stage = "MOVING";
-      assignment.stage_history = Array.isArray(assignment.stage_history)
-        ? assignment.stage_history
-        : [];
-      assignment.stage_history.push({
-        stage: "MOVING",
-        started_at: new Date(),
-        distance_at_stage_km: assignment.current_distance_km || 0,
-        eta_minutes: assignment.eta_minutes || 0,
-      });
-    }
-
-    await assignment.save();
-
     const rescue = await User.findById(rescue_id).select("full_name phone");
     const sos = await SosRequest.findById(assignment.request_id);
 
@@ -307,7 +287,6 @@ export const getCurrentTracking = async (req, res) => {
       assignmentId,
       isVictim,
     );
-    console.log("🚀 TRACKING RESULT:", JSON.stringify(result, null, 2));
 
     // Service giờ trả về { success, data } hoặc { success: false, message }
     // Không throw nữa → không bao giờ ECONNRESET

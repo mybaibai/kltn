@@ -198,6 +198,12 @@ export default function TrackingView() {
   // GPS watcher ref
   const watchIdRef = useRef(null);
   const isFinishedRef = useRef(false);
+  const gpsSendRef = useRef({
+    lastSentAt: 0,
+    lastSentPos: null,
+    inFlight: false,
+    queuedPos: null,
+  });
 
   // Session: rescue staff user
   const staffUser = useMemo(() => {
@@ -257,16 +263,62 @@ export default function TrackingView() {
   // ── GPS: watch rescue position & push to server ───────────────────────────
 
   useEffect(() => {
-    if (!assignmentId || isMockMode) return;
+    // Khi rescue đã ARRIVED trở đi thì ngừng gửi GPS để giảm tải backend/socket/DB.
+    const stage = tracking?.current_stage || "ASSIGNED";
+    const stopRealtime =
+      stage === "ARRIVED" ||
+      stage === "RESCUING" ||
+      stage === "COMPLETED" ||
+      stage === "CANCELLED";
+
+    if (!assignmentId || isMockMode || stopRealtime) return;
     if (!navigator.geolocation) return;
 
     watchIdRef.current = navigator.geolocation.watchPosition(
-      async (pos) => {
+      (pos) => {
         const { latitude: lat, longitude: lng } = pos.coords;
-        setRescuePos({ lat, lng });
-        try {
-          await updateRescueLocation(assignmentId, lat, lng);
-        } catch (e) { console.error("Location update failed", e); }
+        const nextPos = { lat, lng };
+        setRescuePos(nextPos);
+
+        // Throttle: gửi tối đa mỗi ~8s hoặc khi di chuyển đáng kể
+        const now = Date.now();
+        const state = gpsSendRef.current;
+        const last = state.lastSentPos;
+        const movedEnough =
+          !last ||
+          Math.abs(Number(last.lat) - Number(lat)) > 0.00022 ||
+          Math.abs(Number(last.lng) - Number(lng)) > 0.00022;
+        const due = now - (state.lastSentAt || 0) >= 8000;
+
+        if (!due && !movedEnough) return;
+
+        // Coalesce: nếu đang in-flight thì queue vị trí mới nhất
+        if (state.inFlight) {
+          state.queuedPos = nextPos;
+          return;
+        }
+
+        const send = async (p) => {
+          state.inFlight = true;
+          state.queuedPos = null;
+          try {
+            await updateRescueLocation(assignmentId, p.lat, p.lng);
+            state.lastSentAt = Date.now();
+            state.lastSentPos = p;
+          } catch (e) {
+            console.error("Location update failed", e);
+          } finally {
+            state.inFlight = false;
+            if (state.queuedPos) {
+              const queued = state.queuedPos;
+              state.queuedPos = null;
+              // fire-and-forget next send; still respects coalescing
+              void send(queued);
+            }
+          }
+        };
+
+        void send(nextPos);
       },
       (err) => console.warn("GPS error:", err),
       { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
@@ -277,19 +329,28 @@ export default function TrackingView() {
         navigator.geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;
       }
+      gpsSendRef.current.inFlight = false;
+      gpsSendRef.current.queuedPos = null;
     };
-  }, [assignmentId, isMockMode]);
+  }, [assignmentId, isMockMode, tracking?.current_stage]);
 
   // ── Mock mode: push clicked position to server ────────────────────────────
 
   useEffect(() => {
-    if (!isMockMode || !rescuePos || !assignmentId) return;
+    const stage = tracking?.current_stage || "ASSIGNED";
+    const stopRealtime =
+      stage === "ARRIVED" ||
+      stage === "RESCUING" ||
+      stage === "COMPLETED" ||
+      stage === "CANCELLED";
+
+    if (!isMockMode || !rescuePos || !assignmentId || stopRealtime) return;
     const t = setInterval(async () => {
       try { await updateRescueLocation(assignmentId, rescuePos.lat, rescuePos.lng); }
       catch (e) { console.error("Mock location push failed", e); }
-    }, 2000);
+    }, 8000);
     return () => clearInterval(t);
-  }, [isMockMode, rescuePos, assignmentId]);
+  }, [isMockMode, rescuePos, assignmentId, tracking?.current_stage]);
 
   // ── Socket: rescue receives mission_stage_update & mission_location_confirmed
 

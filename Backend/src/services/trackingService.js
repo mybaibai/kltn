@@ -83,7 +83,8 @@ export async function updateRescueLocation(
       if (newStage === "ARRIVED") assignment.arrived_at = new Date();
       if (newStage === "RESCUING") assignment.rescuing_started_at = new Date();
 
-      await createTrackingLog({
+      // Fire-and-forget: tránh block API vì ghi log (DB) quá dày khi GPS update liên tục
+      void createTrackingLog({
         assignment_id: assignmentId,
         request_id: assignment.request_id,
         event_type: "STAGE_CHANGE",
@@ -99,7 +100,8 @@ export async function updateRescueLocation(
         },
       });
     } else {
-      await createTrackingLog({
+      // Fire-and-forget: giảm tải DB, tăng tốc độ phản hồi
+      void createTrackingLog({
         assignment_id: assignmentId,
         request_id: assignment.request_id,
         event_type: "LOCATION_UPDATE",
@@ -206,7 +208,8 @@ export async function updateRescueStage(
       }
     }
 
-    await createTrackingLog({
+    // Fire-and-forget: log không nên làm chậm stage change
+    void createTrackingLog({
       assignment_id: assignmentId,
       request_id: assignment.request_id,
       event_type: "STAGE_CHANGE",
