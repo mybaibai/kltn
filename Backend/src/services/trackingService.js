@@ -171,7 +171,22 @@ export async function updateRescueStage(
     if (newStage === "ARRIVED") assignment.arrived_at = new Date();
     else if (newStage === "RESCUING")
       assignment.rescuing_started_at = new Date();
-    else if (newStage === "COMPLETED") assignment.completed_at = new Date();
+    else if (newStage === "COMPLETED") {
+      assignment.completed_at = new Date();
+
+      // Cập nhật trạng thái SOS gốc thành RESOLVED
+      const sos = await SosRequest.findById(assignment.request_id);
+      if (sos) {
+        sos.status = "RESOLVED";
+        sos.status_history.push({
+          status: "RESOLVED",
+          updated_by: actorId,
+          updated_at: new Date(),
+          note: "Nhiệm vụ đã hoàn thành",
+        });
+        await sos.save();
+      }
+    }
 
     await assignment.save();
 

@@ -386,15 +386,35 @@ export default function TrackingPage() {
         });
       };
 
-      socket.on("victim_tracking_update", onTrackingUpdate);
-      socket.on("sos_room_update",        onSosRoomUpdate);
+      const onMissionCancelled = (payload) => {
+      // Nếu là nạn nhân tự hủy -> đóng trang
+      if (payload.cancelled_by === "VICTIM") {
+        setErr("Yêu cầu đã được huỷ bởi bạn.");
+        setIsFinishedRef.current = true;
+        return;
+      }
+      
+      // Nếu cứu hộ hủy -> Reset state để tìm đội mới
+      if (payload.cancelled_by === "RESCUE") {
+        setTracking(null); // Xoá info rescue cũ (mất icon xe)
+        setToaster({ 
+          message: "Đội cứu hộ đã huỷ tiếp nhận. Hệ thống đang điều phối đội khác.", 
+          type: "info" 
+        });
+      }
+    };
 
-      // cleanup keeps reference so .off is precise
-      socket._victimCleanup = () => {
-        socket.off("victim_tracking_update", onTrackingUpdate);
-        socket.off("sos_room_update",        onSosRoomUpdate);
-        socket.emit("leave_sos_room", { sos_id: sosId });
-      };
+    socket.on("victim_tracking_update",   onTrackingUpdate);
+    socket.on("sos_room_update",          onSosRoomUpdate);
+    socket.on("mission_cancelled",        onMissionCancelled);
+
+    // cleanup keeps reference so .off is precise
+    socket._victimCleanup = () => {
+      socket.off("victim_tracking_update", onTrackingUpdate);
+      socket.off("sos_room_update",        onSosRoomUpdate);
+      socket.off("mission_cancelled",      onMissionCancelled);
+      socket.emit("leave_sos_room", { sos_id: sosId });
+    };
     }
 
     setupSocket();

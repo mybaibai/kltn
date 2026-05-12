@@ -36,6 +36,7 @@ export default function ResponderMissionBoard({ user }) {
   const [notifications, setNotifications] = useState([]);
   const [toastAlerts, setToastAlerts] = useState([]);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [hiddenMissionIds, setHiddenMissionIds] = useState(new Set());
   const requestsRef = useRef([]);
   const toastTimersRef = useRef(new Set());
 
@@ -79,6 +80,9 @@ export default function ResponderMissionBoard({ user }) {
     if (urgencyLevel !== "all") {
       list = list.filter((r) => String(r.level).toLowerCase() === urgencyLevel);
     }
+
+    // Hide missions that the current rescue has cancelled
+    list = list.filter((r) => !hiddenMissionIds.has(String(r.id)));
 
     list.sort((a, b) => {
       if (proximitySort === "nearest")
@@ -489,11 +493,14 @@ export default function ResponderMissionBoard({ user }) {
       const assignmentId = sos?.assignment?._id;
       const assignedRescueId =
         sos?.assigned_rescue_id?._id || sos?.assigned_rescue_id;
+      const assignmentStage = sos?.assignment?.stage;
 
+      // Nếu đã có người nhận VÀ stage không phải CANCELLED VÀ người đó không phải mình
       if (
         assignmentId &&
         assignedRescueId &&
-        String(assignedRescueId) !== String(userId)
+        String(assignedRescueId) !== String(userId) &&
+        assignmentStage !== "CANCELLED"
       ) {
         setApiMessage(
           "Nhiệm vụ này đã được phân công cho đội khác. Vui lòng chọn nhiệm vụ khác.",
@@ -501,9 +508,12 @@ export default function ResponderMissionBoard({ user }) {
         return;
       }
 
-      let finalAssignmentId = assignmentId;
+      // Nếu assignment cũ đã bị hủy, ta coi như chưa có assignment để tạo mới
+      let finalAssignmentId =
+        assignmentStage === "CANCELLED" ? null : assignmentId;
+
       if (!finalAssignmentId) {
-        if (sos?.status !== "PENDING") {
+        if (sos?.status !== "PENDING" && assignmentStage !== "CANCELLED") {
           setApiMessage(
             "Nhiệm vụ hiện chưa thể nhận. Vui lòng chọn nhiệm vụ có trạng thái PENDING.",
           );
@@ -542,6 +552,13 @@ export default function ResponderMissionBoard({ user }) {
       const mapped = mapSosToResponderRequests(rawList, gps);
       syncRequests(mapped, { notifyNew: false });
       setSelectedId("");
+      
+      // Add to hidden list so this rescue doesn't see it again immediately
+      if (cancelledBy === "RESCUE") {
+        setHiddenMissionIds(prev => new Set(prev).add(String(assignmentId.request_id || assignmentId)));
+        // Note: assignmentId here might be the full object or ID. 
+        // Based on cancelMission service, it takes assignmentId.
+      }
     } catch (e) {
       pushToast(
         e?.response?.data?.message || e?.message || "Không thể hủy nhiệm vụ",

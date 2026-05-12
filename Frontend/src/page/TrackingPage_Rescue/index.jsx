@@ -197,6 +197,7 @@ export default function TrackingView() {
 
   // GPS watcher ref
   const watchIdRef = useRef(null);
+  const isFinishedRef = useRef(false);
 
   // Session: rescue staff user
   const staffUser = useMemo(() => {
@@ -228,6 +229,7 @@ export default function TrackingView() {
     let active = true;
 
     async function fetchAll() {
+      if (isFinishedRef.current) return;
       try {
         const res  = await getSosDetail(sosId, { preferVictimToken: false });
         if (!active) return;
@@ -246,7 +248,9 @@ export default function TrackingView() {
     }
 
     fetchAll();
-    const poll = setInterval(fetchAll, 10000);
+    const poll = setInterval(() => {
+      if (!isFinishedRef.current) fetchAll();
+    }, 10000);
     return () => { active = false; clearInterval(poll); };
   }, [sosId, loadTracking]);
 
@@ -330,14 +334,21 @@ export default function TrackingView() {
       setToaster({ message: "AI đã hoàn tất phân tích sự cố", type: "info" });
     };
 
+    const onMissionCancelled = (payload) => {
+      setErr(`Nhiệm vụ đã bị huỷ: ${payload.message || "Nạn nhân đã huỷ yêu cầu"}`);
+      setIsFinishedRef.current = true;
+    };
+
     socket.on("mission_stage_update",      onStageUpdate);
     socket.on("mission_location_confirmed", onLocationConfirmed);
     socket.on("sos_ai_analyzed",           onAiAnalyzed);
+    socket.on("mission_cancelled",         onMissionCancelled);
 
     return () => {
       socket.off("mission_stage_update",      onStageUpdate);
       socket.off("mission_location_confirmed", onLocationConfirmed);
       socket.off("sos_ai_analyzed",           onAiAnalyzed);
+      socket.off("mission_cancelled",         onMissionCancelled);
       socket.emit("leave_sos_room", { sos_id: sosId });
     };
   }, [sosId]);
@@ -707,6 +718,15 @@ export default function TrackingView() {
               >
                 Làm mới
               </button>
+              
+              {!isTerminalStage && (
+                <button
+                  onClick={() => setShowCancelModal(true)}
+                  className="flex-1 py-4 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-2xl font-bold text-xs transition-all uppercase tracking-widest border border-rose-200"
+                >
+                  Huỷ nhiệm vụ
+                </button>
+              )}
             </div>
           </div>
         </div>
