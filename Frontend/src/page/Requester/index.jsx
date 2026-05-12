@@ -308,7 +308,7 @@ export default function SosPage() {
     }
   };
   const location = useLocation();
-
+  const [avatar, setAvatar] = useState(() => localStorage.getItem('userAvatar') || null);
   useEffect(() => {
     if (location.state?.toast) {
       showToast(location.state.toast, 'warning');
@@ -334,7 +334,7 @@ export default function SosPage() {
 
           {/* MENU + AVATAR */}
           <div className="flex items-center gap-6">
-            <button className="text-sm">Bản đồ</button>
+            {/* <button className="text-sm">Bản đồ</button> */}
             <button className="text-sm">Tin tức</button>
             <button className="text-sm">Hướng dẫn</button>
   
@@ -347,9 +347,13 @@ export default function SosPage() {
                   setOpen(!open); // mở menu
                 }
               }}
-              className="w-10 h-10 rounded-full bg-pink-400 flex items-center justify-center text-white"
+              className="w-10 h-10 rounded-full flex items-center justify-center text-white"
             >
-              👤
+              <img
+                src={avatar || "https://i.pravatar.cc/56?img=11"}
+                className="w-10 h-10 rounded-full object-cover"
+                onError={(e) => { e.target.style.display = "none"; }}
+              />
             </button>
   
               {open && (
@@ -358,11 +362,11 @@ export default function SosPage() {
                   {/* Header: avatar + name + phone */}
                   <div className="flex items-center gap-3 px-1 pb-4">
                     <div className="relative flex-shrink-0">
-                      <img
-                        src={user?.avatar || "https://i.pravatar.cc/56?img=11"}
-                        className="w-14 h-14 rounded-xl object-cover"
-                        onError={(e) => { e.target.style.display = 'none'; }}
-                      />
+                    <img
+                      src={avatar || "https://i.pravatar.cc/56?img=11"}
+                      className="w-14 h-14 rounded-xl object-cover"
+                      onError={(e) => { e.target.style.display = "none"; }}
+                    />
                       <div className="absolute bottom-0.5 right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
                     </div>
                     <div>
@@ -396,7 +400,7 @@ export default function SosPage() {
                   <button
                     className="w-full flex items-center gap-3 px-2 py-3 rounded-lg hover:bg-gray-50 text-left transition-colors"
                     onClick={() => {
-                      // TODO: navigate to history
+                      navigate('/history');
                       setOpen(false);
                     }}
                   >
@@ -542,7 +546,7 @@ export default function SosPage() {
           </div>
         </div>
         {/* RIGHT BUTTONS */}
-        <div className="pointer-events-auto absolute bottom-8 right-8 flex flex-col gap-3">
+        <div className="pointer-events-auto absolute bottom-10 mb-24 right-8 flex flex-col gap-3">
           <button
             onClick={handleGetLocation}
             disabled={loadingGPS}
@@ -560,8 +564,6 @@ export default function SosPage() {
             ) : '📍'}
             <span>{loadingGPS ? 'Đang lấy...' : position ? 'Cập nhật vị trí' : 'Lấy vị trí'}</span>
           </button>
-          <button className="w-12 h-12 bg-white rounded-xl shadow">🔔</button>
-          <button className="w-12 h-12 bg-white rounded-xl shadow">ℹ️</button>
         </div>
 
         {/* Overlay khi chưa có vị trí — nhắc người dùng nhấn nút GPS */}

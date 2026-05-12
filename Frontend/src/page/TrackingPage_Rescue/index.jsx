@@ -707,14 +707,6 @@ export default function TrackingView() {
               >
                 Làm mới
               </button>
-              {!isTerminalStage && (
-                <button
-                  onClick={() => setShowCancelModal(true)}
-                  className="px-6 py-4 border-2 border-rose-500 text-rose-600 rounded-2xl font-bold text-xs hover:bg-rose-50 transition-all uppercase tracking-widest"
-                >
-                  Huỷ bỏ
-                </button>
-              )}
             </div>
           </div>
         </div>

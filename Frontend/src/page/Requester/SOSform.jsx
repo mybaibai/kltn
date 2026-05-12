@@ -139,8 +139,8 @@ export default function SOSForm({ position, onConfirm, onCancel, sending, user }
               rows={4}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Mô tả tình trạng hiện tại..."
-              className="w-full bg-gray-100 rounded-xl px-4 py-3"
+              placeholder="Vui lòng nhập thông tin bổ sung giúp đội cứu trợ hỗ trợ nhanh và chính xác hơn..."
+              className="w-full bg-gray-100 rounded-xl text-sm px-4 py-3"
             />
           </div>
 
