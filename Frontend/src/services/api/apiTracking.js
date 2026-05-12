@@ -1,5 +1,8 @@
 import api from "./index";
 
+const trackingBySosInflight = new Map();
+const TRACKING_BY_SOS_COALESCE_MS = 1200;
+
 // ===== TRACKING API =====
 
 // Accept mission
@@ -64,14 +67,33 @@ export async function getCurrentTracking(assignmentId) {
 
  */
 export async function getCurrentTrackingBySosId(sosId, opts = {}) {
+  const requestKey = `${sosId}:${opts.preferVictimToken ? "victim" : "staff"}`;
+  const now = Date.now();
+  const cached = trackingBySosInflight.get(requestKey);
+
+  if (cached && now - cached.startedAt < TRACKING_BY_SOS_COALESCE_MS) {
+    return cached.promise;
+  }
+
+  const promise = api.get(`/tracking/current/by-sos/${sosId}`, {
+    skipStaffJwt: !!opts.preferVictimToken,
+  });
+
+  trackingBySosInflight.set(requestKey, { promise, startedAt: now });
+
   try {
-    const response = await api.get(`/tracking/current/by-sos/${sosId}`, {
-      skipStaffJwt: !!opts.preferVictimToken,
-    });
+    const response = await promise;
     return response;
   } catch (err) {
     console.error("❌ Error getting tracking by sosId:", err);
     throw err;
+  } finally {
+    window.setTimeout(() => {
+      const current = trackingBySosInflight.get(requestKey);
+      if (current?.promise === promise) {
+        trackingBySosInflight.delete(requestKey);
+      }
+    }, TRACKING_BY_SOS_COALESCE_MS);
   }
 }
 

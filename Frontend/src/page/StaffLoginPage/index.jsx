@@ -6,8 +6,10 @@ import { loginWithEmailPassword } from '@/services/auth/staffAuth';
 import {
   getRoleHomePath,
   saveStaffSession,
+  clearVictimProfile,
 } from '@/services/auth/session';
 import { auth } from '@/lib/firebase';
+import { disconnectSocket, initSocket } from '@/services/socket';
 
 function pickPostLoginPath(role, locationState) {
   const fromLoc = locationState?.from;
@@ -38,7 +40,10 @@ export default function StaffLoginPage() {
       } catch {
         /* ignore */
       }
+      clearVictimProfile();
+      disconnectSocket();
       saveStaffSession(data.token, data.user);
+      initSocket(data.token, data.user?._id || data.user?.id, data.user?.role);
       navigate(pickPostLoginPath(data.user?.role, location.state), { replace: true });
     } catch (error) {
       setErr(error?.message || 'Đăng nhập thất bại');

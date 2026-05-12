@@ -38,11 +38,24 @@ export default function ResponderMissionBoard({ user }) {
   const [cancelLoading, setCancelLoading] = useState(false);
   const [hiddenMissionIds, setHiddenMissionIds] = useState(new Set());
   const requestsRef = useRef([]);
+  const rawSosRef = useRef([]);
+  const gpsRef = useRef(gps);
   const toastTimersRef = useRef(new Set());
+  const refreshTimerRef = useRef(null);
+  const refreshInFlightRef = useRef(false);
+  const refreshQueuedRef = useRef(false);
+  const refreshQueuedNotifyRef = useRef(false);
+  const socketEventDedupRef = useRef(new Map());
+  const nearestDebounceRef = useRef(null);
+  const nearestLastQueryRef = useRef({ lat: null, lng: null, distance: null, ts: 0 });
 
   useEffect(() => {
     requestsRef.current = requests;
   }, [requests]);
+
+  useEffect(() => {
+    gpsRef.current = gps;
+  }, [gps]);
 
   function pushNotification(title, detail = "") {
     const id = Date.now();
@@ -61,9 +74,11 @@ export default function ResponderMissionBoard({ user }) {
   function pushToast(message, type = "error") {
     const id = Date.now();
     setToastAlerts((prev) => [{ id, message, type }, ...prev].slice(0, 3));
-    setTimeout(() => {
+    const timerId = window.setTimeout(() => {
       setToastAlerts((prev) => prev.filter((t) => t.id !== id));
+      toastTimersRef.current.delete(timerId);
     }, 5000);
+    toastTimersRef.current.add(timerId);
   }
 
   function dismissToast(id) {
@@ -108,17 +123,138 @@ export default function ResponderMissionBoard({ user }) {
     [visibleRequests, selectedId],
   );
 
-  function syncRequests(newList, { notifyNew = false } = {}) {
-    setRequests(newList);
-    if (notifyNew) {
+  function syncStatsFromSosList(sosList) {
+    const list = Array.isArray(sosList) ? sosList : [];
+    setRequestStats({
+      total: list.length,
+      pending: list.filter(
+        (item) => String(item?.status || item?.source?.status || "").toUpperCase() === "PENDING",
+      ).length,
+    });
+  }
+
+  function replaceRequestsFromSosList(sosList, { notifyNew = false } = {}) {
+    const normalizedList = Array.isArray(sosList) ? sosList : [];
+    const previousIds = new Set(
+      requestsRef.current.map((item) => String(item.id)),
+    );
+
+    rawSosRef.current = normalizedList;
+
+    const mapped = mapSosToResponderRequests(normalizedList, gpsRef.current);
+    setRequests(mapped);
+    syncStatsFromSosList(normalizedList);
+
+    if (!notifyNew) return;
+
+    const newItems = mapped.filter(
+      (item) => !previousIds.has(String(item.id)),
+    );
+    if (!newItems.length) return;
+
+    if (newItems.length === 1) {
       pushNotification(
-        "Yêu cầu SOS mới",
-        "Có một sự cố vừa được báo cáo gần bạn",
+        `SOS Mới: ${newItems[0].incidentType || "Khác"}`,
+        newItems[0].address || "Danh sách nhiệm vụ đã được cập nhật",
       );
+      return;
+    }
+
+    pushNotification(
+      `Có ${newItems.length} yêu cầu SOS mới`,
+      "Danh sách nhiệm vụ đã được cập nhật",
+    );
+  }
+
+  function upsertRealtimeSos(sosData, { notifyNew = false } = {}) {
+    const requestId = String(sosData?._id || sosData?.id || "");
+    if (!requestId) return;
+
+    const nextRawList = [...rawSosRef.current];
+    const index = nextRawList.findIndex(
+      (item) => String(item?._id || item?.id || "") === requestId,
+    );
+
+    if (index >= 0) {
+      nextRawList[index] = { ...nextRawList[index], ...sosData };
+    } else {
+      nextRawList.unshift(sosData);
+    }
+
+    replaceRequestsFromSosList(nextRawList, {
+      notifyNew: notifyNew && index < 0,
+    });
+  }
+
+  function removeRealtimeSos(requestId) {
+    const nextRawList = rawSosRef.current.filter(
+      (item) => String(item?._id || item?.id || "") !== String(requestId),
+    );
+    replaceRequestsFromSosList(nextRawList, { notifyNew: false });
+  }
+
+  function markSocketEventSeen(scope, requestId, ttlMs = 1500) {
+    const now = Date.now();
+    const key = `${scope}:${requestId}`;
+    const lastSeen = socketEventDedupRef.current.get(key);
+    socketEventDedupRef.current.set(key, now);
+
+    socketEventDedupRef.current.forEach((timestamp, mapKey) => {
+      if (now - timestamp > 120000) {
+        socketEventDedupRef.current.delete(mapKey);
+      }
+    });
+
+    return Boolean(lastSeen && now - lastSeen < ttlMs);
+  }
+
+  async function refreshSosList({ notifyNew = false } = {}) {
+    if (!userId) return;
+
+    if (refreshInFlightRef.current) {
+      refreshQueuedRef.current = true;
+      refreshQueuedNotifyRef.current =
+        refreshQueuedNotifyRef.current || notifyNew;
+      return;
+    }
+
+    refreshInFlightRef.current = true;
+
+    try {
+      const res = await getAllSos();
+      const rawList = res?.data?.data || [];
+      replaceRequestsFromSosList(rawList, { notifyNew });
+      setApiMessage(rawList.length ? "" : "Chưa có yêu cầu SOS nào");
+    } catch (error) {
+      throw error;
+    } finally {
+      refreshInFlightRef.current = false;
+
+      if (refreshQueuedRef.current) {
+        const queuedNotify = refreshQueuedNotifyRef.current;
+        refreshQueuedRef.current = false;
+        refreshQueuedNotifyRef.current = false;
+        window.setTimeout(() => {
+          refreshSosList({ notifyNew: queuedNotify }).catch(() => {});
+        }, 0);
+      }
     }
   }
 
-  // ✅ Fix: chờ userId có giá trị mới load SOS
+  function scheduleSosRefresh({ delay = 250, notifyNew = false } = {}) {
+    refreshQueuedNotifyRef.current =
+      refreshQueuedNotifyRef.current || notifyNew;
+
+    if (refreshTimerRef.current) return;
+
+    refreshTimerRef.current = window.setTimeout(() => {
+      refreshTimerRef.current = null;
+      const queuedNotify = refreshQueuedNotifyRef.current;
+      refreshQueuedNotifyRef.current = false;
+      refreshSosList({ notifyNew: queuedNotify }).catch(() => {});
+    }, delay);
+  }
+
   useEffect(() => {
     if (!userId) return;
 
@@ -126,30 +262,12 @@ export default function ResponderMissionBoard({ user }) {
 
     async function loadSosRequests() {
       try {
-        const res = await getAllSos();
-        const rawList = res?.data?.data || [];
-        const sosList = rawList;
-        const mapped = mapSosToResponderRequests(sosList, gps);
         if (cancelled) return;
-
-        if (!mapped.length) {
-          syncRequests([], { notifyNew: false });
-          setSelectedId("");
-          setRequestStats({ total: 0, pending: 0 });
-          setApiMessage((prev) => prev || "Chưa có yêu cầu SOS nào");
-          return;
-        }
-
-        syncRequests(mapped, { notifyNew: true });
-        setRequestStats({
-          total: sosList.length,
-          pending: sosList.filter(
-            (x) => String(x?.status || "").toLowerCase() === "pending",
-          ).length,
-        });
+        await refreshSosList({ notifyNew: false });
       } catch {
         if (cancelled) return;
-        syncRequests(REQUESTS, { notifyNew: false });
+        rawSosRef.current = [];
+        setRequests(REQUESTS);
         setSelectedId(String(REQUESTS[0].id));
         setRequestStats({ total: REQUESTS.length, pending: REQUESTS.length });
         setApiMessage(
@@ -162,10 +280,14 @@ export default function ResponderMissionBoard({ user }) {
     return () => {
       cancelled = true;
     };
-  }, [gps, userId]);
+  }, [userId]);
 
   useEffect(() => {
     return () => {
+      if (refreshTimerRef.current) {
+        window.clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
       toastTimersRef.current.forEach((timerId) => {
         window.clearTimeout(timerId);
       });
@@ -176,6 +298,11 @@ export default function ResponderMissionBoard({ user }) {
   useEffect(() => {
     requestsRef.current = requests;
   }, [requests]);
+
+  useEffect(() => {
+    if (!rawSosRef.current.length) return;
+    setRequests(mapSosToResponderRequests(rawSosRef.current, gps));
+  }, [gps]);
 
   useEffect(() => {
     if (!visibleRequests.length) {
@@ -273,6 +400,38 @@ export default function ResponderMissionBoard({ user }) {
     let cancelled = false;
     async function syncTeamLocationAndNearest() {
       try {
+        // Debounce & dedupe nearest lookup to avoid spamming requests
+        if (nearestDebounceRef.current) {
+          window.clearTimeout(nearestDebounceRef.current);
+          nearestDebounceRef.current = null;
+        }
+
+        const nextLat = Number(gps.lat);
+        const nextLng = Number(gps.lng);
+        if (!Number.isFinite(nextLat) || !Number.isFinite(nextLng)) return;
+
+        const now = Date.now();
+        const last = nearestLastQueryRef.current;
+        const sameCoords =
+          last.lat != null &&
+          last.lng != null &&
+          Math.abs(last.lat - nextLat) < 0.00015 &&
+          Math.abs(last.lng - nextLng) < 0.00015;
+
+        // If GPS hasn't meaningfully moved recently, skip.
+        if (sameCoords && now - (last.ts || 0) < 1500) return;
+
+        nearestDebounceRef.current = window.setTimeout(async () => {
+          nearestDebounceRef.current = null;
+          nearestLastQueryRef.current = {
+            lat: nextLat,
+            lng: nextLng,
+            distance: 10000,
+            ts: Date.now(),
+          };
+
+          if (cancelled) return;
+
         const isTestMode = import.meta.env.VITE_USE_FIXED_LOCATIONS === "true";
         if (userId && !isTestMode) {
           await updateTeamLocation(userId, gps.lat, gps.lng);
@@ -280,6 +439,7 @@ export default function ResponderMissionBoard({ user }) {
         const nearestRes = await findNearestTeams(gps.lat, gps.lng, 10000);
         if (cancelled) return;
         setNearestTeams(nearestRes?.data?.data || []);
+        }, 500);
       } catch {
         if (cancelled) return;
         setApiMessage((prev) => prev || "Không đồng bộ được vị trí đội");
@@ -289,6 +449,10 @@ export default function ResponderMissionBoard({ user }) {
     syncTeamLocationAndNearest();
     return () => {
       cancelled = true;
+      if (nearestDebounceRef.current) {
+        window.clearTimeout(nearestDebounceRef.current);
+        nearestDebounceRef.current = null;
+      }
     };
   }, [gps, userId]);
 
@@ -300,88 +464,27 @@ export default function ResponderMissionBoard({ user }) {
     }
     if (!socket) return;
 
-    function syncStatsFromRequests(list) {
-      setRequestStats({
-        total: list.length,
-        pending: list.filter(
-          (x) => String(x.source?.status || "").toUpperCase() === "PENDING",
-        ).length,
-      });
-    }
-
-    // ✅ Fix: chờ userId có giá trị mới gọi API trong socket handler
-    async function refreshRealtimeSosList() {
-      if (!userId) return;
-      try {
-        const res = await getAllSos();
-        const rawList = res?.data?.data || [];
-        const mapped = mapSosToResponderRequests(rawList, gps);
-        syncRequests(mapped);
-        syncStatsFromRequests(mapped);
-      } catch {
-        /* ignore */
-      }
-    }
-
-    function upsertRealtimeSos(sosData, { notifyNew = true } = {}) {
-      const requestId = String(sosData._id || sosData.id || "");
-      if (!requestId) return;
-
-      const mappedItem = mapSosToResponderRequests([sosData], gps)[0];
-      if (!mappedItem) return;
-
-      const current = [...requestsRef.current];
-      const idx = current.findIndex((it) => String(it.id) === requestId);
-
-      if (idx >= 0) {
-        current[idx] = { ...current[idx], ...mappedItem };
-      } else {
-        current.unshift(mappedItem);
-        if (notifyNew) {
-          pushNotification(
-            `SOS Mới: ${mappedItem.incidentType}`,
-            mappedItem.address,
-          );
-        }
-      }
-
-      syncRequests(current);
-      syncStatsFromRequests(current);
-    }
-
-    async function handleSosCreated(payload) {
-      console.log("📡 Socket: sos_created/new event:", payload);
+    function handleSosCreated(payload = {}) {
       const requestId = payload?.request_id || payload?._id;
       if (!requestId) return;
+      if (markSocketEventSeen("sos_created", requestId)) return;
 
       const alreadyExists = requestsRef.current.some(
         (item) => String(item.id) === String(requestId),
       );
-
-      try {
-        const detailRes = await getSosDetail(requestId);
-        const fullSos = detailRes?.data?.data;
-        if (fullSos?._id) {
-          upsertRealtimeSos(fullSos, { notifyNew: !alreadyExists });
-          return;
-        }
-      } catch {
-        /* fallback */
-      }
-
-      await refreshRealtimeSosList();
+      scheduleSosRefresh({ delay: 250, notifyNew: !alreadyExists });
     }
 
-    async function handleSosAssigned(data = {}) {
-      console.log("✅ Socket: sos_assigned event received:", data);
+    function handleSosAssigned(data = {}) {
       const requestId = data.request_id ? String(data.request_id) : "";
       if (!requestId) return;
+      if (markSocketEventSeen("sos_assigned", requestId)) return;
 
       const existing = requestsRef.current.find(
         (item) => String(item.id) === requestId,
       );
       if (!existing) {
-        await refreshRealtimeSosList();
+        scheduleSosRefresh({ delay: 200, notifyNew: false });
         return;
       }
 
@@ -390,26 +493,32 @@ export default function ResponderMissionBoard({ user }) {
           ...(existing.source || {}),
           _id: requestId,
           status: data.status || "ASSIGNED",
+          assigned_rescue_id:
+            data.rescue_id || existing.source?.assigned_rescue_id,
         },
         { notifyNew: false },
       );
     }
 
-    async function handleSosStatusUpdated(data = {}) {
+    function handleSosStatusUpdated(data = {}) {
       const requestId = data.request_id ? String(data.request_id) : "";
       if (!requestId) return;
+      if (markSocketEventSeen("sos_status_updated", requestId)) return;
       const status = String(data.status || "").toUpperCase();
 
       if (status === "CANCELLED" || status === "RESOLVED") {
-        const next = requestsRef.current.filter(
-          (item) => String(item.id) !== requestId,
-        );
-        syncRequests(next, { notifyNew: false });
-        syncStatsFromRequests(next);
+        removeRealtimeSos(requestId);
         return;
       }
 
       upsertRealtimeSos({ _id: requestId, status }, { notifyNew: false });
+    }
+
+    function handleSosCancelled(data = {}) {
+      const requestId = data.request_id ? String(data.request_id) : "";
+      if (!requestId) return;
+      if (markSocketEventSeen("sos_cancelled", requestId)) return;
+      removeRealtimeSos(requestId);
     }
 
     function setupListeners() {
@@ -418,12 +527,14 @@ export default function ResponderMissionBoard({ user }) {
       socket.off("sos_broadcast_all", handleSosCreated);
       socket.off("sos_assigned", handleSosAssigned);
       socket.off("sos_status_updated", handleSosStatusUpdated);
+      socket.off("sos_cancelled", handleSosCancelled);
 
       socket.on("sos_created", handleSosCreated);
       socket.on("sos_new_pending", handleSosCreated);
       socket.on("sos_broadcast_all", handleSosCreated);
       socket.on("sos_assigned", handleSosAssigned);
       socket.on("sos_status_updated", handleSosStatusUpdated);
+      socket.on("sos_cancelled", handleSosCancelled);
     }
 
     if (socket.connected) {
@@ -442,14 +553,15 @@ export default function ResponderMissionBoard({ user }) {
       socket.off("sos_broadcast_all", handleSosCreated);
       socket.off("sos_assigned", handleSosAssigned);
       socket.off("sos_status_updated", handleSosStatusUpdated);
+      socket.off("sos_cancelled", handleSosCancelled);
     };
-  }, [gps, userId]);
+  }, [userId]);
 
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
 
-    socket.on("mission_location_confirmed", (data) => {
+    function handleMissionLocationConfirmed(data) {
       setRequests((prev) =>
         prev.map((req) =>
           req.id === selectedRequest?.id
@@ -465,9 +577,9 @@ export default function ResponderMissionBoard({ user }) {
             : req,
         ),
       );
-    });
+    }
 
-    socket.on("mission_stage_update", (data) => {
+    function handleMissionStageUpdate(data) {
       setRequests((prev) =>
         prev.map((req) =>
           req.id === selectedRequest?.id
@@ -475,11 +587,14 @@ export default function ResponderMissionBoard({ user }) {
             : req,
         ),
       );
-    });
+    }
+
+    socket.on("mission_location_confirmed", handleMissionLocationConfirmed);
+    socket.on("mission_stage_update", handleMissionStageUpdate);
 
     return () => {
-      socket.off("mission_location_confirmed");
-      socket.off("mission_stage_update");
+      socket.off("mission_location_confirmed", handleMissionLocationConfirmed);
+      socket.off("mission_stage_update", handleMissionStageUpdate);
     };
   }, [selectedRequest?.id]);
 
@@ -546,11 +661,7 @@ export default function ResponderMissionBoard({ user }) {
     try {
       await cancelMission(assignmentId, cancelledBy, reason);
       pushToast("Nhiệm vụ đã được hủy. Quay lại danh sách yêu cầu.", "success");
-      // Reload the SOS list
-      const res = await getAllSos();
-      const rawList = res?.data?.data || [];
-      const mapped = mapSosToResponderRequests(rawList, gps);
-      syncRequests(mapped, { notifyNew: false });
+      await refreshSosList({ notifyNew: false });
       setSelectedId("");
       
       // Add to hidden list so this rescue doesn't see it again immediately

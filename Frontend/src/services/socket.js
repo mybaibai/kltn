@@ -2,6 +2,7 @@ import io from "socket.io-client";
 import { auth } from "@/lib/firebase";
 
 let socketInstance = null;
+let socketIdentity = null;
 
 function normalizeRole(role) {
   const value = String(role || "").trim().toUpperCase();
@@ -21,15 +22,42 @@ function resolveSocketUrl() {
 }
 
 export function initSocket(token, userId, userRole) {
-  if (socketInstance) return socketInstance;
+  const normalizedRole = normalizeRole(userRole);
+  const nextIdentity = {
+    token: token || "",
+    userId: userId || "",
+    userRole: normalizedRole || "",
+  };
+
+  // Không khởi tạo socket nếu chưa có userId hợp lệ
+  if (!nextIdentity.userId) {
+    console.warn("⚠️ initSocket: bỏ qua — chưa có userId");
+    return null;
+  }
+
+  if (
+    socketInstance &&
+    socketIdentity &&
+    socketIdentity.token === nextIdentity.token &&
+    socketIdentity.userId === nextIdentity.userId &&
+    socketIdentity.userRole === nextIdentity.userRole
+  ) {
+    return socketInstance;
+  }
+
+  if (socketInstance) {
+    socketInstance.disconnect();
+    socketInstance = null;
+  }
 
   const SOCKET_URL = resolveSocketUrl();
+  socketIdentity = nextIdentity;
 
   socketInstance = io(SOCKET_URL, {
     auth: {
-      token,
-      userId,
-      userRole,
+      token: nextIdentity.token,
+      userId: nextIdentity.userId,
+      userRole: nextIdentity.userRole,
     },
     reconnection: true,
     reconnectionDelay: 1000,
@@ -115,6 +143,7 @@ export function disconnectSocket() {
     socketInstance.disconnect();
     socketInstance = null;
   }
+  socketIdentity = null;
 }
 
 export default socketInstance;

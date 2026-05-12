@@ -3,7 +3,7 @@ import api from "@/services/api/index.js";
 function readApiMessage(error) {
   const msg = error?.response?.data?.message;
   if (typeof msg === "string" && msg.trim()) return msg;
-  if (error?.code === "ECONNABORTED") return "Ket noi den server bi timeout";
+  if (error?.code === "ECONNABORTED") return "Kết nối đến server bị timeout";
   return error?.message || "Dang nhap that bai";
 }
 
@@ -12,6 +12,10 @@ export async function loginWithEmailPassword({ email, password }) {
     const res = await api.post("/auth/login-email", {
       email: String(email || "").trim(),
       password,
+    }, {
+      // Đăng nhập staff có thể chậm hơn khi backend đang bận realtime/socket.
+      // Giữ timeout global 10s cho API thường, nhưng nới riêng cho login để tránh false-timeout.
+      timeout: 30000,
     });
     return res.data;
   } catch (error) {

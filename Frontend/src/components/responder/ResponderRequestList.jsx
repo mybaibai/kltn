@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Filter, MapPin, Zap, Flame, Droplets, Wind, HelpCircle, User } from "lucide-react";
 
 const PAGE_SIZE = 5;
@@ -53,7 +53,7 @@ export default function ResponderRequestList({
   };
 
   // Reset pagination when list or filters change
-  useMemo(() => {
+  useEffect(() => {
     setCurrentPage(1);
   }, [requests.length, proximitySort, urgencyLevel]);
 

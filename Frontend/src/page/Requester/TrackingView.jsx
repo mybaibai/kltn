@@ -221,6 +221,8 @@ export default function TrackingPage() {
   // Ref to track whether mission has reached a terminal state — prevents polling & socket downgrades
   const isFinishedRef = useRef(false);
   const pollRef = useRef(null);
+  const trackingRequestRef = useRef({ inFlight: false, lastStartedAt: 0 });
+  const sosRequestRef = useRef(false);
 
 
   // Session: only victim profile matters on this page
@@ -231,8 +233,21 @@ export default function TrackingPage() {
 
   // ── Data loading ──────────────────────────────────────────────────────────
 
-  const loadTracking = useCallback(async (currentSosId) => {
-    if (!currentSosId) return;
+  const loadTracking = useCallback(async (currentSosId, options = {}) => {
+    if (!currentSosId) return null;
+
+    const { force = false } = options;
+    const now = Date.now();
+    if (
+      !force &&
+      trackingRequestRef.current.inFlight &&
+      now - trackingRequestRef.current.lastStartedAt < 7000
+    ) {
+      return null;
+    }
+
+    trackingRequestRef.current = { inFlight: true, lastStartedAt: now };
+
     try {
       const res = await getCurrentTrackingBySosId(currentSosId, { preferVictimToken: true });
       if (res?.data?.success && res.data.data) {
@@ -245,8 +260,13 @@ export default function TrackingPage() {
           current_stage: d.stage ?? d.current_stage ?? prev?.current_stage,
         }));
         if (d.assignment_id) setAssignmentId(d.assignment_id);
+        return d;
       }
+      return null;
     } catch (e) { console.error("Tracking load failed", e); }
+    finally {
+      trackingRequestRef.current.inFlight = false;
+    }
   }, []);
 
   useEffect(() => {
@@ -259,18 +279,29 @@ export default function TrackingPage() {
         if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
         return;
       }
+      if (sosRequestRef.current) return;
+      sosRequestRef.current = true;
       try {
         const res  = await getSosDetail(sosId, { preferVictimToken: true });
         if (!active) return;
         const data = res?.data?.data;
         if (!data) { setErr("Không tải được yêu cầu SOS"); setLoading(false); return; }
         setSos(data);
-        await loadTracking(sosId);
+        const sosStatus = String(data.status || "").toUpperCase();
+        const assignmentFromSos = data.assignment?._id || null;
+        if (assignmentFromSos) setAssignmentId(assignmentFromSos);
+
+        // Chỉ gọi tracking fallback khi đã có assignment hoặc đang thực sự in-progress.
+        if (
+          assignmentFromSos ||
+          ["ASSIGNED", "MOVING", "ARRIVED", "RESCUING", "IN_PROGRESS", "COMPLETED", "RESOLVED"].includes(sosStatus)
+        ) {
+          await loadTracking(sosId);
+        }
         if (!active) return;
         setLoading(false);
 
         // Check if mission reached terminal state from API data
-        const sosStatus = String(data.status || "").toUpperCase();
         if (TERMINAL_STAGES.has(sosStatus)) {
           isFinishedRef.current = true;
           if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
@@ -279,6 +310,8 @@ export default function TrackingPage() {
         if (!active) return;
         setErr(e?.message || "Lỗi tải dữ liệu");
         setLoading(false);
+      } finally {
+        sosRequestRef.current = false;
       }
     }
 

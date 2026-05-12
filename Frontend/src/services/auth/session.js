@@ -45,6 +45,7 @@ export function getAuthUser() {
 
 export function saveStaffSession(token, user) {
   try {
+    localStorage.removeItem(VICTIM_PROFILE_KEY);
     localStorage.setItem(AUTH_TOKEN_KEY, token);
     localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
   } catch {
