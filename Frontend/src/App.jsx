@@ -5,6 +5,9 @@ import RescueTrackingPage from "@/page/TrackingPage_Rescue/index";
 import AdminLayout from "@/layouts/AdminLayout";
 import IncidentManagement from "@/page/AdminPage/IncidentManagement";
 import AdminTrackingPage from "@/page/AdminPage/AdminTrackingPage";
+import DashboardPage from "@/page/AdminPage/DashboardPage";
+import UsersPage from "@/page/AdminPage/UsersPage";
+import AdminHistoryPage from "@/page/AdminPage/HistoryPage";
 import AdminPlaceholder from "@/page/AdminPage/AdminPlaceholder";
 import StaffLoginPage from "@/page/StaffLoginPage";
 import ResponderPage from "@/page/ResponderPage";
@@ -17,11 +20,13 @@ import {
   StaffHomeRedirect,
 } from "@/components/auth/AuthGuards";
 import { STAFF_ROLE_ADMIN, STAFF_ROLE_RESCUE } from "@/services/auth/session";
-import HistoryPage from "./page/Requester/History";
+import HistoryPage from "@/page/Requester/History";
+import { Toaster } from "react-hot-toast";
 
 export default function App() {
   return (
     <BrowserRouter>
+      <Toaster position="top-right" />
       <Routes>
         <Route path="/" element={<SosPage />} />
         <Route path="/sos" element={<SosPage />} />
@@ -49,17 +54,17 @@ export default function App() {
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route
             path="dashboard"
-            element={<AdminPlaceholder title="Dashboard" />}
+            element={<DashboardPage />}
           />
           <Route path="incidents" element={<IncidentManagement />} />
           <Route path="tracking/:sosId" element={<AdminTrackingPage />} />
           <Route
             path="users"
-            element={<AdminPlaceholder title="Quản lý người dùng" />}
+            element={<UsersPage />}
           />
           <Route
             path="history"
-            element={<AdminPlaceholder title="Lịch sử" />}
+            element={<AdminHistoryPage />}
           />
           <Route
             path="settings"
