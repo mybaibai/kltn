@@ -81,6 +81,11 @@ export const getSosDetail = async (id, opts = {}) => {
   return api.get(`/sos/${id}`);
 };
 
+export const cancelSos = async (id) => {
+  const config = await withVictimAuthHeader();
+  return api.patch(`/sos/${id}/cancel`, {}, config);
+};
+
 // ─── Victim Profile APIs ──────────────────────────────────────────────────────
 
 export const getVictimProfile = async () => {
@@ -101,6 +106,13 @@ export const addEmergencyContact = async (data) => {
 export const deleteEmergencyContact = async (index) => {
   const config = await withVictimAuthHeader();
   return api.delete(`/users/profile/emergency-contact/${index}`, config);
+};
+
+// ─── Victim SOS Feed (news) ───────────────────────────────────────────────────
+
+export const getAllSosForVictim = async (params = {}) => {
+  const config = await withVictimAuthHeader({ params });
+  return api.get('/sos', config);
 };
 
 // ─── Staff / Responder APIs ───────────────────────────────────────────────────

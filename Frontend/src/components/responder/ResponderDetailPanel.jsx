@@ -9,6 +9,9 @@ export default function ResponderDetailPanel({
   onSelectToastRequest,
   onAcceptMission,
   acceptLoading,
+  primaryActionLabel,
+  onPrimaryAction,
+  primaryActionDisabled,
 }) {
   const alerts = Array.isArray(toastAlerts) ? toastAlerts : [];
 
@@ -64,11 +67,11 @@ export default function ResponderDetailPanel({
       <button
         type="button"
         className="responder-main-action"
-        disabled={acceptLoading || !onAcceptMission}
-        onClick={() => onAcceptMission?.(selectedRequest)}
+        disabled={acceptLoading || primaryActionDisabled || (!onPrimaryAction && !onAcceptMission)}
+        onClick={() => (onPrimaryAction ? onPrimaryAction(selectedRequest) : onAcceptMission?.(selectedRequest))}
       >
         <Ambulance size={18} />{" "}
-        {acceptLoading ? "ĐANG XỬ LÝ..." : "NHẬN NHIỆM VỤ"}
+        {acceptLoading ? "ĐANG XỬ LÝ..." : (primaryActionLabel || "NHẬN NHIỆM VỤ")}
       </button>
     </aside>
   );
@@ -77,33 +80,35 @@ export default function ResponderDetailPanel({
     <>
       {detailContent}
       {alerts.length ? (
-        <div className="responder-floating-alerts">
+        <div className="responder-toast-alerts">
           {alerts.map((alert) => (
-            <article key={alert.popupId} className={`floating-alert ${alert.level}`}>
-              <button
-                type="button"
-                className="floating-close-btn"
-                onClick={() => onDismissToast?.(alert.popupId)}
-                aria-label="Đóng thông báo"
-              >
-                ×
-              </button>
-              <div className="floating-topline">
-                <span className="floating-tag">{alert.tag}</span>
-                <span>{alert.ago}</span>
+            <article key={alert.id} className={`toast-alert toast-${alert.level}`}>
+              <div className="toast-head">
+                <span className="toast-tag">{alert.level === "high" ? "CAO" : alert.level === "critical" ? "CỰC CAO" : alert.level === "medium" ? "TRUNG BÌNH" : alert.level === "low" ? "THẤP" : "THÔNG BÁO"}</span>
+                <span className="toast-time">{alert.ago}</span>
               </div>
               <h4>{alert.title}</h4>
               <p>{alert.description}</p>
-              <button
-                type="button"
-                className="floating-action-btn"
-                onClick={() => {
-                  onSelectToastRequest?.(alert.requestId);
-                  onDismissToast?.(alert.popupId);
-                }}
-              >
-                {alert.actionLabel}
-              </button>
+              <div className="toast-actions">
+                <button
+                  type="button"
+                  className="toast-action-btn"
+                  onClick={() => {
+                    onSelectToastRequest?.(alert.requestId);
+                    onDismissToast?.(alert.id);
+                  }}
+                >
+                  {alert.actionLabel}
+                </button>
+                <button
+                  type="button"
+                  className="toast-close-btn"
+                  onClick={() => onDismissToast?.(alert.id)}
+                  aria-label="Đóng"
+                >
+                  ×
+                </button>
+              </div>
             </article>
           ))}
         </div>

@@ -7,6 +7,7 @@ import {
   getCurrentTrackingBySosId,
   getTrackingHistory,
   getActiveMissions,
+  cancelMission,
 } from "../controllers/trackingController.js";
 import {
   startSimulation,
@@ -28,6 +29,8 @@ router.post("/location", updateLocation);
 // 🔄 Update stage
 router.patch("/stage", updateStage);
 
+// 🚫 Cancel mission
+router.post("/cancel", cancelMission);
 
 // 👀 Victim get tracking theo sosId (victim chỉ biết sosId)
 router.get("/current/by-sos/:sosId", getCurrentTrackingBySosId);

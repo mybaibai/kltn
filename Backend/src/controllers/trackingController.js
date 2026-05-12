@@ -11,17 +11,21 @@ export const acceptMission = async (req, res) => {
     const rescue_id = req.user?._id;
 
     if (!assignment_id) {
-      return res.status(400).json({ success: false, message: "Thiếu assignment_id" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Thiếu assignment_id" });
     }
 
     const assignment = await RescueAssignment.findByIdAndUpdate(
       assignment_id,
       { accepted_at: new Date() },
-      { new: true }
+      { new: true },
     );
 
     if (!assignment) {
-      return res.status(404).json({ success: false, message: "Assignment not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Assignment not found" });
     }
 
     if (String(assignment.rescue_id) !== String(rescue_id)) {
@@ -104,7 +108,11 @@ export const updateLocation = async (req, res) => {
     const { assignment_id, latitude, longitude } = req.body;
     const rescue_id = req.user?._id || req.body.rescue_id;
 
-    if (!assignment_id || typeof latitude === "undefined" || typeof longitude === "undefined") {
+    if (
+      !assignment_id ||
+      typeof latitude === "undefined" ||
+      typeof longitude === "undefined"
+    ) {
       return res.status(400).json({
         success: false,
         message: "Thiếu assignment_id, latitude hoặc longitude",
@@ -115,7 +123,7 @@ export const updateLocation = async (req, res) => {
       assignment_id,
       latitude,
       longitude,
-      rescue_id
+      rescue_id,
     );
 
     if (!result.success) {
@@ -183,7 +191,13 @@ export const updateLocation = async (req, res) => {
       });
     }
 
-    res.status(200).json({ success: true, data: trackingData, message: "Vị trí đã cập nhật" });
+    res
+      .status(200)
+      .json({
+        success: true,
+        data: trackingData,
+        message: "Vị trí đã cập nhật",
+      });
   } catch (err) {
     console.error("❌ Error updating location:", err.message);
     res.status(500).json({ success: false, message: err.message });
@@ -209,7 +223,7 @@ export const updateStage = async (req, res) => {
       new_stage,
       reason,
       actor_id,
-      actor_role
+      actor_role,
     );
 
     if (!result.success) {
@@ -247,6 +261,17 @@ export const updateStage = async (req, res) => {
 
     io.to("admin-dashboard").emit("stage_changed", stageChangeData);
 
+    if (result.new_stage === "COMPLETED") {
+      const statusPayload = {
+        request_id: assignment.request_id,
+        status: "RESOLVED",
+        timestamp: new Date(),
+      };
+      io.to("rescue-all").emit("sos_status_updated", statusPayload);
+      io.to(`rescue-${assignment.rescue_id}`).emit("sos_status_updated", statusPayload);
+      io.to("admin-dashboard").emit("sos_status_updated", statusPayload);
+    }
+
     res.status(200).json({
       success: true,
       data: stageChangeData,
@@ -267,7 +292,9 @@ export const getCurrentTracking = async (req, res) => {
 
     const assignment = await RescueAssignment.findById(assignmentId);
     if (!assignment) {
-      return res.status(404).json({ success: false, message: "Assignment not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Assignment not found" });
     }
 
     const sos = await SosRequest.findById(assignment.request_id);
@@ -287,20 +314,23 @@ export const getCurrentTracking = async (req, res) => {
       });
     }
 
-    const result = await trackingService.getCurrentTracking(assignmentId, isVictim);
+    const result = await trackingService.getCurrentTracking(
+      assignmentId,
+      isVictim,
+    );
     console.log("🚀 TRACKING RESULT:", JSON.stringify(result, null, 2));
-    
-      // Service giờ trả về { success, data } hoặc { success: false, message }
-      // Không throw nữa → không bao giờ ECONNRESET
-      if (!result.success) {
-        return res.status(400).json(result);
-      }
 
-      res.status(200).json(result);
-    } catch (err) {
-      console.error("❌ Error getting current tracking:", err.message);
-      res.status(500).json({ success: false, message: err.message });
+    // Service giờ trả về { success, data } hoặc { success: false, message }
+    // Không throw nữa → không bao giờ ECONNRESET
+    if (!result.success) {
+      return res.status(400).json(result);
     }
+
+    res.status(200).json(result);
+  } catch (err) {
+    console.error("❌ Error getting current tracking:", err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
 };
 
 // ===== 3b. GET /api/tracking/current/by-sos/:sosId =====
@@ -341,7 +371,10 @@ export const getCurrentTrackingBySosId = async (req, res) => {
       });
     }
 
-    const result = await trackingService.getCurrentTrackingBySosId(sosId, isVictim);
+    const result = await trackingService.getCurrentTrackingBySosId(
+      sosId,
+      isVictim,
+    );
 
     if (!result.success) {
       return res.status(400).json(result);
@@ -393,6 +426,77 @@ export const getActiveMissions = async (req, res) => {
     res.status(200).json(result);
   } catch (err) {
     console.error("❌ Error getting active missions:", err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ===== 7. POST /api/tracking/cancel =====
+export const cancelMission = async (req, res) => {
+  try {
+    const { assignment_id, cancelled_by, reason } = req.body;
+    const user_id = req.user?._id;
+    const user_role = req.user?.role || "USER";
+
+    if (!assignment_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Thiếu assignment_id",
+      });
+    }
+
+    // Determine who is cancelling
+    const actor = cancelled_by || "RESCUE";
+
+    const result = await trackingService.cancelMission(
+      assignment_id,
+      actor,
+      reason || "",
+    );
+
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    const { assignment, sos } = result;
+
+    // Broadcast to victim
+    io.to(`victim-${sos.victim_id}`).emit("mission_cancelled", {
+      reason: reason || `Cancelled by ${actor}`,
+      new_sos_status: sos.status,
+      message:
+        actor === "VICTIM"
+          ? "Bạn đã huỷ yêu cầu cứu trợ"
+          : "Đội cứu hộ đã từ chối nhận nhiệm vụ",
+      timestamp: new Date(),
+    });
+
+    // Broadcast to rescue
+    io.to(`rescue-${assignment.rescue_id}`).emit("mission_cancelled", {
+      reason: reason || `Cancelled by ${actor}`,
+      message: "Nhiệm vụ đã bị huỷ",
+      timestamp: new Date(),
+    });
+
+    // Broadcast to admin dashboard
+    io.to("admin-dashboard").emit("mission_cancelled", {
+      assignment_id: assignment._id,
+      request_id: assignment.request_id,
+      cancelled_by: actor,
+      reason: reason || "",
+      new_sos_status: sos.status,
+      timestamp: new Date(),
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        assignment,
+        sos,
+        message: `Mission cancelled successfully. SOS status: ${sos.status}`,
+      },
+    });
+  } catch (err) {
+    console.error("❌ Error cancelling mission:", err.message);
     res.status(500).json({ success: false, message: err.message });
   }
 };

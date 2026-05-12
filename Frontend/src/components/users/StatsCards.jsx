@@ -1,10 +1,10 @@
 const StatsCards = ({ stats }) => {
-    // 🔥 fallback nếu chưa có data
+    // fallback nếu chưa có data
     const data = stats || [
       { title: "TỔNG CỘNG (DN)", value: "--" },
-      { title: "LỰC LƯỢNG", value: "--" },
-      { title: "ĐÃ XÁC MINH", value: "--" },
-      { title: "ĐANG CHỜ", value: "--" },
+    { title: "LỰC LƯỢNG", value: "--" },
+    { title: "ĐANG HOẠT ĐỘNG", value: "--" },
+    { title: "NGƯNG HOẠT ĐỘNG", value: "--" },
     ];
   
     return (
@@ -26,4 +26,5 @@ const StatsCards = ({ stats }) => {
     );
   };
   
+
   export default StatsCards;

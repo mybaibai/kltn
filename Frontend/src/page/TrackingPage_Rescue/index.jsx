@@ -185,6 +185,7 @@ export default function TrackingView() {
   const [err,         setErr]         = useState("");
   const [assignmentId, setAssignmentId] = useState(null);
   const [toaster,     setToaster]     = useState(null);
+  const [showVictimPopup, setShowVictimPopup] = useState(false);
 
   // Map / location state
   const [rescuePos,    setRescuePos]   = useState(null); // current rescue position (lat/lng)
@@ -197,11 +198,31 @@ export default function TrackingView() {
 
   // GPS watcher ref
   const watchIdRef = useRef(null);
+  const redirectTimerRef = useRef(null);
 
   // Session: rescue staff user
   const staffUser = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("auth_user") ?? "null"); }
     catch { return null; }
+  }, []);
+
+  const scheduleReturnToHome = useCallback((message) => {
+    setToaster({ message: message || "Nhiệm vụ đã bị hủy", type: "info" });
+    if (redirectTimerRef.current) {
+      window.clearTimeout(redirectTimerRef.current);
+    }
+    redirectTimerRef.current = window.setTimeout(() => {
+      navigate("/responder", { replace: true });
+    }, 1200);
+  }, [navigate]);
+
+  useEffect(() => {
+    return () => {
+      if (redirectTimerRef.current) {
+        window.clearTimeout(redirectTimerRef.current);
+        redirectTimerRef.current = null;
+      }
+    };
   }, []);
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -299,11 +320,16 @@ export default function TrackingView() {
     if (sosId) socket.emit("join_sos_room", { sos_id: sosId });
 
     const onStageUpdate = (payload) => {
+      const nextStage = payload?.stage;
       setTracking(prev => ({
         ...prev,
-        current_stage: payload.stage ?? prev?.current_stage,
+        current_stage: nextStage ?? prev?.current_stage,
       }));
-      if (payload.stage === "COMPLETED") {
+      if (nextStage === "CANCELLED") {
+        scheduleReturnToHome(payload?.message || "Nhiệm vụ đã bị hủy");
+        return;
+      }
+      if (nextStage === "COMPLETED") {
         setShowCompletion(true);
       }
     };
@@ -330,17 +356,29 @@ export default function TrackingView() {
       setToaster({ message: "AI đã hoàn tất phân tích sự cố", type: "info" });
     };
 
+    const onMissionCancelled = (payload) => {
+      scheduleReturnToHome(payload?.message || "Nhiệm vụ đã bị hủy");
+    };
+
+    const onSosCancelled = (payload) => {
+      scheduleReturnToHome(payload?.message || "Yêu cầu đã bị hủy");
+    };
+
     socket.on("mission_stage_update",      onStageUpdate);
     socket.on("mission_location_confirmed", onLocationConfirmed);
     socket.on("sos_ai_analyzed",           onAiAnalyzed);
+    socket.on("mission_cancelled",         onMissionCancelled);
+    socket.on("sos_cancelled",             onSosCancelled);
 
     return () => {
       socket.off("mission_stage_update",      onStageUpdate);
       socket.off("mission_location_confirmed", onLocationConfirmed);
       socket.off("sos_ai_analyzed",           onAiAnalyzed);
+      socket.off("mission_cancelled",         onMissionCancelled);
+      socket.off("sos_cancelled",             onSosCancelled);
       socket.emit("leave_sos_room", { sos_id: sosId });
     };
-  }, [sosId]);
+  }, [sosId, scheduleReturnToHome]);
 
   // ── Route rescue → victim ─────────────────────────────────────────────────
 
@@ -411,12 +449,152 @@ export default function TrackingView() {
   const requestCode  = sos._id ? `#SOS-${String(sos._id).slice(-4).toUpperCase()}` : "#SOS-????";
   const victimName   = sos.victim_id?.full_name || "—";
   const victimPhone  = sos.victim_id?.phone || sos.victim_id?.profile?.phone || "—";
+  const victimProfile = sos.victim_id?.profile || {};
+  const bloodType = victimProfile.blood_type || "—";
+  const height = victimProfile.height ? `${victimProfile.height} cm` : "—";
+  const weight = victimProfile.weight ? `${victimProfile.weight} kg` : "—";
+  const allergies = Array.isArray(victimProfile.allergies)
+    ? victimProfile.allergies.filter(Boolean)
+    : typeof victimProfile.allergies === "string"
+      ? victimProfile.allergies.split(",").map((item) => item.trim()).filter(Boolean)
+      : [];
+  const medicalWarning = victimProfile.medical_alert || victimProfile.health_warning || victimProfile.medical_condition || (Array.isArray(victimProfile.medical_conditions) ? victimProfile.medical_conditions[0] : null);
+  const emergencyContacts = Array.isArray(victimProfile.emergency_contacts)
+    ? victimProfile.emergency_contacts
+    : [];
 
   return (
     <div className="h-screen w-full bg-gray-50 flex flex-col overflow-hidden font-sans">
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         <AnimatePresence>
           {toaster && <Toast {...toaster} onClose={() => setToaster(null)} />}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showVictimPopup && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[1200] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-3"
+            >
+              <motion.div
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 20, opacity: 0 }}
+                className="w-full max-w-[380px] rounded-[24px] bg-white shadow-2xl overflow-hidden border border-slate-200 max-h-[90vh] overflow-y-auto"
+              >
+                <div className="flex items-center justify-between gap-3 p-3 border-b border-slate-100 sticky top-0 bg-white">
+                  <div className="flex items-center gap-2">
+                    <div className="h-12 w-12 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-500 text-lg font-bold">
+                      {victimName ? victimName.charAt(0).toUpperCase() : "?"}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{victimName}</p>
+                      <span className="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.2em] text-rose-600">
+                        Nạn nhân
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowVictimPopup(false)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition flex-shrink-0"
+                    aria-label="Đóng thông tin nạn nhân"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="space-y-3 p-3">
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-3 text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-500">
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                        <User size={12} />
+                      </span>
+                       Thông tin y tế
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-[16px] border border-slate-200 bg-slate-50 p-2.5 text-center">
+                        <p className="text-[9px] uppercase tracking-[0.2em] text-slate-500 font-bold">Máu</p>
+                        <p className="mt-1.5 text-lg font-bold text-rose-600">{bloodType}</p>
+                      </div>
+                      <div className="rounded-[16px] border border-slate-200 bg-slate-50 p-2.5 text-center">
+                        <p className="text-[9px] uppercase tracking-[0.2em] text-slate-500 font-bold">Cao</p>
+                        <p className="mt-1.5 text-lg font-bold text-slate-900">{height}</p>
+                      </div>
+                      <div className="rounded-[16px] border border-slate-200 bg-slate-50 p-2.5 text-center">
+                        <p className="text-[9px] uppercase tracking-[0.2em] text-slate-500 font-bold">Cân</p>
+                        <p className="mt-1.5 text-lg font-bold text-slate-900">{weight}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-sm font-semibold text-slate-900 mb-1.5">Dị ứng</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {allergies.length > 0 ? allergies.map((item, idx) => (
+                        <span key={idx} className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+                          {item}
+                        </span>
+                      )) : (
+                        <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500">Không</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[20px] border border-rose-200 bg-rose-50 p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-rose-100 text-rose-700 flex-shrink-0">
+                        <AlertTriangle size={14} />
+                      </span>
+                      <div>
+                        <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-rose-700">⚠ Cảnh báo</p>
+                        <h3 className="text-sm font-bold text-slate-900">{medicalWarning || "An toàn"}</h3>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-600 ml-10">{medicalWarning ? "Cần theo dõi nhịp tim." : "Không có cảnh báo."}</p>
+                    {medicalWarning && (
+                      <span className="mt-2 inline-flex rounded-full bg-white px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-rose-700 border border-rose-200">
+                        CARDIAC
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="rounded-[20px] border border-slate-200 bg-white p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="text-[9px] uppercase tracking-[0.2em] text-slate-500 font-semibold">Khẩn cấp</p>
+                        <h3 className="text-sm font-bold text-slate-900">Liên hệ</h3>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {emergencyContacts.length > 0 ? emergencyContacts.slice(0, 2).map((contact, index) => (
+                        <div key={index} className="flex items-center gap-2 rounded-[18px] border border-slate-200 bg-slate-50 p-2.5">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-700 shadow-sm text-xs font-bold flex-shrink-0">
+                            {String(contact.name || "?").slice(0, 1).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-slate-900 truncate">{contact.name || "N/A"}</p>
+                            <p className="text-[11px] text-slate-500 truncate">{contact.phone || "N/A"}</p>
+                          </div>
+                          <a
+                            href={`tel:${contact.phone || ""}`}
+                            className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-900 hover:bg-slate-100 flex-shrink-0"
+                          >
+                            <Phone size={12} />
+                          </a>
+                        </div>
+                      )) : (
+                        <p className="text-xs text-slate-500">Chưa có.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
         </AnimatePresence>
 
         <CompletionPopup 
@@ -601,6 +779,14 @@ export default function TrackingView() {
                     <div className="flex items-center gap-2 mb-1">
                       <User size={12} className="text-gray-400 shrink-0" />
                       <span className="text-sm font-bold text-slate-900 truncate">{victimName}</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowVictimPopup(true)}
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-rose-500 text-white hover:bg-rose-600 transition-shadow shadow-sm"
+                        aria-label="Xem thông tin nạn nhân"
+                      >
+                        <AlertTriangle size={14} />
+                      </button>
                     </div>
                     <div className="flex items-center gap-2">
                       <Phone size={12} className="text-gray-400 shrink-0" />

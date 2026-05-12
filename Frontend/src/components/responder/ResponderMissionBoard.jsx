@@ -36,7 +36,7 @@ export default function ResponderMissionBoard({ user }) {
   const [notifications, setNotifications] = useState([]);
   const [toastAlerts, setToastAlerts] = useState([]);
   const requestsRef = useRef([]);
-  const toastTimersRef = useRef(new Set());
+  const toastTimersRef = useRef(new Map());
 
   useEffect(() => {
     requestsRef.current = requests;
@@ -54,20 +54,38 @@ export default function ResponderMissionBoard({ user }) {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }
 
-  function pushToast(message, type = "error") {
+  function pushToast({ level = "info", title = "Thông báo mới", description = "Có yêu cầu mới", requestId = "", actionLabel = "NHẬN NGAY", ago = "Vừa xong" }) {
     const id = Date.now();
-    setToastAlerts((prev) => [{ id, message, type }, ...prev].slice(0, 3));
-    setTimeout(() => {
+    const alert = { id, level, title, description, requestId, actionLabel, ago };
+    setToastAlerts((prev) => [alert, ...prev].slice(0, 3));
+
+    const timerId = window.setTimeout(() => {
       setToastAlerts((prev) => prev.filter((t) => t.id !== id));
+      toastTimersRef.current.delete(id);
     }, 5000);
+
+    toastTimersRef.current.set(id, timerId);
   }
 
   function dismissToast(id) {
+    const timerId = toastTimersRef.current.get(id);
+    if (timerId) {
+      window.clearTimeout(timerId);
+      toastTimersRef.current.delete(id);
+    }
     setToastAlerts((prev) => prev.filter((t) => t.id !== id));
   }
 
   function handleSelectRequest(id) {
     setSelectedId(String(id));
+  }
+
+  function filterActiveSos(list) {
+    if (!Array.isArray(list)) return [];
+    return list.filter((sos) => {
+      const status = String(sos?.status || "").toUpperCase();
+      return status !== "RESOLVED" && status !== "CANCELLED";
+    });
   }
 
   const visibleRequests = useMemo(() => {
@@ -114,7 +132,7 @@ export default function ResponderMissionBoard({ user }) {
       try {
         const res = await getAllSos();
         const rawList = res?.data?.data || [];
-        const sosList = rawList;
+        const sosList = filterActiveSos(rawList);
         const mapped = mapSosToResponderRequests(sosList, gps);
         if (cancelled) return;
 
@@ -296,7 +314,7 @@ export default function ResponderMissionBoard({ user }) {
       try {
         const res = await getAllSos();
         const rawList = res?.data?.data || [];
-        const mapped = mapSosToResponderRequests(rawList, gps);
+        const mapped = mapSosToResponderRequests(filterActiveSos(rawList), gps);
         syncRequests(mapped);
         syncStatsFromRequests(mapped);
       } catch { /* ignore */ }
@@ -318,6 +336,14 @@ export default function ResponderMissionBoard({ user }) {
         current.unshift(mappedItem);
         if (notifyNew) {
           pushNotification(`SOS Mới: ${mappedItem.incidentType}`, mappedItem.address);
+          pushToast({
+            level: mappedItem.level || "high",
+            title: mappedItem.title || "Yêu cầu SOS mới",
+            description: `${mappedItem.address} • ${mappedItem.distanceKm != null ? `${mappedItem.distanceKm}km` : "Khoảng cách chưa xác định"}`,
+            requestId,
+            ago: mappedItem.recentAgo || "Vừa xong",
+            actionLabel: "NHẬN NGAY",
+          });
         }
       }
 
@@ -367,14 +393,26 @@ export default function ResponderMissionBoard({ user }) {
       if (!requestId) return;
       const status = String(data.status || "").toUpperCase();
 
-      if (status === "CANCELLED" || status === "RESOLVED") {
-        const next = requestsRef.current.filter((item) => String(item.id) !== requestId);
+      const removeRequestById = (id) => {
+        const next = requestsRef.current.filter((item) => String(item.id) !== String(id));
         syncRequests(next, { notifyNew: false });
         syncStatsFromRequests(next);
+      };
+
+      if (status === "CANCELLED" || status === "RESOLVED") {
+        removeRequestById(requestId);
         return;
       }
 
       upsertRealtimeSos({ _id: requestId, status }, { notifyNew: false });
+    }
+
+    function handleSosCancelled(payload = {}) {
+      const requestId = payload.request_id ? String(payload.request_id) : "";
+      if (!requestId) return;
+      const next = requestsRef.current.filter((item) => String(item.id) !== requestId);
+      syncRequests(next, { notifyNew: false });
+      syncStatsFromRequests(next);
     }
 
     function setupListeners() {
@@ -383,12 +421,16 @@ export default function ResponderMissionBoard({ user }) {
       socket.off("sos_broadcast_all", handleSosCreated);
       socket.off("sos_assigned", handleSosAssigned);
       socket.off("sos_status_updated", handleSosStatusUpdated);
+      socket.off("sos_cancelled", handleSosCancelled);
+      socket.off("mission_cancelled", handleSosCancelled);
 
       socket.on("sos_created", handleSosCreated);
       socket.on("sos_new_pending", handleSosCreated);
       socket.on("sos_broadcast_all", handleSosCreated);
       socket.on("sos_assigned", handleSosAssigned);
       socket.on("sos_status_updated", handleSosStatusUpdated);
+      socket.on("sos_cancelled", handleSosCancelled);
+      socket.on("mission_cancelled", handleSosCancelled);
     }
 
     if (socket.connected) {
@@ -407,6 +449,8 @@ export default function ResponderMissionBoard({ user }) {
       socket.off("sos_broadcast_all", handleSosCreated);
       socket.off("sos_assigned", handleSosAssigned);
       socket.off("sos_status_updated", handleSosStatusUpdated);
+      socket.off("sos_cancelled", handleSosCancelled);
+      socket.off("mission_cancelled", handleSosCancelled);
     };
   }, [gps, userId]);
 
@@ -498,6 +542,30 @@ export default function ResponderMissionBoard({ user }) {
     }
   }
 
+  const selectedSource = selectedRequest?.source || null;
+  const selectedStatus = String(selectedSource?.status || "PENDING").toUpperCase();
+  const assignedRescueId =
+    selectedSource?.assigned_rescue_id?._id || selectedSource?.assigned_rescue_id || null;
+  const isAssignedToMe =
+    userId && assignedRescueId && String(assignedRescueId) === String(userId);
+  const canViewTracking =
+    isAssignedToMe && (selectedStatus === "ASSIGNED" || selectedStatus === "IN_PROGRESS");
+  const primaryActionLabel = canViewTracking
+    ? "XEM QUÁ TRÌNH"
+    : selectedStatus === "PENDING"
+      ? "NHẬN NHIỆM VỤ"
+      : "ĐANG XỬ LÝ";
+  const primaryActionDisabled = !selectedRequest || (!canViewTracking && selectedStatus !== "PENDING");
+
+  function handlePrimaryAction(request) {
+    if (!request) return;
+    if (canViewTracking) {
+      navigate(`/responder/tracking/${request.id}`);
+      return;
+    }
+    handleAcceptMission(request);
+  }
+
   return (
     <div className="responder-board-page">
       <div className="responder-board-shell">
@@ -535,6 +603,9 @@ export default function ResponderMissionBoard({ user }) {
             onDismissToast={dismissToast}
             onSelectToastRequest={handleSelectRequest}
             onAcceptMission={handleAcceptMission}
+            primaryActionLabel={primaryActionLabel}
+            onPrimaryAction={handlePrimaryAction}
+            primaryActionDisabled={primaryActionDisabled}
             acceptLoading={acceptLoading}
           />
         </section>

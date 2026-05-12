@@ -70,7 +70,19 @@ export const create = async (req, res) => {
       created_at: fullSos?.created_at || new Date(),
     });
 
-    // Notify đội gần nhất ngay lập tức
+    // 🚨 Broadcast NGAY LẬP TỨC cho TẤT CẢ rescue (không chờ 60s)
+    io.to('rescue-all').emit('sos_broadcast_all', {
+      request_id:  fullSos?._id,
+      status:      'PENDING',
+      address:     fullSos?.address || '',
+      created_at:  fullSos?.created_at || new Date(),
+      victim_name: fullSos?.victim_id?.full_name || '',
+      location:    fullSos?.location,
+      priority:    true,
+    });
+    console.log(`📢 SOS ${sos._id} — broadcast to all rescue teams (IMMEDIATE)`);
+
+    // Notify đội gần nhất ngay lập tức với priority flag
     try {
       const nearRescues = await teamService.findNearestTeam(Number(resolvedLat), Number(resolvedLng));
       if (nearRescues.length > 0) {
@@ -88,21 +100,6 @@ export const create = async (req, res) => {
     } catch (e) {
       console.warn('⚠️ Could not find nearest rescue teams:', e.message);
     }
-
-    // Sau 60 giây: broadcast cho TẤT CẢ rescue
-    const broadcastTimer = setTimeout(() => {
-      io.to('rescue-all').emit('sos_broadcast_all', {
-        request_id:  fullSos?._id,
-        status:      'PENDING',
-        address:     fullSos?.address || '',
-        created_at:  fullSos?.created_at || new Date(),
-        victim_name: fullSos?.victim_id?.full_name || '',
-        location:    fullSos?.location,
-      });
-      console.log(`📢 SOS ${sos._id} — broadcast to all rescue teams (60s)`);
-      pendingBroadcastTimers.delete(String(sos._id));
-    }, 60_000);
-    pendingBroadcastTimers.set(String(sos._id), broadcastTimer);
 
     // Trả response cho victim NGAY — không chờ AI
     res.status(201).json({ success: true, data: fullSos });
@@ -216,6 +213,64 @@ export const updateStatus = async (req, res) => {
       req.body.note || ''
     );
     res.status(200).json({ success: true, data: sos });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// PATCH /api/sos/:id/cancel
+export const cancelSos = async (req, res) => {
+  try {
+    const sos = await sosService.getSosById(req.params.id);
+    if (!sos) return res.status(404).json({ success: false, message: 'Không tìm thấy SOS' });
+
+    // Validate permission
+    const victimId = sos.victim_id?._id || sos.victim_id;
+    if (String(victimId) !== String(req.user._id)) {
+      return res.status(403).json({ success: false, message: 'Không có quyền hủy SOS này' });
+    }
+
+    if (sos.status === 'COMPLETED' || sos.status === 'RESOLVED') {
+      return res.status(400).json({ success: false, message: 'Không thể hủy SOS đã hoàn thành' });
+    }
+
+    const updatedSos = await sosService.updateSosStatus(
+      req.params.id,
+      'CANCELLED',
+      req.user._id,
+      'Nạn nhân đã tự hủy yêu cầu'
+    );
+
+    // Cancel assignment if there is one
+    const assignment = await sosService.getLatestAssignmentForRequest(req.params.id);
+    if (assignment) {
+      const RescueAssignment = mongoose.model('RescueAssignment');
+      await RescueAssignment.findByIdAndUpdate(assignment._id, { stage: 'CANCELLED' });
+      const rescueId = assignment.rescue_id?._id || assignment.rescue_id;
+      io.to(`rescue-${rescueId}`).emit('sos_cancelled', {
+        request_id: sos._id,
+        message: 'Nạn nhân đã hủy yêu cầu cứu trợ',
+      });
+      io.to(`rescue-${rescueId}`).emit('mission_stage_update', {
+        stage: 'CANCELLED',
+        stage_changed: true,
+      });
+    }
+
+    io.to('admin-dashboard').emit('sos_cancelled', {
+      request_id: sos._id,
+    });
+    
+    // Xóa khỏi pending timer
+    const timer = pendingBroadcastTimers.get(String(req.params.id));
+    if (timer) {
+      clearTimeout(timer);
+      pendingBroadcastTimers.delete(String(req.params.id));
+    }
+    
+    io.to('rescue-all').emit('sos_cancelled', { request_id: sos._id });
+
+    res.status(200).json({ success: true, data: updatedSos });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

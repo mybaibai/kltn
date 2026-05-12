@@ -22,4 +22,3 @@ router.delete(
   removeEmergencyContact
 );
 export default router;
-

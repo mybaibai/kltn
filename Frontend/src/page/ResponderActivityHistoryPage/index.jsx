@@ -8,10 +8,11 @@ import {
   MapPin,
   Phone,
   Trash2,
+  X,
 } from "lucide-react";
 import ResponderSidebar from "@/components/responder/ResponderSidebar";
 import { getAllTeams, getTeamDetail } from "@/services/api/apiTeam";
-import { getSosByTeam } from "@/services/api/apiSos";
+import { getSosByTeam, updateSosStatus } from "@/services/api/apiSos";
 import { getAuthUser } from "@/services/auth/session";
 import "./activity-history.css";
 
@@ -111,8 +112,9 @@ export default function ResponderActivityHistoryPage() {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState("RESOLVED");
   const [currentPage, setCurrentPage] = useState(1);
+  const [cancelLoading, setCancelLoading] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -161,18 +163,36 @@ export default function ResponderActivityHistoryPage() {
     setCurrentPage(1);
   }, [filter, activities.length]);
 
+  async function handleCancelRequest(sosId) {
+    if (!sosId) return;
+    setCancelLoading(sosId);
+    try {
+      await updateSosStatus(sosId, "CANCELLED", { reason: "Cancelled by responder" });
+      setActivities((prev) =>
+        prev.map((item) =>
+          String(item._id) === String(sosId) ? { ...item, status: "CANCELLED" } : item,
+        ),
+      );
+    } catch (err) {
+      console.error("Failed to cancel request:", err);
+    } finally {
+      setCancelLoading(null);
+    }
+  }
+
   const filteredActivities = useMemo(() => {
-    if (filter === "all") return activities;
     const filterValue = normalizeStatus(filter);
-    return activities.filter((item) => normalizeStatus(item?.status) === filterValue);
+    return activities.filter((item) => {
+      const status = normalizeStatus(item?.status);
+      return status === filterValue;
+    });
   }, [activities, filter]);
 
   const stats = useMemo(() => {
     return {
       total: activities.length,
       completed: activities.filter((x) => normalizeStatus(x?.status) === "RESOLVED").length,
-      inprogress: activities.filter((x) => normalizeStatus(x?.status) === "INPROGRESS").length,
-      assigned: activities.filter((x) => normalizeStatus(x?.status) === "ASSIGNED").length,
+      cancelled: activities.filter((x) => normalizeStatus(x?.status) === "CANCELLED").length,
     };
   }, [activities]);
 
@@ -231,42 +251,17 @@ export default function ResponderActivityHistoryPage() {
               </div>
             </article>
             <article>
-              <div className="stat-icon info">
-                <Clock size={20} />
+              <div className="stat-icon danger">
+                <X size={20} />
               </div>
               <div>
-                <strong>{stats.inprogress}</strong>
-                <p>Đang xử lý</p>
-              </div>
-            </article>
-            <article>
-              <div className="stat-icon warning">
-                <MapPin size={20} />
-              </div>
-              <div>
-                <strong>{stats.assigned}</strong>
-                <p>Đã chấp nhận</p>
-              </div>
-            </article>
-            <article>
-              <div className="stat-icon neutral">
-                <Phone size={20} />
-              </div>
-              <div>
-                <strong>{stats.total}</strong>
-                <p>Tổng hoạt động</p>
+                <strong>{stats.cancelled}</strong>
+                <p>Đã hủy</p>
               </div>
             </article>
           </section>
 
           <section className="activity-history-filter">
-            <button
-              type="button"
-              className={`filter-btn ${filter === "all" ? "is-active" : ""}`}
-              onClick={() => setFilter("all")}
-            >
-              Tất cả
-            </button>
             <button
               type="button"
               className={`filter-btn ${filter === "RESOLVED" ? "is-active" : ""}`}
@@ -276,17 +271,10 @@ export default function ResponderActivityHistoryPage() {
             </button>
             <button
               type="button"
-              className={`filter-btn ${filter === "INPROGRESS" ? "is-active" : ""}`}
-              onClick={() => setFilter("INPROGRESS")}
+              className={`filter-btn ${filter === "CANCELLED" ? "is-active" : ""}`}
+              onClick={() => setFilter("CANCELLED")}
             >
-              Đang xử lý
-            </button>
-            <button
-              type="button"
-              className={`filter-btn ${filter === "ASSIGNED" ? "is-active" : ""}`}
-              onClick={() => setFilter("ASSIGNED")}
-            >
-              Đã chấp nhận
+              Đã hủy
             </button>
           </section>
 
@@ -335,9 +323,17 @@ export default function ResponderActivityHistoryPage() {
                       <span>Tạo: {createdAt}</span>
                       {updatedAt !== createdAt && <span>Cập nhật: {updatedAt}</span>}
                     </div>
-                    <button type="button" className="activity-delete-btn" title="Xóa hoạt động này">
-                      <Trash2 size={14} />
-                    </button>
+                    {normalizeStatus(item?.status) !== "CANCELLED" && (
+                      <button
+                        type="button"
+                        className="activity-cancel-btn"
+                        onClick={() => handleCancelRequest(item._id)}
+                        disabled={cancelLoading === item._id}
+                        title="Hủy yêu cầu này"
+                      >
+                        {cancelLoading === item._id ? "Hủy..." : <X size={14} />}
+                      </button>
+                    )}
                   </div>
                 </article>
               );
