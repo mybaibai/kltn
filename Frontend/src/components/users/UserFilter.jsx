@@ -31,11 +31,13 @@ export default function UserFilter({ onFilter }) {
         className="border px-3 py-2 rounded"
       >
         <option value="">Tất cả vai trò</option>
-        <option value="Người dân">Người dân</option>
-        <option value="Đội cứu trợ">Đội cứu trợ</option>
+        <option value="Admin">Admin</option>
+        <option value="Rescue">Rescue</option>
+        <option value="Victim">Victim</option>
+
       </select>
 
-      {/* 🔥 WARD FILTER */}
+      {/* WARD FILTER */}
       <select
         value={ward}
         onChange={(e) => setWard(e.target.value)}

@@ -1,8 +1,6 @@
-import { useEffect, useState } from "react";
-import axios from "axios";
 import UserRow from "./UserRow";
 
-const UserTable = ({ users = [], loading, onEdit, onDelete }) => {
+const UserTable = ({ users = [], loading, onView, onToggleStatus }) => {  
   return (
     <div className="bg-white rounded-xl border overflow-hidden">
       <table className="w-full text-sm">
@@ -11,7 +9,8 @@ const UserTable = ({ users = [], loading, onEdit, onDelete }) => {
           <tr>
             <th className="px-4 py-3 text-left">Họ tên & ID</th>
             <th>Vai trò</th>
-            <th>Xác minh</th>
+            <th>Trạng thái</th>
+            <th>SĐT</th>
             <th>Vị trí hiện tại</th>
             <th>Hành động</th>
           </tr>
@@ -20,24 +19,24 @@ const UserTable = ({ users = [], loading, onEdit, onDelete }) => {
         <tbody>
           {loading ? (
             <tr>
-              <td colSpan="5" className="text-center py-6 text-gray-400">
+              <td colSpan="6" className="text-center py-6 text-gray-400">
                 Đang tải dữ liệu...
               </td>
             </tr>
           ) : users.length === 0 ? (
             <tr>
-              <td colSpan="5" className="text-center py-6 text-gray-400">
+              <td colSpan="6" className="text-center py-6 text-gray-400">
                 Không có dữ liệu
               </td>
             </tr>
           ) : (
             users.map((user) => (
               <UserRow
-                key={user._id}
+                key={user._id || user.id}
                 user={user}
-                onEdit={onEdit}
-                onDelete={onDelete}
-              />
+                onView={onView}
+                onToggleStatus={onToggleStatus}
+            />
             ))
           )}
         </tbody>
@@ -47,4 +46,4 @@ const UserTable = ({ users = [], loading, onEdit, onDelete }) => {
   );
 };
 
-export default UserTable; 
+export default UserTable;
