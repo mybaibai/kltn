@@ -10,22 +10,14 @@ import {
   Pencil,
   Phone,
   Save,
-  Shield,
   UploadCloud,
 } from "lucide-react";
 import ResponderSidebar from "@/components/responder/ResponderSidebar";
 import { getAllTeams, getTeamDetail, updateTeam } from "@/services/api/apiTeam";
 import { getAuthUser } from "@/services/auth/session";
 import "./team-edit-page.css";
+import { getUserAvatarSrc } from "@/lib/userAvatar";
 
-
-function initialsFromName(name) {
-  if (!name) return "RT";
-  const chunks = String(name).trim().split(/\s+/).filter(Boolean);
-  if (!chunks.length) return "RT";
-  if (chunks.length === 1) return chunks[0].slice(0, 2).toUpperCase();
-  return `${chunks[0][0] || ""}${chunks[chunks.length - 1][0] || ""}`.toUpperCase();
-}
 
 function readApiMessage(error) {
   const message = error?.response?.data?.message;
@@ -74,6 +66,30 @@ export default function ResponderTeamEditPage() {
     emergencyContact: "",
     avatarUrl: "",
   });
+
+  const [notifications, setNotifications] = useState([
+    {
+      id: "te-1",
+      title: "Có nhiệm vụ mới",
+      description: "Hệ thống vừa ghi nhận một yêu cầu SOS ưu tiên cao gần bạn.",
+      time: "Vừa xong",
+      unread: true,
+    },
+    {
+      id: "te-2",
+      title: "Chỉnh sửa hồ sơ",
+      description: "Bạn có thể cập nhật số điện thoại và khu vực hoạt động ngay tại đây.",
+      time: "5 phút trước",
+      unread: true,
+    },
+    {
+      id: "te-3",
+      title: "Đồng bộ dữ liệu",
+      description: "Thông tin đội đã được đồng bộ với bảng nhiệm vụ responder.",
+      time: "18 phút trước",
+      unread: false,
+    },
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -274,6 +290,9 @@ export default function ResponderTeamEditPage() {
   }
 
   const avatarUrl = form.avatarUrl || team?.profile?.avatar_url || "";
+  const avatarDisplaySrc = getUserAvatarSrc({
+    profile: { avatar_url: avatarUrl },
+  });
   const teamName = team?.full_name || "Đội cứu hộ";
   const normalizedStatus = String(team?.status || "").trim().toLowerCase();
   const statusSummary =
@@ -284,29 +303,6 @@ export default function ResponderTeamEditPage() {
         : "Chưa có dữ liệu";
   const updatedSummary = formatLastUpdated(team?.updated_at || team?.updatedAt);
   const securitySummary = team?.auth?.email || authUser?.auth?.email || "Mã hóa chuẩn quốc tế";
-  const [notifications, setNotifications] = useState([
-    {
-      id: "te-1",
-      title: "Có nhiệm vụ mới",
-      description: "Hệ thống vừa ghi nhận một yêu cầu SOS ưu tiên cao gần bạn.",
-      time: "Vừa xong",
-      unread: true,
-    },
-    {
-      id: "te-2",
-      title: "Chỉnh sửa hồ sơ",
-      description: "Bạn có thể cập nhật số điện thoại và khu vực hoạt động ngay tại đây.",
-      time: "5 phút trước",
-      unread: true,
-    },
-    {
-      id: "te-3",
-      title: "Đồng bộ dữ liệu",
-      description: "Thông tin đội đã được đồng bộ với bảng nhiệm vụ responder.",
-      time: "18 phút trước",
-      unread: false,
-    },
-  ]);
   const unreadCount = notifications.filter((item) => item.unread).length;
 
   function handleToggleNotifications() {
@@ -365,11 +361,7 @@ export default function ResponderTeamEditPage() {
               <span>Đang trực</span>
             </div>
             <div className="team-edit-avatar">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt={teamName} className="team-edit-avatar-img" />
-              ) : (
-                initialsFromName(teamName)
-              )}
+              <img src={avatarDisplaySrc} alt={teamName} className="team-edit-avatar-img" />
             </div>
           </div>
         </header>
@@ -402,11 +394,7 @@ export default function ResponderTeamEditPage() {
             <div className="team-edit-card-head">
               <div className="team-badge-avatar-wrap">
                 <div className="team-badge-avatar">
-                  {avatarUrl ? (
-                    <img src={avatarUrl} alt={teamName} className="team-badge-avatar-img" />
-                  ) : (
-                    <Shield size={38} />
-                  )}
+                  <img src={avatarDisplaySrc} alt={teamName} className="team-badge-avatar-img" />
                 </div>
                 <button
                   type="button"

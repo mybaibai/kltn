@@ -1,9 +1,12 @@
 import { X, Lock, Unlock } from "lucide-react";
+import { getUserAvatarSrc } from "@/lib/userAvatar";
 
 const UserDetail = ({ user, open, onClose, onToggleStatus }) => {
   if (!open || !user) return null;
 
-  const isActive = user?.status === "Active";
+  const isActive = String(user?.status || "").toLowerCase() === "active";
+  const roleKey = String(user?.role || "").trim().toLowerCase();
+  const canLockAccount = roleKey === "victim" || roleKey === "rescue";
 
   const formatDate = (date) => {
     if (!date) return "--";
@@ -31,10 +34,7 @@ const UserDetail = ({ user, open, onClose, onToggleStatus }) => {
 
           <div className="flex flex-col items-start gap-3">
             <img
-              src={
-                user?.profile?.avatar_url ||
-                "/default-avatar.png"
-              }
+              src={getUserAvatarSrc(user)}
               className="w-20 h-20 rounded-full object-cover border"
               alt=""
             />
@@ -114,6 +114,7 @@ const UserDetail = ({ user, open, onClose, onToggleStatus }) => {
 
         {/* ACTION */}
         <div className="p-4 border-t flex gap-3">
+          {canLockAccount ? (
           <button
             onClick={() => onToggleStatus?.(user)}
             className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border
@@ -135,10 +136,11 @@ const UserDetail = ({ user, open, onClose, onToggleStatus }) => {
               </>
             )}
           </button>
+          ) : null}
 
           <button
             onClick={onClose}
-            className="flex-1 bg-gray-100 py-2 rounded-lg"
+            className={`${canLockAccount ? "flex-1" : "w-full"} bg-gray-100 py-2 rounded-lg`}
           >
             Đóng
           </button>

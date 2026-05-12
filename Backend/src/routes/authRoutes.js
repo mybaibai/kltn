@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { firebaseAdminAuth } from "../config/firebaseAdmin.js";
 import User from "../models/userModel.js";
+import { isAccountLockedStatus } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -198,6 +199,11 @@ router.post("/firebase", async (req, res) => {
         return res.status(403).json({
           message:
             "Tài khoản này đăng nhập bằng email/mật khẩu (cứu hộ/quản trị). Không dùng OTP số điện thoại tại đây.",
+        });
+      }
+      if (isAccountLockedStatus(user.status)) {
+        return res.status(403).json({
+          message: "Tài khoản bị khóa. Vui lòng liên hệ quản trị.",
         });
       }
       await User.updateOne(

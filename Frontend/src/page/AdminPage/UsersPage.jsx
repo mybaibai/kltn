@@ -87,45 +87,47 @@ const UsersPage = () => {
       },
       {
         title: "ĐANG HOẠT ĐỘNG",
-        value: users.filter((u) => u.status === "Active").length,
+        value: users.filter((u) => String(u.status || "").toLowerCase() === "active").length,
       },
       {
         title: "NGƯNG HOẠT ĐỘNG",
-        value: users.filter((u) => u.status !== "Active").length,
+        value: users.filter((u) => String(u.status || "").toLowerCase() !== "active").length,
       },
     ];
 
     const handleToggleStatus = async (user) => {
+      const roleKey = String(user?.role || "").trim().toLowerCase();
+      if (roleKey !== "victim" && roleKey !== "rescue") {
+        window.alert("Chỉ khóa/mở khóa được tài khoản Nạn nhân và Cứu hộ.");
+        return;
+      }
       try {
-        const isActive = user.status === "Active";
-    
+        const isActive = String(user.status || "").toLowerCase() === "active";
+
         const confirm = window.confirm(
           isActive
-            ? "Xác nhận KHÓA tài khoản này?"
+            ? "Xác nhận KHÓA tài khoản này? Người dùng sẽ không thể đăng nhập hoặc dùng ứng dụng."
             : "Xác nhận MỞ KHÓA tài khoản này?"
         );
-    
+
         if (!confirm) return;
-    
-        await api.patch(
-          `/users/${user._id}/toggle-active`
-        );
-    
-        // 👉 tự tính lại status
-        const newStatus = isActive ? "Locked" : "Active";
-    
-        setUsers((prev) =>
-          prev.map((u) =>
-            u._id === user._id ? { ...u, status: newStatus } : u
-          )
-        );
-    
-        setSelectedUser((prev) =>
-          prev ? { ...prev, status: newStatus } : prev
-        );
-    
+
+        const res = await api.patch(`/users/${user._id}/toggle-active`);
+        const updated = res?.data?.data;
+        if (updated?._id) {
+          setUsers((prev) =>
+            prev.map((u) => (u._id === updated._id ? { ...u, ...updated } : u))
+          );
+          setSelectedUser((prev) =>
+            prev && prev._id === updated._id ? { ...prev, ...updated } : prev
+          );
+        }
       } catch (err) {
         console.error(err);
+        window.alert(
+          err?.response?.data?.message ||
+            "Không cập nhật được trạng thái. Đảm bảo bạn đã đăng nhập quản trị."
+        );
       }
     };
 

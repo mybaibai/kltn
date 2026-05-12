@@ -12,7 +12,7 @@ router.post('/',                      create);
 router.get('/',                     getAll);
 router.get('/:id',                  getDetail);
 router.put('/:id',                  update);
-router.patch('/:id/toggle-active',  toggleActive);
+router.patch('/:id/toggle-active',  requireAuth, attachAuthUser, toggleActive);
 router.delete('/:id',               remove);
 router.post('/profile/emergency-contact', requireAuth, attachAuthUser, addEmergencyContact);
 router.delete(

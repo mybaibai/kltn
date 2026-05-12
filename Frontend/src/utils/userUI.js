@@ -42,4 +42,5 @@ export const STATUS_CONFIG = {
   'Chưa xác minh': statusStyle.bad,
   Blocked: statusStyle.bad,
   BANNED: statusStyle.bad,
+  Locked: statusStyle.bad,
 };

@@ -3,16 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Bell, ChevronDown, LogOut } from "lucide-react";
 import rescueLogo from "@/assets/rescue.svg";
 import { clearAllAuth } from "@/services/auth/session";
-
-function initialsFromName(name) {
-  if (!name) return "RT";
-  const chunks = String(name).trim().split(/\s+/).filter(Boolean);
-  if (!chunks.length) return "RT";
-  if (chunks.length === 1) return chunks[0].slice(0, 2).toUpperCase();
-  return `${chunks[0][0] || ""}${
-    chunks[chunks.length - 1][0] || ""
-  }`.toUpperCase();
-}
+import { getUserAvatarSrc } from "@/lib/userAvatar";
 
 export default function ResponderBoardHeader({
   user,
@@ -157,15 +148,11 @@ export default function ResponderBoardHeader({
             aria-expanded={openMenu === "avatar"}
             aria-haspopup="menu"
           >
-            {user?.profile?.avatar_url ? (
-              <img
-                src={user.profile.avatar_url}
-                alt={user?.full_name || "Avatar đội cứu trợ"}
-                className="responder-avatar-img"
-              />
-            ) : (
-              initialsFromName(user?.full_name)
-            )}
+            <img
+              src={getUserAvatarSrc(user)}
+              alt={user?.full_name || "Avatar đội cứu trợ"}
+              className="responder-avatar-img"
+            />
           </button>
 
           {openMenu === "avatar" ? (

@@ -1,5 +1,6 @@
 import { MapPin, Info, Lock, Unlock } from "lucide-react";
 import { ROLE_CONFIG, STATUS_CONFIG } from "@/utils/userUI";
+import { getUserAvatarSrc } from "@/lib/userAvatar";
 
 const UserRow = ({ user = {}, onView, onToggleStatus }) => {
   const role = ROLE_CONFIG?.[user?.role];
@@ -7,9 +8,11 @@ const UserRow = ({ user = {}, onView, onToggleStatus }) => {
 
   const RoleIcon = role?.icon;
   const StatusIcon = status?.icon;
-  
-  const isAdmin = user?.role === "Admin";
-  const isActive = user?.status === "Active";
+
+  const roleKey = String(user?.role || "").trim().toLowerCase();
+  const canLockAccount = roleKey === "victim" || roleKey === "rescue";
+  const isActive =
+    String(user?.status || "").toLowerCase() === "active";
 
   return (
     <tr className="border-t hover:bg-gray-50">
@@ -18,7 +21,7 @@ const UserRow = ({ user = {}, onView, onToggleStatus }) => {
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
           <img
-            src={user?.profile?.avatar_url || user?.avatar || '/avatar.svg'}
+            src={getUserAvatarSrc(user)}
             className="h-10 w-10 rounded-full object-cover"
             alt=""
           />
@@ -86,8 +89,8 @@ const UserRow = ({ user = {}, onView, onToggleStatus }) => {
             <Info className="size-4" />
           </button>
 
-          {/* KHÓA / MỞ KHÓA */}
-          {!isAdmin && (
+          {/* KHÓA / MỞ KHÓA — chỉ Nạn nhân & Cứu hộ */}
+          {canLockAccount && (
             <button
             type="button"
             className={`inline-flex ${
@@ -104,7 +107,7 @@ const UserRow = ({ user = {}, onView, onToggleStatus }) => {
               <Unlock className="size-4" />
               )}
           </button>
-)}
+          )}
 
         </div>
       </td>

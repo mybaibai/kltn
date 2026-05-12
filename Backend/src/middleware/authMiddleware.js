@@ -2,6 +2,14 @@ import jwt from "jsonwebtoken";
 import { firebaseAdminAuth } from "../config/firebaseAdmin.js";
 import User from "../models/userModel.js";
 
+/** Tài khoản bị khóa — không dùng API / phiên đã xác thực */
+export function isAccountLockedStatus(status) {
+  const v = String(status || "")
+    .trim()
+    .toLowerCase();
+  return v === "blocked" || v === "banned" || v === "inactive";
+}
+
 function normalizeRoleForTracking(role) {
   const r = String(role || "").trim().toLowerCase();
   if (r === "admin") return "ADMIN";
@@ -65,6 +73,12 @@ export async function attachAuthUser(req, res, next) {
         ...user,
         role: normalizeRoleForTracking(user.role),
       };
+      if (isAccountLockedStatus(user.status)) {
+        return res.status(403).json({
+          success: false,
+          message: "Tài khoản bị khóa. Vui lòng liên hệ quản trị.",
+        });
+      }
       return next();
     }
     if (req.authKind === "firebase" && req.firebaseUser) {
@@ -80,6 +94,12 @@ export async function attachAuthUser(req, res, next) {
         ...user,
         role: normalizeRoleForTracking(user.role),
       };
+      if (isAccountLockedStatus(user.status)) {
+        return res.status(403).json({
+          success: false,
+          message: "Tài khoản bị khóa. Vui lòng liên hệ quản trị.",
+        });
+      }
       return next();
     }
 

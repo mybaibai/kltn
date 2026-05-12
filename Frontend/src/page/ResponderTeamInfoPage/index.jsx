@@ -15,14 +15,7 @@ import { getAuthUser } from "@/services/auth/session";
 import { getTeamDetail, getAllTeams } from "@/services/api/apiTeam";
 import { getSosByTeam } from "@/services/api/apiSos";
 import "./team-info-page.css";
-
-function initialsFromName(name) {
-  if (!name) return "RT";
-  const chunks = String(name).trim().split(/\s+/).filter(Boolean);
-  if (!chunks.length) return "RT";
-  if (chunks.length === 1) return chunks[0].slice(0, 2).toUpperCase();
-  return `${chunks[0][0] || ""}${chunks[chunks.length - 1][0] || ""}`.toUpperCase();
-}
+import { getUserAvatarSrc } from "@/lib/userAvatar";
 
 function readApiMessage(error) {
   const message = error?.response?.data?.message;
@@ -195,7 +188,6 @@ export default function ResponderTeamInfoPage() {
   const teamStatus       = team?.status                       || "—";
   const teamAddress      = team?.profile?.address             || "Chưa cập nhật địa chỉ";
   const emergencyContact = team?.profile?.emergency_contact   || "—";
-  const avatarUrl        = team?.profile?.avatar_url          || null;
   const authEmail        = team?.auth?.email                  || "—";
   const authType         = team?.auth?.type                   || "—";
   const createdAt        = formatDateTime(team?.created_at);
@@ -262,10 +254,11 @@ export default function ResponderTeamInfoPage() {
             </div>
 
             <div className="team-info-avatar">
-              {avatarUrl
-                ? <img src={avatarUrl} alt={teamName} style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
-                : initialsFromName(teamName)
-              }
+              <img
+                src={getUserAvatarSrc(team)}
+                alt={teamName}
+                style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}
+              />
             </div>
           </div>
         </header>
@@ -282,15 +275,11 @@ export default function ResponderTeamInfoPage() {
               <div className="team-card-top">
                 <div className="team-card-left">
                   <div className="team-card-avatar-box">
-                    {avatarUrl ? (
-                      <img
-                        src={avatarUrl}
-                        alt={teamName}
-                        className="team-card-avatar-img"
-                      />
-                    ) : (
-                      <div className="team-card-avatar-fallback">{initialsFromName(teamName)}</div>
-                    )}
+                    <img
+                      src={getUserAvatarSrc(team)}
+                      alt={teamName}
+                      className="team-card-avatar-img"
+                    />
                   </div>
                   <div>
                     <h2>{teamName}</h2>

@@ -11,6 +11,7 @@ import { getAllTeams } from '@/services/api/apiTeam';
 import LoginRequester from './LoginRequester';
 import SOSForm from './SOSform';  
 import Logo from "@/assets/logo.svg";
+import { getUserAvatarSrc } from "@/lib/userAvatar";
 
 import {
   subscribeAuthState,
@@ -550,9 +551,9 @@ export default function SosPage() {
               className="w-10 h-10 rounded-full flex items-center justify-center text-white"
             >
               <img
-                src={avatar || "https://i.pravatar.cc/56?img=11"}
+                src={getUserAvatarSrc({ profile: { avatar_url: avatar } })}
                 className="w-10 h-10 rounded-full object-cover"
-                onError={(e) => { e.target.style.display = "none"; }}
+                alt=""
               />
             </button>
   
@@ -563,9 +564,9 @@ export default function SosPage() {
                   <div className="flex items-center gap-3 px-1 pb-4">
                     <div className="relative flex-shrink-0">
                     <img
-                      src={avatar || "https://i.pravatar.cc/56?img=11"}
+                      src={getUserAvatarSrc({ profile: { avatar_url: avatar } })}
                       className="w-14 h-14 rounded-xl object-cover"
-                      onError={(e) => { e.target.style.display = "none"; }}
+                      alt=""
                     />
                       <div className="absolute bottom-0.5 right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
                     </div>

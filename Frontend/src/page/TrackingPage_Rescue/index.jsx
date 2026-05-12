@@ -24,6 +24,7 @@ import { getSosDetail } from "@/services/api/apiSos";
 import { getCurrentTracking, updateRescueLocation, updateRescueStage } from "@/services/api/apiTracking";
 import { getSocket, reinitSocketForTrackingPersona } from "@/services/socket";
 import { getOSRMRoute } from "@/services/api/apiRouting";
+import { getUserAvatarSrc } from "@/lib/userAvatar";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -827,7 +828,7 @@ export default function TrackingView() {
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-100 shadow-sm shrink-0">
                     <img
-                      src={sos.victim_id?.profile?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${sos.victim_id?._id}`}
+                      src={getUserAvatarSrc(sos?.victim_id)}
                       className="w-full h-full object-cover"
                       alt=""
                     />

@@ -33,8 +33,32 @@ export const update = async (req, res) => {
 
 export const toggleActive = async (req, res) => {
   try {
-    res.status(200).json({ success: true, data: await userService.toggleUserActive(req.params.id, req.body.is_active) });
-  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+    const actorRole = String(req.user?.role || "").toUpperCase();
+    if (actorRole !== "ADMIN") {
+      return res.status(403).json({
+        success: false,
+        message: "Chỉ quản trị viên được khóa/mở khóa tài khoản",
+      });
+    }
+
+    const target = await userService.getUserById(req.params.id);
+    if (!target) {
+      return res.status(404).json({ success: false, message: "Không tìm thấy user" });
+    }
+
+    const targetRole = String(target.role || "").trim().toLowerCase();
+    if (targetRole !== "victim" && targetRole !== "rescue") {
+      return res.status(400).json({
+        success: false,
+        message: "Chỉ khóa/mở khóa được tài khoản Nạn nhân và Cứu hộ",
+      });
+    }
+
+    const updated = await userService.toggleUserActive(req.params.id, req.body?.is_active);
+    res.status(200).json({ success: true, data: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 };
 
 export const remove = async (req, res) => {

@@ -23,6 +23,7 @@ import { getSosDetail, cancelSos } from "@/services/api/apiSos";
 import { getCurrentTrackingBySosId } from "@/services/api/apiTracking";
 import { getSocket, reinitSocketForTrackingPersona } from "@/services/socket";
 import { getOSRMRoute } from "@/services/api/apiRouting";
+import { getUserAvatarSrc } from "@/lib/userAvatar";
 
 import Fire        from "../../assets/fire.svg?react";
 import Compass     from "../../assets/lost.svg?react";
@@ -718,7 +719,7 @@ export default function TrackingPage() {
               <div className="bg-emerald-50 rounded-3xl p-5 border border-emerald-100 flex items-center gap-4">
                 <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-md">
                   <img
-                    src={sos.victim_id?.profile?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${sos.victim_id?._id}`}
+                    src={getUserAvatarSrc(sos?.victim_id)}
                     className="w-full h-full object-cover"
                     alt=""
                   />
