@@ -43,6 +43,10 @@ export default function SOSForm({ position, onConfirm, onCancel, sending, user }
       showError('Vui lòng nhập loại sự cố');
       return;
     }
+    if (!description.trim()) {
+      showError('Vui lòng nhập mô tả chi tiết');
+      return;
+    }
     onConfirm?.({
       type: selectedType === 'other' ? otherType : selectedType,
       description,
@@ -132,7 +136,7 @@ export default function SOSForm({ position, onConfirm, onCancel, sending, user }
           {/* DESCRIPTION */}
           <div>
             <p className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-2">
-              <FileText size={14} /> Mô tả chi tiết
+              <FileText size={14} /> Mô tả chi tiết <span className="text-red-500">*</span>
             </p>
 
             <textarea

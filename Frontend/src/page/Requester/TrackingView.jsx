@@ -656,8 +656,17 @@ export default function TrackingPage() {
                     <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs shadow-lg shadow-blue-100">
                       <Ambulance size={14} />
                     </div>
-                    <span className="text-xs font-bold text-slate-800 truncate max-w-[80px]">
-                      {tracking?.rescue_name || (rescuePt ? "Đội gần nhất" : "Đang tìm...")}
+                    <span className="text-xs font-bold text-slate-800 truncate max-w-[120px]">
+                      {tracking?.rescue_name || (
+                        <div className="flex items-center gap-1">
+                          <span>Đội cứu hộ</span>
+                          <span className="flex gap-0.5">
+                            <span className="animate-bounce [animation-delay:-0.3s]">.</span>
+                            <span className="animate-bounce [animation-delay:-0.15s]">.</span>
+                            <span className="animate-bounce">.</span>
+                          </span>
+                        </div>
+                      )}
                     </span>
                   </div>
                 </div>
