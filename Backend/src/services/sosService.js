@@ -4,7 +4,7 @@ import UserLocation from '../models/userLocationModel.js';
 import RescueAssignment from '../models/rescueAssignmentModel.js';
 import IncidentType from '../models/incidentTypeModel.js';
 import { analyzeSOS } from './aiService.js';
-
+import mongoose from 'mongoose';
 const ALLOWED_STATUS = ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'CANCELLED'];
 
 export const createSos = async (data) => {
@@ -73,24 +73,39 @@ export const getLatestAssignmentForRequest = (requestId) =>
     .select('_id stage rescue_id request_id accepted_at arrived_at rescuing_started_at completed_at stage_history current_distance_km eta_minutes')
     .populate('rescue_id', 'full_name phone');
 
-export const getSosByRequester = async (requesterId) => {
-  const sosList = await SosRequest.find({ victim_id: requesterId })
-    .populate('victim_id', 'full_name phone')
-    .populate('assigned_rescue_id', 'full_name phone')
-    .populate('incident_type', 'name icon color_code')
-    .sort({ created_at: -1 })
-    .lean();
-
-  return Promise.all(
-    sosList.map(async (sos) => {
-      const assignment = await RescueAssignment.findOne({ request_id: sos._id })
-        .sort({ assigned_at: -1 })
-        .select('_id stage stage_history accepted_at arrived_at rescuing_started_at completed_at')
+    export const getSosByRequester = async (requesterId) => {
+      // Lấy raw trước, không populate incident_type
+      const sosList = await SosRequest.find({ victim_id: requesterId })
+        .populate('victim_id', 'full_name phone')
+        .populate('assigned_rescue_id', 'full_name phone')
+        .sort({ created_at: -1 })
         .lean();
-      return { ...sos, assignment: assignment || null };
-    })
-  );
-};
+    
+      return Promise.all(
+        sosList.map(async (sos) => {
+          // Populate incident_type an toàn — bỏ qua nếu không phải ObjectId hợp lệ
+          let incidentType = null;
+          try {
+            if (sos.incident_type && mongoose.Types.ObjectId.isValid(sos.incident_type)) {
+              incidentType = await IncidentType.findById(sos.incident_type)
+                .select('name icon color_code')
+                .lean();
+            }
+          } catch (_) {}
+    
+          const assignment = await RescueAssignment.findOne({ request_id: sos._id })
+            .sort({ assigned_at: -1 })
+            .select('_id stage stage_history accepted_at arrived_at rescuing_started_at completed_at')
+            .lean();
+    
+          return {
+            ...sos,
+            incident_type: incidentType,
+            assignment: assignment || null,
+          };
+        })
+      );
+    };
 
 export const getSosByTeam = (teamId) =>
   SosRequest.find({ assigned_rescue_id: teamId })
