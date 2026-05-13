@@ -311,17 +311,17 @@ function describeDonutSlicePath(cx, cy, rInner, rOuter, a0, a1) {
 
 /** Cột: loại/đội — phần trăm — số lượng (đồng bộ với DistributionRow) */
 const METRIC_TABLE_GRID =
-  'grid grid-cols-[minmax(0,9.5rem)_minmax(6.5rem,1fr)_minmax(5.5rem,7.25rem)] items-center gap-x-3';
+  'grid grid-cols-[minmax(0,1fr)_minmax(6.5rem,1fr)_minmax(3.25rem,auto)] items-center gap-x-2 sm:gap-x-3';
 
 function DistributionMetricHeader({ firstColumnLabel }) {
   return (
     <div
       className={cn(
         METRIC_TABLE_GRID,
-        'border-b border-gray-100 pb-2 text-[11px] font-semibold text-gray-500',
+        'border-b border-gray-100 pb-2 text-sm font-semibold text-gray-500',
       )}
     >
-      <span className="min-w-0 truncate">{firstColumnLabel}</span>
+      <span className="min-w-0 text-left">{firstColumnLabel}</span>
       <span className="text-center">Phần trăm %</span>
       <span className="text-right">Số lượng</span>
     </div>
@@ -333,7 +333,9 @@ function DistributionRow({ label, emoji, count, percent, barColor }) {
     <div className={cn(METRIC_TABLE_GRID, 'py-2')}>
       <div className="flex min-w-0 items-center gap-2">
         {emoji && <span className="shrink-0 text-lg leading-none">{emoji}</span>}
-        <span className="truncate text-sm font-medium text-gray-700">{label}</span>
+        <span className="min-w-0 flex-1 text-pretty break-words text-sm font-medium leading-snug text-gray-700">
+          {label}
+        </span>
       </div>
       <div className="flex min-w-0 items-center gap-2">
         <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100">
@@ -713,7 +715,14 @@ export default function DashboardPage() {
   ]);
 
   return (
-    <div className="w-full space-y-6 px-6 py-8">
+    <div
+      className={cn(
+        'text-[15px] leading-relaxed sm:text-base sm:leading-normal',
+        '[&_.text-xs]:text-sm [&_.text-sm]:text-base [&_.text-base]:text-lg',
+        '[&_.text-lg]:text-xl [&_.text-xl]:text-2xl [&_.text-2xl]:text-3xl [&_.text-3xl]:text-4xl [&_.text-4xl]:text-5xl',
+        'w-full space-y-6 px-6 py-8',
+      )}
+    >
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Thống kê & Báo cáo</h1>
@@ -820,7 +829,7 @@ export default function DashboardPage() {
             {activeTrendData.map((d, i) => (
               <div key={i} className="flex flex-1 flex-col items-center gap-2">
                 <div className="group relative w-full">
-                  <div className="pointer-events-none absolute -top-8 left-1/2 z-10 -translate-x-1/2 rounded-md bg-gray-900 px-2 py-1 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">
+                  <div className="pointer-events-none absolute -top-8 left-1/2 z-10 -translate-x-1/2 rounded-md bg-gray-900 px-2 py-1 text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">
                     {d.count} sự cố
                   </div>
                   <div
@@ -828,7 +837,7 @@ export default function DashboardPage() {
                     style={{ height: `${Math.max(d.height, 4)}px` }}
                   />
                 </div>
-                <p className="text-[10px] font-semibold text-gray-400">{d.label}</p>
+                <p className="text-xs font-semibold text-gray-400">{d.label}</p>
               </div>
             ))}
           </div>
@@ -898,7 +907,7 @@ export default function DashboardPage() {
                         {donutHover.emoji ? `${donutHover.emoji} ` : ''}
                         {donutHover.label}
                       </p>
-                      <p className="mt-1 text-[11px] leading-snug text-gray-600">
+                      <p className="mt-1 text-sm leading-snug text-gray-600">
                         <span className="font-medium text-gray-800">{donutHover.count}</span> sự cố
                         <span className="mx-1 text-gray-300">•</span>
                         <span className="font-medium text-gray-800">{donutHover.percent}%</span> tổng
@@ -932,7 +941,9 @@ export default function DashboardPage() {
                         {item.emoji && (
                           <span className="shrink-0 text-base leading-none">{item.emoji}</span>
                         )}
-                        <span className="truncate font-medium">{item.label}</span>
+                        <span className="min-w-0 flex-1 text-pretty break-words font-medium leading-snug">
+                          {item.label}
+                        </span>
                       </span>
                       <span className="text-center font-semibold tabular-nums text-gray-800">
                         {item.percent}%
@@ -964,7 +975,7 @@ export default function DashboardPage() {
             )}
             {!loading && rescueTeamDistribution.length > 0 && (
               <>
-                <DistributionMetricHeader firstColumnLabel="Loại" />
+                <DistributionMetricHeader firstColumnLabel="Đội cứu trợ" />
                 <div className="divide-y divide-gray-50">
                   {rescueTeamDistribution.slice(0, 5).map((item, i) => (
                     <DistributionRow
@@ -1017,7 +1028,7 @@ export default function DashboardPage() {
                       style={{ height: `${Math.max(height, 4)}px` }}
                     />
                   </div>
-                  <p className="text-[9px] font-semibold text-gray-400">
+                  <p className="text-xs font-semibold text-gray-400">
                     {String(hourStart).padStart(2, '0')}:00
                   </p>
                 </div>
@@ -1052,7 +1063,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Footer */}
-      <div className="flex flex-col items-center justify-between gap-2 px-1 pb-2 text-[11px] text-gray-400 sm:flex-row">
+      <div className="flex flex-col items-center justify-between gap-2 px-1 pb-2 text-sm text-gray-400 sm:flex-row">
         <span>© 2024 GUARDIAN RESPONSE SYSTEM • BẢO MẬT TUYỆT ĐỐI</span>
         <span className="flex items-center gap-2">
           <span className="inline-block size-1.5 rounded-full bg-green-500" />

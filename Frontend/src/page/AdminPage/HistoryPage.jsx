@@ -219,7 +219,14 @@ export default function HistoryPage() {
   );
 
   return (
-    <div className="w-full px-6 py-8 space-y-6">
+    <div
+      className={cn(
+        'text-[15px] leading-relaxed sm:text-base sm:leading-normal',
+        '[&_.text-xs]:text-sm [&_.text-sm]:text-base [&_.text-base]:text-lg',
+        '[&_.text-lg]:text-xl [&_.text-xl]:text-2xl [&_.text-2xl]:text-3xl [&_.text-3xl]:text-4xl [&_.text-4xl]:text-5xl',
+        'w-full space-y-6 px-6 py-8',
+      )}
+    >
       {/* Title */}
       <h1 className="text-2xl font-bold text-gray-900">Lịch sử sự cố</h1>
 
@@ -331,7 +338,7 @@ export default function HistoryPage() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] border-collapse text-left text-sm">
             <thead>
-              <tr className="border-b border-[#E8E8EC] bg-gray-50 text-[11px] font-bold uppercase tracking-widest text-gray-500">
+              <tr className="border-b border-[#E8E8EC] bg-gray-50 text-sm font-bold uppercase tracking-widest text-gray-500">
                 <th className="px-5 py-3.5">ID</th>
                 <th className="px-5 py-3.5">Loại sự cố</th>
                 <th className="px-5 py-3.5">Vị trí</th>
@@ -467,7 +474,7 @@ export default function HistoryPage() {
       </div>
 
       {/* Footer */}
-      <div className="flex flex-col items-center justify-between gap-2 px-1 pb-2 text-[11px] text-gray-400 sm:flex-row">
+      <div className="flex flex-col items-center justify-between gap-2 px-1 pb-2 text-sm text-gray-400 sm:flex-row">
         <span>© 2024 GUARDIAN RESPONSE SYSTEM • BẢO MẬT TUYỆT ĐỐI</span>
         <span className="flex items-center gap-2">
           <span className="size-1.5 rounded-full bg-green-500 inline-block" />

@@ -185,7 +185,14 @@ export default function IncidentManagement() {
   const systemLoad = Math.min(100, rawLoad || 75);
 
   return (
-    <div className="w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+    <div
+      className={cn(
+        'text-[15px] leading-relaxed sm:text-base sm:leading-normal',
+        '[&_.text-xs]:text-sm [&_.text-sm]:text-base [&_.text-base]:text-lg',
+        '[&_.text-lg]:text-xl [&_.text-xl]:text-2xl [&_.text-2xl]:text-3xl [&_.text-3xl]:text-4xl [&_.text-4xl]:text-5xl',
+        'w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8',
+      )}
+    >
       <div className="mx-auto w-full max-w-none space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
