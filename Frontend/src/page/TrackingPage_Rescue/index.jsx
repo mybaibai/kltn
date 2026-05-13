@@ -18,14 +18,13 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import CompletionPopup from "@/components/ui/CompletionPopup";
-
+import  infoIcon from "../../assets/info.svg";
 
 import { getSosDetail } from "@/services/api/apiSos";
 import { getCurrentTracking, updateRescueLocation, updateRescueStage } from "@/services/api/apiTracking";
 import { getSocket, reinitSocketForTrackingPersona } from "@/services/socket";
 import { getOSRMRoute } from "@/services/api/apiRouting";
 import { getUserAvatarSrc } from "@/lib/userAvatar";
-
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 /**
@@ -837,14 +836,20 @@ export default function TrackingView() {
                     <div className="flex items-center gap-2 mb-1">
                       <User size={12} className="text-gray-400 shrink-0" />
                       <span className="text-sm font-bold text-slate-900 truncate">{victimName}</span>
-                      <button
-                        type="button"
-                        onClick={() => setShowVictimPopup(true)}
-                        className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-rose-500 text-white hover:bg-rose-600 transition-shadow shadow-sm"
-                        aria-label="Xem thông tin nạn nhân"
-                      >
-                        <AlertTriangle size={14} />
-                      </button>
+                      <div className="relative group">
+                        <button
+                          type="button"
+                          onClick={() => setShowVictimPopup(true)}
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-white shadow-sm"
+                        >
+                          <img src = {infoIcon} alt="Info" className="w-4 h-4" />
+                        </button>
+
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2
+                          opacity-0 group-hover:opacity-100 transition bg-blue-200 text-blue-800 text-xs px-2 py-2 rounded-sm whitespace-nowrap">
+                          Nhấn để xem thêm thông tin
+                        </div>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <Phone size={12} className="text-gray-400 shrink-0" />
@@ -919,7 +924,7 @@ export default function TrackingView() {
           <div className="p-6 bg-[#F2F4F6] border-t border-gray-200 shrink-0">
             <button
               onClick={() => window.location.reload()}
-              className="w-full py-4 bg-gray-200 hover:bg-gray-300 text-slate-800 rounded-2xl font-bold text-xs transition-all uppercase tracking-widest"
+              className="w-full py-4 bg-gray-200 hover:bg-black hover:text-white text-slate-800 rounded-2xl font-bold text-xs transition-all uppercase tracking-widest"
             >
               Làm mới dữ liệu
             </button>

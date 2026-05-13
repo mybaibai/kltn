@@ -238,7 +238,9 @@ export default function SosPage() {
   const [newsItems, setNewsItems] = useState([]);
   const [newsLoading, setNewsLoading] = useState(false);
   const [newsError, setNewsError] = useState('');
-
+  const [showActiveSosWarning, setShowActiveSosWarning] = useState(false);
+  const activeSosId = localStorage.getItem("active_sos_id");
+  
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
@@ -386,7 +388,13 @@ export default function SosPage() {
     );
   };
 
-  const handleSosClick = () => {    
+  const handleSosClick = () => {
+    // Kiểm tra đang có SOS active
+    if (activeSosId) {
+      setShowActiveSosWarning(true); // ✅ hiện modal thay vì cho gửi tiếp
+      return;
+    }
+  
     if (!position || !position.lat || !position.lng) {
       showToast('⚠️ Vui lòng lấy vị trí của bạn trước', 'warning');
       return;
@@ -458,6 +466,8 @@ export default function SosPage() {
         incident_type: incidentType,
       });
       const sosId = res.data.data._id;
+
+      localStorage.setItem("active_sos_id", sosId);
       setShowModal(false);
       navigate(`/tracking/${sosId}`);
     } catch (err) {
@@ -656,7 +666,21 @@ export default function SosPage() {
           </div>
         </nav>
       </header>
-  
+      {/* banner active SOS */}
+      {localStorage.getItem("active_sos_id") && (
+        <div className="fixed top-[200px] left-1/2 -translate-x-1/2 z-[999] w-[90%] max-w-md">
+          <button
+            onClick={() => navigate(`/tracking/${localStorage.getItem("active_sos_id")}`)}
+            className="w-full flex items-center gap-3 px-5 py-3.5 
+              bg-amber-500 hover:bg-amber-600 text-white rounded-2xl 
+              shadow-xl shadow-amber-200 transition-all font-semibold text-sm"
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping shrink-0" />
+            <span className="flex-1 text-left">Bạn đang có yêu cầu cứu trợ đang xử lý</span>
+            <span className="text-white/80 text-xs font-bold uppercase tracking-wider">Xem →</span>
+          </button>
+        </div>
+      )}
       <div className="absolute inset-0 z-0 text-sans">
         <style>{sosMapStyles}</style>
         <MapContainer
@@ -704,32 +728,8 @@ export default function SosPage() {
       )}
   
       {/* FLOATING UI */}
-      <div className="pointer-events-none absolute inset-0 z-10 flex flex-col justify-between p-6 pt-32">
-  
-        {/* LEFT CARD */}
-        <div className="pointer-events-auto">
-          <div className="w-72 rounded-2xl bg-white/80 backdrop-blur-md shadow-xl p-4">
-            <div className="font-semibold mb-3">❗ Thông tin cứu hộ</div>
-  
-            <div className="flex justify-between text-sm mb-2">
-              <span className="text-gray-500">Đội gần nhất</span>
-              <span className="bg-gray-100 px-2 py-1 rounded-full">2.4 km</span>
-            </div>
-  
-            <div className="flex justify-between text-sm mb-4">
-              <span className="text-gray-500">Thời gian</span>
-              <span className="bg-gray-100 px-2 py-1 rounded-full">8 phút</span>
-            </div>
-  
-            <button
-              className="w-full py-2 rounded-lg bg-gray-100 hover:bg-gray-200"
-              onClick={() => setSupportOpen(true)}
-            >
-              Gọi hỗ trợ trực tiếp
-            </button>
-          </div>
-        </div>
-  
+      <div className="pointer-events-none absolute inset-0 z-10 flex flex-col justify-end p-6 pt-32">
+
         {/* SOS */}
         <div className="pointer-events-auto flex flex-col items-center gap-4 pb-8">
           <div className="relative flex items-center justify-center">
@@ -917,6 +917,42 @@ export default function SosPage() {
           sending={sending}
           user={user}
         />
+      )}
+      {showActiveSosWarning && (
+        <div className="fixed inset-0 z-[99999] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-[340px] rounded-[28px] p-6 shadow-2xl">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center">
+              <svg className="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+              </svg>
+            </div>
+            <h2 className="text-center text-lg font-bold text-slate-900 mb-2">
+              Bạn đang có yêu cầu cứu trợ
+            </h2>
+            <p className="text-center text-sm text-gray-500 mb-6 leading-relaxed">
+              Vui lòng chờ yêu cầu hiện tại hoàn thành hoặc hủy trước khi gửi yêu cầu mới.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  setShowActiveSosWarning(false);
+                  navigate(`/tracking/${activeSosId}`); // ✅ dùng state
+                }}
+                className="w-full py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm transition-all"
+              >
+                Xem yêu cầu đang xử lý
+              </button>
+              <button
+                onClick={() => {setShowActiveSosWarning(false)
+                navigate(`/tracking/${localStorage.getItem("active_sos_id")}`);
+                }}
+                className="w-full py-3.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-slate-900 font-bold text-sm transition-all"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {toast && (
         <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 

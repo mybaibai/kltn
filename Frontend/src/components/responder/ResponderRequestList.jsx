@@ -11,29 +11,47 @@ const PAGE_SIZE = 5;
 
 function resolveIncidentDisplay(incidentType) {
   const type = String(incidentType || "").toLowerCase();
-  if (type.includes("vehicle") || type.includes("xe") || type.includes("tai nạn")) {
+
+  if (type.includes("vehicle") || type.includes("xe") || type.includes("sự cố phương tiện")) {
     return { Icon: CarIcon, label: "Sự cố phương tiện" };
   }
-  if (type.includes("fire") || type.includes("cháy") || type.includes("hỏa hoạn")) {
-    return { Icon: FireIcon, label: "Hỏa hoạn" };
+  if (type.includes("fire") || type.includes("cháy") || type.includes("cháy nổ")) {
+    return { Icon: FireIcon, label: "Cháy nổ" };
   }
-  if (type.includes("flood") || type.includes("lụt") || type.includes("ngập")) {
-    return { Icon: WaveIcon, label: "Ngập lụt" };
-  }
-  if (type.includes("storm") || type.includes("bão")) {
-    return { Icon: WaveIcon, label: "Bão" };
-  }
-  if (type.includes("natural") || type.includes("thiên tai")) {
+  if (type.includes("flood") || type.includes("lụt") || type.includes("thiên tai")) {
     return { Icon: WaveIcon, label: "Thiên tai" };
   }
-  if (type.includes("medical") || type.includes("y tế") || type.includes("thương") || type.includes("cấp cứu")) {
-    return { Icon: MedicalIcon, label: "Cấp cứu y tế" };
+  if (type.includes("medical") || type.includes("y tế") || type.includes("sức khỏe") || type.includes("cấp cứu")) {
+    return { Icon: MedicalIcon, label: "Sức khỏe" };
   }
   if (type.includes("lost") || type.includes("lạc") || type.includes("mất tích")) {
     return { Icon: LostIcon, label: "Lạc đường" };
   }
   return { Icon: MoreIcon, label: "Khác" };
 }
+
+const LEVEL_STYLES = {
+  critical: {
+    border: "border-l-red-500",
+    badge: "bg-red-100 text-red-700",
+    selectedBg: "bg-red-50 border-red-200",
+  },
+  high: {
+    border: "border-l-orange-500",
+    badge: "bg-orange-100 text-orange-700",
+    selectedBg: "bg-orange-50 border-orange-200",
+  },
+  medium: {
+    border: "border-l-amber-400",
+    badge: "bg-amber-100 text-amber-700",
+    selectedBg: "bg-amber-50 border-amber-200",
+  },
+  low: {
+    border: "border-l-green-500",
+    badge: "bg-green-100 text-green-700",
+    selectedBg: "bg-green-50 border-green-200",
+  },
+};
 
 export default function ResponderRequestList({
   requests,
@@ -67,7 +85,6 @@ export default function ResponderRequestList({
     low:      "Mức độ: Thấp",
   };
 
-  // Reset pagination when list or filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [requests.length, proximitySort, urgencyLevel]);
@@ -76,7 +93,6 @@ export default function ResponderRequestList({
   const pagedRequests = requests.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   function isRequestAlreadyAccepted(item) {
-    // If the SOS already has an assigned_rescue_id and it's not the current user, or if status is not PENDING
     if (item.source?.assigned_rescue_id && String(item.source.assigned_rescue_id) !== String(currentUserId)) {
       return true;
     }
@@ -89,7 +105,6 @@ export default function ResponderRequestList({
     onAcceptRequest?.(item);
   }
 
-  // Generate pagination items: [1, 2, '...', total]
   const pageItems = useMemo(() => {
     const items = [];
     if (totalPages <= 7) {
@@ -107,191 +122,207 @@ export default function ResponderRequestList({
   }, [currentPage, totalPages]);
 
   return (
-    <div className="responder-list-col">
-      <div className="responder-list-heading">
-        <div className="responder-heading-main">
-          <h1>NHẬN YÊU CẦU CỨU TRỢ</h1>
-          <p>
-            <span className="live-dot" /> Đang giám sát thời gian thực
+    // font-[600] base weight — dùng DM Sans hoặc Nunito nếu đã import, fallback sans-serif
+    <div className="flex flex-col gap-4 [&_*]:font-[family-name:var(--font-sans,inherit)]">
+
+      {/* ── HEADING ── */}
+      <div className="flex items-start justify-between gap-4">
+        {/* Title + live */}
+        <div>
+          <h1 className="text-3xl font-black tracking-tight text-black">
+            NHẬN YÊU CẦU CỨU TRỢ
+          </h1>
+          <p className="flex items-center gap-2 mt-1 text-sm font-semibold text-black">
+            <span className="inline-block w-2 h-2 rounded-full bg-green-500 shrink-0" />
+            Đang giám sát thời gian thực
+            {apiMessage && (
+              <span className="ml-2 text-blue-500">{apiMessage}</span>
+            )}
           </p>
         </div>
 
-        <div className="responder-list-filters">
-          <div className="responder-filter-dropdown">
+        {/* Filters */}
+        <div className="flex items-center gap-2 shrink-0">
+
+          {/* Proximity dropdown */}
+          <div className="relative">
             <button
               type="button"
-              className="responder-filter-trigger"
+              className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-black hover:border-blue-400 transition-colors"
               onClick={() => setOpenMenu((prev) => (prev === "proximity" ? null : "proximity"))}
               aria-expanded={openMenu === "proximity"}
               aria-haspopup="menu"
             >
-              <Filter size={12} style={{ marginRight: 4 }} />
+              <Filter size={12} />
               {proximityLabelMap[proximitySort] || "Mới nhất"}
-              <ChevronDown size={14} className={`responder-filter-chevron ${openMenu === "proximity" ? "is-open" : ""}`} />
+              <ChevronDown
+                size={14}
+                className={`transition-transform ${openMenu === "proximity" ? "rotate-180" : ""}`}
+              />
             </button>
 
-            {openMenu === "proximity" ? (
-              <ul className="responder-filter-menu" role="menu" aria-label="Sắp xếp khoảng cách">
-                <li role="none">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className={`responder-filter-menu-item ${proximitySort === "nearest" ? "is-selected" : ""}`}
-                    onClick={() => {
-                      onProximitySortChange?.("nearest");
-                      setOpenMenu(null);
-                    }}
-                  >
-                    Gần nhất
-                  </button>
-                </li>
-                <li role="none">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className={`responder-filter-menu-item ${proximitySort === "farthest" ? "is-selected" : ""}`}
-                    onClick={() => {
-                      onProximitySortChange?.("farthest");
-                      setOpenMenu(null);
-                    }}
-                  >
-                    Xa nhất
-                  </button>
-                </li>
-                <li role="none">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className={`responder-filter-menu-item ${proximitySort === "latest" ? "is-selected" : ""}`}
-                    onClick={() => {
-                      onProximitySortChange?.("latest");
-                      setOpenMenu(null);
-                    }}
-                  >
-                    Mới nhất
-                  </button>
-                </li>
+            {openMenu === "proximity" && (
+              <ul
+                className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1"
+                role="menu"
+                aria-label="Sắp xếp khoảng cách"
+              >
+                {[
+                  { value: "nearest", label: "Gần nhất" },
+                  { value: "farthest", label: "Xa nhất" },
+                  { value: "latest", label: "Mới nhất" },
+                ].map(({ value, label }) => (
+                  <li key={value} role="none">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className={`w-full text-left px-4 py-2 text-sm font-semibold hover:bg-blue-50 hover:text-blue-700 transition-colors ${
+                        proximitySort === value ? "text-blue-600 bg-blue-50" : "text-black"
+                      }`}
+                      onClick={() => { onProximitySortChange?.(value); setOpenMenu(null); }}
+                    >
+                      {label}
+                    </button>
+                  </li>
+                ))}
               </ul>
-            ) : null}
+            )}
           </div>
 
-          <div className="responder-filter-dropdown">
+          {/* Urgency dropdown */}
+          <div className="relative">
             <button
               type="button"
-              className="responder-filter-trigger"
+              className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-black hover:border-blue-400 transition-colors"
               onClick={() => setOpenMenu((prev) => (prev === "urgency" ? null : "urgency"))}
               aria-expanded={openMenu === "urgency"}
               aria-haspopup="menu"
             >
-              {urgencyLabelMap[urgencyLevel] || "Mức độ khẩn cấp"}
-              <ChevronDown size={14} className={`responder-filter-chevron ${openMenu === "urgency" ? "is-open" : ""}`} />
+              <Filter size={12} />
+              {urgencyLabelMap[urgencyLevel] || "Tất cả mức độ"}
+              <ChevronDown
+                size={14}
+                className={`transition-transform ${openMenu === "urgency" ? "rotate-180" : ""}`}
+              />
             </button>
 
-            {openMenu === "urgency" ? (
-              <ul className="responder-filter-menu" role="menu" aria-label="Lọc mức độ khẩn cấp">
-                <li role="none">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className={`responder-filter-menu-item ${urgencyLevel === "all" ? "is-selected" : ""}`}
-                    onClick={() => { onUrgencyLevelChange?.("all"); setOpenMenu(null); }}
-                  >
-                    Tất cả
-                  </button>
-                </li>
-                <li role="none">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className={`responder-filter-menu-item ${urgencyLevel === "critical" ? "is-selected" : ""}`}
-                    onClick={() => { onUrgencyLevelChange?.("critical"); setOpenMenu(null); }}
-                  >
-                    🔴 Cực cao
-                  </button>
-                </li>
-                <li role="none">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className={`responder-filter-menu-item ${urgencyLevel === "high" ? "is-selected" : ""}`}
-                    onClick={() => { onUrgencyLevelChange?.("high"); setOpenMenu(null); }}
-                  >
-                    Cao
-                  </button>
-                </li>
-                <li role="none">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className={`responder-filter-menu-item ${urgencyLevel === "medium" ? "is-selected" : ""}`}
-                    onClick={() => { onUrgencyLevelChange?.("medium"); setOpenMenu(null); }}
-                  >
-                    Trung bình
-                  </button>
-                </li>
-                <li role="none">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className={`responder-filter-menu-item ${urgencyLevel === "low" ? "is-selected" : ""}`}
-                    onClick={() => { onUrgencyLevelChange?.("low"); setOpenMenu(null); }}
-                  >
-                    Thấp
-                  </button>
-                </li>
+            {openMenu === "urgency" && (
+              <ul
+                className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1"
+                role="menu"
+                aria-label="Lọc mức độ khẩn cấp"
+              >
+                {[
+                  { value: "all",      label: "Tất cả" },
+                  { value: "critical", label: "🔴 Cực cao" },
+                  { value: "high",     label: "Cao" },
+                  { value: "medium",   label: "Trung bình" },
+                  { value: "low",      label: "Thấp" },
+                ].map(({ value, label }) => (
+                  <li key={value} role="none">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className={`w-full text-left px-4 py-2 text-sm font-semibold hover:bg-blue-50 hover:text-blue-700 transition-colors ${
+                        urgencyLevel === value ? "text-blue-600 bg-blue-50" : "text-black"
+                      }`}
+                      onClick={() => { onUrgencyLevelChange?.(value); setOpenMenu(null); }}
+                    >
+                      {label}
+                    </button>
+                  </li>
+                ))}
               </ul>
-            ) : null}
+            )}
           </div>
-        </div>
 
-        {apiMessage ? <p className="responder-api-note">{apiMessage}</p> : null}
+        </div>
       </div>
 
-      <div className="responder-request-list">
+      {/* ── CARD LIST ── */}
+      <div className="flex flex-col gap-3">
         {!requests.length ? (
-          <article className="responder-request-empty">{emptyMessage || "Chưa có yêu cầu SOS để hiển thị"}</article>
+          <article className="py-12 text-center text-black text-sm font-semibold bg-white rounded-2xl border border-gray-100">
+            {emptyMessage || "Chưa có yêu cầu SOS để hiển thị"}
+          </article>
         ) : pagedRequests.map((item) => {
-          // Fallback: if level is unknown (e.g. not in levelMeta), treat as medium
           const meta = levelMeta[item.level] || levelMeta.medium || levelMeta.high;
+          const levelStyle = LEVEL_STYLES[item.level] || LEVEL_STYLES.medium;
           const incidentDisplay = resolveIncidentDisplay(item.incidentType);
           const selected = String(item.id) === String(selectedRequestId);
+
           return (
             <article
               key={item.id}
-              className={`responder-request-card ${selected ? "is-selected" : ""}`}
-              style={{ "--accent-line": meta.leftBorder }}
+              className={[
+                "bg-white rounded-2xl border border-l-4 border-gray-100 px-5 py-4 transition-shadow",
+                levelStyle.border,
+                selected ? `${levelStyle.selectedBg} shadow-md` : "hover:shadow-md",
+              ].join(" ")}
             >
-              <div className="responder-request-top">
-                <div className="responder-level-wrap">
-                  <span className={`responder-level-badge ${meta.className}`}>{meta.label}</span>
-                  <span className="responder-distance">{item.distanceKm != null ? `${item.distanceKm}km` : "—"}</span>
-                </div>
-                <div className="responder-time-stack">
-                  <span className="responder-time">{item.receivedAt}</span>
-                  <span className="responder-incident-icon" aria-label={incidentDisplay.label}>
-                    <incidentDisplay.Icon className="w-4 h-4" aria-hidden="true" />
+              {/* Top row: badge + distance/time | incident icon + label (thay "...") */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide ${levelStyle.badge}`}>
+                    {meta.label}
                   </span>
+                  <span className="text-sm font-semibold text-black">
+                    {item.distanceKm != null ? `${item.distanceKm}km` : "—"}
+                    {item.receivedAt ? ` • ${item.receivedAt}` : ""}
+                  </span>
+                </div>
+
+                {/* Incident type: icon + label — thay cho "..." */}
+                <div className="flex items-center gap-1.5" aria-label={incidentDisplay.label}>
+                  <incidentDisplay.Icon className="w-5 h-5 shrink-0 text-black" aria-hidden="true" />
+                  <span className="text-sm font-semibold text-black">{incidentDisplay.label}</span>
                 </div>
               </div>
 
-              <h3>{item.victimName || item.title}</h3>
-              <p className="responder-meta-line">Số điện thoại: {item.victimPhone || "Chưa có số điện thoại"}</p>
-              <p className="responder-meta-line">Loại sự cố: {item.incidentType || "Khác"}</p>
-              <p className="responder-description">Mô tả nguyên nhân: {item.description}</p>
-              <p className="responder-address">{item.address}</p>
+              {/* Victim name */}
+              <h3 className="text-lg font-bold text-black mb-2">
+                {item.victimName || item.title}
+              </h3>
 
-              <div className="responder-card-footer">
-                <button type="button" onClick={() => onSelectRequest?.(String(item.id))}>
+              {/* Info row: phone only (incident type đã lên top-right) */}
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mb-2">
+                <p className="flex items-center gap-1.5 text-sm font-semibold text-black">
+                  <span>📞</span>
+                  {item.victimPhone || "Chưa có số điện thoại"}
+                </p>
+              </div>
+
+              {/* Description */}
+              {item.description && (
+                <p className="text-sm font-semibold text-black mb-1">
+                  Mô tả nguyên nhân: {item.description}
+                </p>
+              )}
+
+              {/* Address */}
+              <p className="flex items-start gap-1.5 text-xs font-semibold text-black mb-3">
+                <span className="mt-0.5 shrink-0">📍</span>
+                {item.address}
+              </p>
+
+              {/* Footer buttons */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  className="px-4 py-2 text-sm font-semibold text-black bg-white border border-gray-200 rounded-xl hover:border-blue-400 hover:text-blue-600 transition-colors"
+                  onClick={() => onSelectRequest?.(String(item.id))}
+                >
                   Xem chi tiết
                 </button>
+
                 {!isRequestAlreadyAccepted(item) && (
                   <button
                     type="button"
-                    className="responder-accept-btn"
                     disabled={!onAcceptRequest || acceptLoading}
+                    className="flex items-center gap-1.5 px-5 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     onClick={() => handleAcceptRequest(item)}
                   >
-                    {acceptLoading ? "ĐANG XỬ LÝ..." : "Nhận"}
+                    {acceptLoading ? "ĐANG XỬ LÝ..." : "Nhận →"}
                   </button>
                 )}
               </div>
@@ -300,43 +331,50 @@ export default function ResponderRequestList({
         })}
       </div>
 
-      {requests.length > PAGE_SIZE ? (
-        <nav className="responder-pagination" aria-label="Phân trang yêu cầu">
-          <p className="responder-pagination-info">Trang {currentPage}/{totalPages}</p>
+      {/* ── PAGINATION ── */}
+      {requests.length > PAGE_SIZE && (
+        <nav className="flex items-center justify-between pt-2" aria-label="Phân trang yêu cầu">
+          <p className="text-sm font-semibold text-black">
+            Trang {currentPage}/{totalPages}
+          </p>
 
-          <div className="responder-pagination-controls">
+          <div className="flex items-center gap-1">
             <button
               type="button"
-              className="responder-page-nav"
+              className="px-3 py-1.5 text-sm font-semibold text-black border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
               disabled={currentPage === 1}
             >
               Trước
             </button>
 
-            <div className="responder-page-numbers">
-              {pageItems.map((item, index) => (
+            <div className="flex items-center gap-1">
+              {pageItems.map((item, index) =>
                 typeof item === "number" ? (
                   <button
                     key={item}
                     type="button"
-                    className={`responder-page-btn ${item === currentPage ? "is-active" : ""}`}
+                    className={`w-8 h-8 text-sm font-semibold rounded-lg transition-colors ${
+                      item === currentPage
+                        ? "bg-blue-600 text-white"
+                        : "text-black border border-gray-200 hover:border-blue-400 hover:text-blue-600"
+                    }`}
                     onClick={() => setCurrentPage(item)}
                     aria-current={item === currentPage ? "page" : undefined}
                   >
                     {item}
                   </button>
                 ) : (
-                  <span key={`${item}-${index}`} className="responder-page-ellipsis" aria-hidden="true">
+                  <span key={`${item}-${index}`} className="w-8 h-8 flex items-center justify-center text-black text-sm font-semibold">
                     ...
                   </span>
                 )
-              ))}
+              )}
             </div>
 
             <button
               type="button"
-              className="responder-page-nav"
+              className="px-3 py-1.5 text-sm font-semibold text-black border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
               disabled={currentPage === totalPages}
             >
@@ -344,7 +382,7 @@ export default function ResponderRequestList({
             </button>
           </div>
         </nav>
-      ) : null}
+      )}
     </div>
   );
 }

@@ -274,6 +274,7 @@ export default function TrackingPage() {
         const sosStatus = String(data.status || "").toUpperCase();
         if (TERMINAL_STAGES.has(sosStatus)) {
           isFinishedRef.current = true;
+          localStorage.removeItem("active_sos_id");
           if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
         }
       } catch (e) {
@@ -338,6 +339,7 @@ export default function TrackingPage() {
             if (msg) setToaster({ message: msg, type: newStage === "COMPLETED" ? "success" : "info" });
             if (TERMINAL_STAGES.has(newStage)) {
               isFinishedRef.current = true;
+              localStorage.removeItem("active_sos_id");
               if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
               if (newStage === "COMPLETED") setShowCompletion(true);
             }
@@ -778,6 +780,7 @@ export default function TrackingPage() {
                     try {
                       setIsCancelling(true);
                       await cancelSos(sosId);
+                      localStorage.removeItem("active_sos_id");
                       setToaster({ message: "Đã hủy yêu cầu", type: "success" });
                       setTimeout(() => {
                         setShowCancelModal(false);

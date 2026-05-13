@@ -23,7 +23,8 @@ export default function Header({
     } catch {
         return true;
     }
-    }); 
+    });
+  const activeSosId = localStorage.getItem("active_sos_id");
   // click ngoài để đóng menu
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -58,7 +59,17 @@ export default function Header({
 
         {/* Right */}
         <div className="flex items-center gap-2">
-
+          {activeSosId && (
+              <button
+                onClick={() => navigate(`/tracking/${activeSosId}`)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 
+                  border border-amber-200 rounded-xl text-amber-700 text-xs font-bold
+                  hover:bg-amber-100 transition-colors"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                Đang cứu hộ
+              </button>
+            )}
           {/* Bell */}
           <button className="relative w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors">
             🔔

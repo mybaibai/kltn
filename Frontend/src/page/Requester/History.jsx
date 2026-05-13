@@ -93,7 +93,7 @@ function getIncidentConfig(typeName, description = "") {
 const STATUS_CONFIG = {
   completed: { label: "HOÀN THÀNH", className: "bg-green-100 text-green-600" },
   resolved:  { label: "HOÀN THÀNH", className: "bg-green-100 text-green-600" },
-  cancelled: { label: "ĐÃ HỦY",     className: "bg-gray-100 text-gray-500" },
+  cancelled: { label: "ĐÃ HỦY",     className: "bg-red-100 text-red-500" },
 };
 
 function normalizeStatus(raw) {
