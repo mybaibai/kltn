@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Eye, Filter, Map, Search } from 'lucide-react';
+import { Eye, Filter, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getAdminPaginationItems } from '@/lib/adminPagination';
 import { cn } from '@/lib/utils';
@@ -104,7 +103,6 @@ function formatIncidentDateTime(iso) {
 const PAGE_SIZE = 10;
 
 export default function IncidentManagement() {
-  const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -387,6 +385,8 @@ export default function IncidentManagement() {
                             >
                               <Eye className="size-4" />
                             </button>
+                            {/*
+                            Tạm tắt trang tracking admin — bật lại khi bật route + import AdminTrackingPage:
                             <span className="inline-flex size-8 items-center justify-center">
                               {['ASSIGNED', 'IN_PROGRESS'].includes(normalizeStatusKey(sos.status)) ? (
                                 <button
@@ -399,6 +399,7 @@ export default function IncidentManagement() {
                                 </button>
                               ) : null}
                             </span>
+                            */}
                           </div>
                         </td>
                       </tr>

@@ -74,7 +74,8 @@ export default function AdminLayout() {
         const sosId = res.data.data._id;
         setShowSos(false);
         setSending(false);
-        navigate(`/admin/tracking/${sosId}`);
+        // Tạm tắt trang tracking admin — bật lại: navigate(`/admin/tracking/${sosId}`);
+        navigate("/admin/incidents");
       } catch (err) {
         alert(`Gửi thất bại: ${err?.response?.data?.message || err?.message}`);
         setSending(false);

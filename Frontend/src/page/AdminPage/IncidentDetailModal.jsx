@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { X, Clock, AlertTriangle, MapPin, Phone, Navigation, StickyNote } from 'lucide-react';
+import { X, Clock, AlertTriangle, Phone, Navigation, StickyNote } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatSosCode, getIncidentTypeDisplay } from '@/constants/incidentMeta';
 import { updateSosStatus } from '@/services/api/apiSos';
@@ -107,7 +106,6 @@ function ConfirmCancelDialog({ onConfirm, onDismiss, loading }) {
 }
 
 export default function IncidentDetailModal({ sos, onClose, onStatusChanged }) {
-  const navigate = useNavigate();
   const [showConfirmCancel, setShowConfirmCancel] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
@@ -204,6 +202,8 @@ export default function IncidentDetailModal({ sos, onClose, onStatusChanged }) {
                 {hasCoords && (
                   <div className="overflow-hidden rounded-xl border">
                     <iframe title="map" src={mapUrl} className="h-40 w-full border-0" loading="lazy" />
+                    {/*
+                    Tạm tắt trang tracking admin — bật lại khi bật route:
                     <button
                       type="button"
                       onClick={() => { onClose(); navigate(`/admin/tracking/${sos._id}`); }}
@@ -211,6 +211,7 @@ export default function IncidentDetailModal({ sos, onClose, onStatusChanged }) {
                     >
                       <MapPin className="size-4" /> Xem trên bản đồ
                     </button>
+                    */}
                   </div>
                 )}
                 {sos.address && (

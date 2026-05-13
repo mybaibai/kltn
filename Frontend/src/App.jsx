@@ -4,7 +4,8 @@ import RequesterTrackingPage from "@/page/Requester/TrackingView";
 import RescueTrackingPage from "@/page/TrackingPage_Rescue/index";
 import AdminLayout from "@/layouts/AdminLayout";
 import IncidentManagement from "@/page/AdminPage/IncidentManagement";
-import AdminTrackingPage from "@/page/AdminPage/AdminTrackingPage";
+// Tạm tắt trang tracking admin — bật lại khi cần:
+// import AdminTrackingPage from "@/page/AdminPage/AdminTrackingPage";
 import DashboardPage from "@/page/AdminPage/DashboardPage";
 import AdminPlaceholder from "@/page/AdminPage/AdminPlaceholder";
 import UsersPage from "@/page/AdminPage/UsersPage";
@@ -61,7 +62,11 @@ export default function App() {
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="incidents" element={<IncidentManagement />} />
-          <Route path="tracking/:sosId" element={<AdminTrackingPage />} />
+          {/* Tạm tắt — bật lại: element={<AdminTrackingPage />} */}
+          <Route
+            path="tracking/:sosId"
+            element={<Navigate to="/admin/incidents" replace />}
+          />
           <Route path="users" element={<UsersPage />} />
           <Route path="history" element={<AdminHistoryPage />} />
           <Route
