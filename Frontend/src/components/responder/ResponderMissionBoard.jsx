@@ -31,7 +31,7 @@ export default function ResponderMissionBoard({ user }) {
   const [requestStats, setRequestStats] = useState({ total: 0, pending: 0 });
   const [acceptLoading, setAcceptLoading] = useState(false);
   const [floatingAlerts, setFloatingAlerts] = useState([]);
-  const [proximitySort, setProximitySort] = useState("nearest");
+  const [proximitySort, setProximitySort] = useState("latest");
   const [urgencyLevel, setUrgencyLevel] = useState("all");
   const [notifications, setNotifications] = useState([]);
   const [toastAlerts, setToastAlerts] = useState([]);

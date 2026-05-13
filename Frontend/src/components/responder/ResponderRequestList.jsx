@@ -126,7 +126,7 @@ export default function ResponderRequestList({
               aria-haspopup="menu"
             >
               <Filter size={12} style={{ marginRight: 4 }} />
-              {proximityLabelMap[proximitySort] || "Gần nhất"}
+              {proximityLabelMap[proximitySort] || "Mới nhất"}
               <ChevronDown size={14} className={`responder-filter-chevron ${openMenu === "proximity" ? "is-open" : ""}`} />
             </button>
 
