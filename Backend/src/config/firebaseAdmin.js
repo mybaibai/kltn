@@ -9,51 +9,73 @@ dotenv.config({ override: true });
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const configuredPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
-const defaultPath = path.join(process.cwd(), "serviceAccountKey.json");
-const serviceAccountPath = configuredPath || defaultPath;
-
-const resolvedServiceAccountPath = fs.existsSync(serviceAccountPath)
-  ? serviceAccountPath
-  : defaultPath;
-
-if (!fs.existsSync(resolvedServiceAccountPath)) {
-  throw new Error(
-    `Firebase service account file not found. Tried: ${serviceAccountPath} and ${defaultPath}. ` +
-      "Set FIREBASE_SERVICE_ACCOUNT_PATH in .env or place serviceAccountKey.json in Backend/."
-  );
-}
-
-let serviceAccount;
-try {
-  const raw = fs.readFileSync(resolvedServiceAccountPath, "utf8").trim();
-  if (!raw) {
-    throw new Error("File rỗng — tải JSON service account từ Firebase Console → Project settings → Service accounts.");
+function loadServiceAccount() {
+  const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_B64?.trim();
+  if (b64) {
+    try {
+      const json = Buffer.from(b64, "base64").toString("utf8");
+      return JSON.parse(json);
+    } catch (e) {
+      throw new Error(`FIREBASE_SERVICE_ACCOUNT_B64 decode/parse failed: ${e.message}`);
+    }
   }
-  serviceAccount = JSON.parse(raw);
-} catch (e) {
-  if (e instanceof SyntaxError) {
+
+  const fromEnv = process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim();
+  if (fromEnv) {
+    try {
+      return JSON.parse(fromEnv);
+    } catch (e) {
+      throw new Error(
+        `FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON: ${e.message}. Tip: minify to one line or use FIREBASE_SERVICE_ACCOUNT_B64.`,
+      );
+    }
+  }
+
+  const configuredPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
+  const defaultPath = path.join(process.cwd(), "serviceAccountKey.json");
+  const serviceAccountPath = configuredPath || defaultPath;
+  const resolvedServiceAccountPath = fs.existsSync(serviceAccountPath)
+    ? serviceAccountPath
+    : defaultPath;
+
+  if (!fs.existsSync(resolvedServiceAccountPath)) {
     throw new Error(
-      `Không đọc được JSON tại ${resolvedServiceAccountPath}. Kiểm tra file không trống và là JSON hợp lệ (copy đủ từ Firebase). Chi tiết: ${e.message}`
+      "Firebase Admin: thiếu credential. Thêm vào .env: FIREBASE_SERVICE_ACCOUNT_B64 (khuyến nghị) hoặc FIREBASE_SERVICE_ACCOUNT_JSON, " +
+        "hoặc đặt file serviceAccountKey.json trong thư mục Backend (gitignore). Trên Render: dán cùng biến B64 vào Environment.",
     );
   }
-  throw e;
+
+  const raw = fs.readFileSync(resolvedServiceAccountPath, "utf8").trim();
+  if (!raw) {
+    throw new Error(
+      "Firebase service account file is empty — download JSON from Firebase Console → Project settings → Service accounts.",
+    );
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    if (e instanceof SyntaxError) {
+      throw new Error(`Invalid JSON in ${resolvedServiceAccountPath}: ${e.message}`);
+    }
+    throw e;
+  }
 }
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+const serviceAccount = loadServiceAccount();
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+}
 
 export const firebaseAdminAuth = admin.auth();
 
-// Nếu bật Firebase Auth Emulator, cấu hình để verify token chạy đúng trong môi trường dev.
-// Ví dụ thêm vào Backend/.env:
-// FIREBASE_AUTH_EMULATOR_HOST=http://localhost:9099
 const emulatorHost = process.env.FIREBASE_AUTH_EMULATOR_HOST;
 if (emulatorHost) {
   try {
     firebaseAdminAuth.useEmulator(emulatorHost);
   } catch {
-    // ignore (tùy version SDK / cách host format)
+    // ignore (SDK version / host format)
   }
 }
