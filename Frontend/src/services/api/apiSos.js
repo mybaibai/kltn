@@ -21,9 +21,9 @@ async function getFirebaseToken() {
   return null;
 }
 
-// ─── Axios instance ──────────────────────────────────────────────────────────
+// ─── Axios instance (phải dùng VITE_API_URL — trùng với src/services/api/index.js) ─
 const api = axios.create({
-  baseURL: "http://localhost:3001/api",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3001/api",
 });
 
 // Interceptor: gắn staff JWT mặc định, trừ khi skipStaffJwt = true
