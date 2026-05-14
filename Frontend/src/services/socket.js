@@ -2,6 +2,7 @@ import io from "socket.io-client";
 import { auth } from "@/lib/firebase";
 
 let socketInstance = null;
+let socketAuthMeta = null;
 
 function normalizeRole(role) {
   const value = String(role || "").trim().toUpperCase();
@@ -20,16 +21,42 @@ function resolveSocketUrl() {
   return apiUrl.replace(/\/api\/?$/, "");
 }
 
+function buildSocketAuthMeta(token, userId, userRole) {
+  return {
+    token: String(token || ""),
+    userId: String(userId || ""),
+    userRole: normalizeRole(userRole) || "",
+  };
+}
+
+function hasSameSocketAuth(nextMeta) {
+  return (
+    socketAuthMeta &&
+    socketAuthMeta.token === nextMeta.token &&
+    socketAuthMeta.userId === nextMeta.userId &&
+    socketAuthMeta.userRole === nextMeta.userRole
+  );
+}
+
 export function initSocket(token, userId, userRole) {
-  if (socketInstance) return socketInstance;
+  const authMeta = buildSocketAuthMeta(token, userId, userRole);
+
+  if (socketInstance && hasSameSocketAuth(authMeta)) {
+    return socketInstance;
+  }
+
+  if (socketInstance) {
+    socketInstance.disconnect();
+    socketInstance = null;
+  }
 
   const SOCKET_URL = resolveSocketUrl();
 
   socketInstance = io(SOCKET_URL, {
     auth: {
-      token,
-      userId,
-      userRole,
+      token: authMeta.token,
+      userId: authMeta.userId,
+      userRole: authMeta.userRole,
     },
     reconnection: true,
     reconnectionDelay: 1000,
@@ -54,6 +81,7 @@ export function initSocket(token, userId, userRole) {
     console.error("❌ Socket error:", err);
   });
 
+  socketAuthMeta = authMeta;
   return socketInstance;
 }
 
@@ -115,6 +143,7 @@ export function disconnectSocket() {
     socketInstance.disconnect();
     socketInstance = null;
   }
+  socketAuthMeta = null;
 }
 
 export default socketInstance;

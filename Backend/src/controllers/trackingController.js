@@ -71,6 +71,28 @@ export const acceptMission = async (req, res) => {
       timestamp: new Date(),
     });
 
+    io.to("rescue-all").emit("sos_assigned", {
+      request_id: assignment.request_id,
+      rescue_id,
+      assignment_id: assignment._id,
+      status: "IN_PROGRESS",
+      assignment_stage: assignment.stage,
+      accepted_at: assignment.accepted_at,
+      rescue_name: rescue.full_name,
+      timestamp: new Date(),
+    });
+
+    io.to(`rescue-${rescue_id}`).emit("sos_assigned", {
+      request_id: assignment.request_id,
+      rescue_id,
+      assignment_id: assignment._id,
+      status: "IN_PROGRESS",
+      assignment_stage: assignment.stage,
+      accepted_at: assignment.accepted_at,
+      rescue_name: rescue.full_name,
+      timestamp: new Date(),
+    });
+
     res.status(200).json({
       success: true,
       data: assignment,

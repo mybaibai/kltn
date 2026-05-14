@@ -90,6 +90,14 @@ export default function ResponderMissionBoard({ user }) {
     });
   }
 
+  function normalizeRescueId(value) {
+    if (!value) return null;
+    if (typeof value === "object") {
+      return String(value?._id || value?.id || "").trim() || null;
+    }
+    return String(value).trim() || null;
+  }
+
   const visibleRequests = useMemo(() => {
     let list = [...requests];
 
@@ -328,10 +336,7 @@ export default function ResponderMissionBoard({ user }) {
 
   // ===== SOCKET.IO: Listen for realtime SOS & tracking updates =====
   useEffect(() => {
-    let socket = getSocket();
-    if (!socket) {
-      socket = initSocketFromSession();
-    }
+    let socket = initSocketFromSession() || getSocket();
     if (!socket) return;
 
     function syncStatsFromRequests(list) {
@@ -364,7 +369,14 @@ export default function ResponderMissionBoard({ user }) {
       const idx = current.findIndex((it) => String(it.id) === requestId);
 
       if (idx >= 0) {
-        current[idx] = { ...current[idx], ...mappedItem };
+        current[idx] = {
+          ...current[idx],
+          ...mappedItem,
+          source: {
+            ...(current[idx]?.source || {}),
+            ...(mappedItem?.source || {}),
+          },
+        };
       } else {
         current.unshift(mappedItem);
         if (notifyNew) {
@@ -414,10 +426,26 @@ export default function ResponderMissionBoard({ user }) {
         return;
       }
 
+      const rescueId = normalizeRescueId(data.rescue_id);
+      const previousSource = existing.source || {};
+
       upsertRealtimeSos({
-        ...(existing.source || {}),
+        ...previousSource,
         _id: requestId,
         status: data.status || "ASSIGNED",
+        assigned_rescue_id:
+          rescueId
+            ? previousSource.assigned_rescue_id &&
+              typeof previousSource.assigned_rescue_id === "object"
+              ? { ...previousSource.assigned_rescue_id, _id: rescueId }
+              : rescueId
+            : previousSource.assigned_rescue_id,
+        assignment: {
+          ...(previousSource.assignment || {}),
+          ...(data.assignment_id ? { _id: data.assignment_id } : {}),
+          ...(data.assignment_stage ? { stage: data.assignment_stage } : {}),
+          ...(data.accepted_at ? { accepted_at: data.accepted_at } : {}),
+        },
       }, { notifyNew: false });
     }
 
@@ -437,7 +465,12 @@ export default function ResponderMissionBoard({ user }) {
         return;
       }
 
-      upsertRealtimeSos({ _id: requestId, status }, { notifyNew: false });
+      const existing = requestsRef.current.find((item) => String(item.id) === requestId);
+      upsertRealtimeSos({
+        ...(existing?.source || {}),
+        _id: requestId,
+        status,
+      }, { notifyNew: false });
     }
 
     function handleSosCancelled(payload = {}) {

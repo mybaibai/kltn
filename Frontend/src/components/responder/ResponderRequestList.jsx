@@ -93,7 +93,9 @@ export default function ResponderRequestList({
   const pagedRequests = requests.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   function isRequestAlreadyAccepted(item) {
-    if (item.source?.assigned_rescue_id && String(item.source.assigned_rescue_id) !== String(currentUserId)) {
+    const assignedRescueId =
+      item.source?.assigned_rescue_id?._id || item.source?.assigned_rescue_id;
+    if (assignedRescueId && String(assignedRescueId) !== String(currentUserId)) {
       return true;
     }
     const status = String(item.source?.status || "PENDING").toUpperCase();
