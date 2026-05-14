@@ -17,11 +17,28 @@ import jwt from "jsonwebtoken";
 import { firebaseAdminAuth } from "./config/firebaseAdmin.js";
 
 dotenv.config();
+
+/** Origins allowed for REST + Socket.IO (must match browser address bar, including LAN IP). */
+function getFrontendCorsOrigins() {
+  const defaults =
+    "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173";
+  const raw = String(process.env.FRONTEND_ORIGINS || defaults);
+  const list = raw
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
+  const single = process.env.FRONTEND_URL?.trim();
+  if (single && !list.includes(single)) list.push(single);
+  return list;
+}
+
+const frontendCorsOrigins = getFrontendCorsOrigins();
+
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: frontendCorsOrigins,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   },
@@ -41,13 +58,7 @@ function normalizeSocketRole(role) {
 app.use(
   cors({
     origin: (origin, cb) => {
-      const allowList = String(
-        process.env.FRONTEND_ORIGINS ||
-          "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173"
-      )
-        .split(",")
-        .map((x) => x.trim());
-      if (!origin || allowList.includes(origin)) return cb(null, true);
+      if (!origin || frontendCorsOrigins.includes(origin)) return cb(null, true);
       return cb(null, false);
     },
     credentials: true,
