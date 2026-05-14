@@ -255,14 +255,13 @@ export default function SosPage() {
     const unsub = subscribeAuthState(async ({ user: fbUser, idToken }) => {
       if (!fbUser || !idToken) return;
       try {
-        const res = await fetch(
-          `${(import.meta.env.VITE_API_URL || 'http://localhost:3001/api').replace(/\/$/, '')}/auth/firebase`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ idToken }),
-          }
-        );
+        const raw = (import.meta.env.VITE_API_URL || "http://localhost:3001/api").replace(/\/$/, "");
+        const apiBase = /\/api$/i.test(raw) ? raw : `${raw}/api`;
+        const res = await fetch(`${apiBase}/auth/firebase`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken }),
+        });
         if (!res.ok) return;
         const data = await res.json();
         const nextUser = {
