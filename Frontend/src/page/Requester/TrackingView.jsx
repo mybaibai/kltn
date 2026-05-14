@@ -459,7 +459,7 @@ export default function TrackingPage() {
     if (!localStorage.getItem(key)) localStorage.setItem(key, Date.now().toString());
 
     const tick = () => {
-      const elapsed   = Math.floor((Date.now() - parseInt(localStorage.getItem(key) || "0")) / 1000);
+      const elapsed   = Math.floor((Date.now() - parseInt(localStorage.getItem(key) || "")) / 1000);
       const remaining = CANCEL_WINDOW_SEC - elapsed;
       if (remaining <= 0) { setCanCancel(false); setCancelCountdown(0); }
       else                { setCanCancel(true);  setCancelCountdown(remaining); }
