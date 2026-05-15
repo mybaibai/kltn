@@ -461,19 +461,17 @@ export default function ProfilePage() {
                   {user?.profile?.emergency_contacts?.map((contact, i) => (
                     <div key={i}
                       onClick={() => setSelectedContact({ ...contact, index: i })}
-                      className="flex items-center justify-between p-3 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-emerald-100 border border-transparent transition cursor-pointer">
-                      <div className="flex items-center gap-3">
-                        <img src={contactIcon} alt="contact" className="w-10 h-10 rounded-full object-cover flex-shrink-0"/>
-                        <div>
+                      className="flex items-center gap-3 p-3 rounded-xl bg-white shadow-sm hover:shadow-md hover:border-emerald-100 border border-transparent transition cursor-pointer">
+                      <img src={contactIcon} alt="contact" className="w-12 h-12 rounded-full object-cover flex-shrink-0"/>
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
                           <p className="text-sm font-semibold text-gray-800 leading-tight">{contact.name}</p>
-                          <p className="text-xs text-emerald-600 font-medium mt-0.5">{contact.relation}</p>
+                          <span className="text-xs font-medium text-emerald-600 border border-emerald-400 rounded-full ml-25 px-2 py-0.5 leading-tight">
+                            {contact.relation}
+                          </span>
                         </div>
+                        <p className="text-xs text-gray-400 mt-0.5">{contact.phone}</p>
                       </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); }}
-                        className="w-9 h-9">
-                        <img src={call} alt="call" className="w-9 h-9"/>
-                      </button>
                     </div>
                   ))}
 
@@ -557,12 +555,6 @@ export default function ProfilePage() {
 
           {/* Actions */}
           <div className="px-5 pb-5 flex gap-3">
-            <button
-              onClick={() => { window.location.href = `tel:${selectedContact.phone}`; }}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#1C6E1B] hover:bg-emerald-700 text-white rounded-xl font-semibold text-sm transition">
-              <img src={call} alt="call" className="w-5 h-5 mt-1"/>
-              Gọi ngay
-            </button>
             <button
               onClick={() => {
                 setContactToDelete(selectedContact);
