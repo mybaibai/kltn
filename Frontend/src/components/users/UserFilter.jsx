@@ -1,15 +1,14 @@
 import { useState } from "react";
 
-import { DA_NANG_WARDS } from "@/constants/wards";
-
 export default function UserFilter({ onFilter }) {
   const [keyword, setKeyword] = useState("");
   const [role, setRole] = useState("");
-  const [ward, setWard] = useState(""); 
+  const [status, setStatus] = useState("");
+
   const handleFilter = () => {
     if (onFilter) {
-      onFilter({ keyword, role, ward });
-    } // gửi ra ngoài
+      onFilter({ keyword, role, status });
+    }
   };
 
   return (
@@ -34,22 +33,17 @@ export default function UserFilter({ onFilter }) {
         <option value="Admin">Admin</option>
         <option value="Rescue">Rescue</option>
         <option value="Victim">Victim</option>
-
       </select>
 
-      {/* WARD FILTER */}
+      {/* STATUS */}
       <select
-        value={ward}
-        onChange={(e) => setWard(e.target.value)}
+        value={status}
+        onChange={(e) => setStatus(e.target.value)}
         className="border px-3 py-2 rounded"
       >
-        <option value="">Tất cả Phường</option>
-
-        {(DA_NANG_WARDS || []).map((w) => (
-          <option key={w} value={w}>
-            {w}
-          </option>
-        ))}
+        <option value="">Tất cả trạng thái</option>
+        <option value="Active">Đang hoạt động</option>
+        <option value="Blocked">Đã khóa</option>
       </select>
 
       {/* BUTTON */}

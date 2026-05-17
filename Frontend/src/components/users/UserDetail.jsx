@@ -114,33 +114,47 @@ const UserDetail = ({ user, open, onClose, onToggleStatus }) => {
 
         {/* ACTION */}
         <div className="p-4 border-t flex gap-3">
-          {canLockAccount ? (
+        {canLockAccount ? (
           <button
             onClick={() => onToggleStatus?.(user)}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border
-              ${
-                isActive
-                  ? "border-red-500 text-red-600"
-                  : "border-green-500 text-green-600"
-              }`}
-          >
-            {isActive ? (
-              <>
-                <Lock className="w-4 h-4" />
-                Khóa
-              </>
-            ) : (
-              <>
-                <Unlock className="w-4 h-4" />
-                Mở khóa
-              </>
-            )}
-          </button>
-          ) : null}
+            className={`
+              flex-1 flex items-center justify-center gap-2
+              py-3 rounded-lg
+              text-white font-semibold
+              transition-all duration-200
+              hover:scale-[1.02]
+              shadow-sm
+
+            ${
+              isActive
+                ? "bg-red-500 hover:bg-red-600"
+                : "bg-green-500 hover:bg-green-600"
+            }
+          `}
+        >
+          {isActive ? (
+      <>
+            <Lock className="w-4 h-4" />
+              Khóa
+          </>
+          ) : (
+          <>
+            <Unlock className="w-4 h-4" />
+              Mở khóa
+          </>
+          )}
+        </button>
+        ) : null}
 
           <button
             onClick={onClose}
-            className={`${canLockAccount ? "flex-1" : "w-full"} bg-gray-100 py-2 rounded-lg`}
+            className={`
+              ${canLockAccount ? "flex-1" : "w-full"}
+              bg-blue-100 text-blue-700 font-semibold
+              py-2 rounded-lg
+              hover:bg-blue-200
+              transition
+            `}
           >
             Đóng
           </button>
@@ -151,22 +165,21 @@ const UserDetail = ({ user, open, onClose, onToggleStatus }) => {
   );
 };
 
-/* ================= COMPONENT CON ================= */
 
-const Field = ({ label, value }) => (
-  <div className="border rounded-lg p-3 bg-gray-50">
-    <p className="text-xs text-gray-400 mb-1">{label}</p>
-    <p className="text-sm">
-      {value || "Chưa cập nhật"}
-    </p>
-  </div>
-);
+        const Field = ({ label, value }) => (
+          <div className="border rounded-lg p-3 bg-gray-50">
+            <p className="text-xs text-gray-400 mb-1">{label}</p>
+            <p className="text-sm">
+              {value || "Chưa cập nhật"}
+            </p>
+          </div>
+        );
 
-const Row = ({ label, value }) => (
-  <div className="flex justify-between border-b py-2 last:border-none">
-    <span className="text-gray-500">{label}</span>
-    <span>{value || "--"}</span>
-  </div>
-);
+        const Row = ({ label, value }) => (
+          <div className="flex justify-between border-b py-2 last:border-none">
+            <span className="text-gray-500">{label}</span>
+            <span>{value || "--"}</span>
+          </div>
+        );
 
 export default UserDetail;

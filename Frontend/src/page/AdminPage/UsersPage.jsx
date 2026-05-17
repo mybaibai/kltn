@@ -21,7 +21,7 @@ const UsersPage = () => {
     const [filters, setFilters] = useState({
       keyword: "",
       role: "",
-      ward: "",
+      status: "",
     });
   
     const [loading, setLoading] = useState(true);
@@ -54,22 +54,29 @@ const UsersPage = () => {
     // FILTER
     const filteredUsers = (Array.isArray(users) ? users : []).filter((user) => {
       const name = user?.name || user?.full_name || "";
-  
+      const phone = user?.auth?.phone || "";
+      const keyword = filters.keyword.toLowerCase();
+    
       const matchKeyword =
-        name.toLowerCase().includes(filters.keyword.toLowerCase());
-  
+        !keyword ||
+        name.toLowerCase().includes(keyword) ||
+        phone.includes(keyword) ||
+        phone.replace("+84", "0").includes(keyword) ||
+        phone.replace("0", "+84").includes(keyword);
+    
       const matchRole =
         !filters.role || user?.role === filters.role;
-  
-        const matchWard =
-        !filters.ward ||
-        user?.profile?.address?.includes(filters.ward);
-  
-      return matchKeyword && matchRole && matchWard;
+    
+      const matchStatus =
+        !filters.status ||
+        user?.status === filters.status;
+    
+      return matchKeyword && matchRole && matchStatus;
     });
   
     // PAGINATION LOGIC
     const totalPages = Math.ceil(filteredUsers.length / pageSize);
+
   
     const paginatedUsers = filteredUsers.slice(
       (currentPage - 1) * pageSize,
@@ -96,38 +103,32 @@ const UsersPage = () => {
     ];
 
     const handleToggleStatus = async (user) => {
-      const roleKey = String(user?.role || "").trim().toLowerCase();
-      if (roleKey !== "victim" && roleKey !== "rescue") {
-        window.alert("Chỉ khóa/mở khóa được tài khoản Nạn nhân và Cứu hộ.");
-        return;
-      }
+      if (user.role === "Admin") return; // double guard
+    
+      const isActive = user.status === "Active";
+      const confirmed = window.confirm(
+        isActive ? "Xác nhận KHÓA tài khoản này?" : "Xác nhận MỞ KHÓA tài khoản này?"
+      );
+      if (!confirmed) return;
+    
       try {
-        const isActive = String(user.status || "").toLowerCase() === "active";
-
-        const confirm = window.confirm(
-          isActive
-            ? "Xác nhận KHÓA tài khoản này? Người dùng sẽ không thể đăng nhập hoặc dùng ứng dụng."
-            : "Xác nhận MỞ KHÓA tài khoản này?"
-        );
-
-        if (!confirm) return;
-
         const res = await api.patch(`/users/${user._id}/toggle-active`);
-        const updated = res?.data?.data;
-        if (updated?._id) {
-          setUsers((prev) =>
-            prev.map((u) => (u._id === updated._id ? { ...u, ...updated } : u))
-          );
-          setSelectedUser((prev) =>
-            prev && prev._id === updated._id ? { ...prev, ...updated } : prev
-          );
-        }
+    
+        // ✅ Dùng data từ server, không tự tính newStatus
+        const updatedUser = res.data?.user ?? res.data?.data;
+        if (!updatedUser) throw new Error("Response không có user");
+    
+        setUsers((prev) =>
+          prev.map((u) => (u._id === user._id ? updatedUser : u))
+        );
+    
+        // ✅ Chỉ sync nếu đúng user đang mở
+        setSelectedUser((prev) =>
+          prev?._id === user._id ? updatedUser : prev
+        );
       } catch (err) {
         console.error(err);
-        window.alert(
-          err?.response?.data?.message ||
-            "Không cập nhật được trạng thái. Đảm bảo bạn đã đăng nhập quản trị."
-        );
+        alert("Có lỗi xảy ra, vui lòng thử lại.");
       }
     };
 
@@ -140,7 +141,7 @@ const UsersPage = () => {
               Quản lý Người dùng Đà Nẵng
             </h1>
             <p className="text-gray-500 text-sm mt-1">
-              Giám sát và phân quyền lực lượng tham gia cứu hộ tại địa bàn thành phố.
+              Giám sát lực lượng tham gia cứu hộ và tại địa bàn thành phố.
             </p>
           </div>
   
