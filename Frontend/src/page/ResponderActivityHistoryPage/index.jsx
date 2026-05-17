@@ -42,7 +42,9 @@ function readApiMessage(error) {
 
 async function resolveTeamFromUser(authUser) {
   const userId = authUser?._id;
-  const userEmail = String(authUser?.auth?.email || "").trim().toLowerCase();
+  const userEmail = String(authUser?.auth?.email || "")
+    .trim()
+    .toLowerCase();
   const userPhone = normalizePhone(authUser?.phone || authUser?.auth?.phone);
 
   let resolved = null;
@@ -59,15 +61,18 @@ async function resolveTeamFromUser(authUser) {
   if (!resolved) {
     const listRes = await getAllTeams();
     const teams = Array.isArray(listRes?.data?.data) ? listRes.data.data : [];
-    resolved = teams.find((item) => {
-      const itemEmail = String(item?.auth?.email || "").trim().toLowerCase();
-      const itemPhone = normalizePhone(item?.phone || item?.auth?.phone);
-      return (
-        (userId && String(item?._id) === String(userId)) ||
-        (userEmail && itemEmail === userEmail) ||
-        (userPhone && itemPhone && userPhone === itemPhone)
-      );
-    }) ?? null;
+    resolved =
+      teams.find((item) => {
+        const itemEmail = String(item?.auth?.email || "")
+          .trim()
+          .toLowerCase();
+        const itemPhone = normalizePhone(item?.phone || item?.auth?.phone);
+        return (
+          (userId && String(item?._id) === String(userId)) ||
+          (userEmail && itemEmail === userEmail) ||
+          (userPhone && itemPhone && userPhone === itemPhone)
+        );
+      }) ?? null;
   }
 
   return resolved;
@@ -75,11 +80,16 @@ async function resolveTeamFromUser(authUser) {
 
 function getStatusDisplay(status) {
   const value = normalizeStatus(status);
-  if (value === "RESOLVED") return { label: "Đã hoàn thành", className: "status-resolved" };
-  if (value === "INPROGRESS" || value === "IN_PROGRESS") return { label: "Đang xử lý", className: "status-inprogress" };
-  if (value === "ASSIGNED") return { label: "Đã chấp nhận", className: "status-assigned" };
-  if (value === "PENDING") return { label: "Chờ chấp nhận", className: "status-pending" };
-  if (value === "CANCELLED") return { label: "Đã hủy", className: "status-cancelled" };
+  if (value === "RESOLVED")
+    return { label: "Đã hoàn thành", className: "status-resolved" };
+  if (value === "INPROGRESS" || value === "IN_PROGRESS")
+    return { label: "Đang xử lý", className: "status-inprogress" };
+  if (value === "ASSIGNED")
+    return { label: "Đã chấp nhận", className: "status-assigned" };
+  if (value === "PENDING")
+    return { label: "Chờ chấp nhận", className: "status-pending" };
+  if (value === "CANCELLED")
+    return { label: "Đã hủy", className: "status-cancelled" };
   return { label: value || "Không xác định", className: "status-unknown" };
 }
 
@@ -98,7 +108,7 @@ function getIncidentTypeBadge(type) {
     "Sức khỏe khẩn cấp": "🚑",
     "Lạc đường": "🗺️",
     "Sự cố phương tiện": "🔧",
-    "Khác": "📋",
+    Khác: "📋",
   };
   return mapping[type] || "📌";
 }
@@ -130,17 +140,26 @@ export default function ResponderActivityHistoryPage() {
         const list = Array.isArray(res?.data?.data) ? res.data.data : [];
 
         const scoped = list.filter((item) => {
-          const assignedRescueId = item?.assigned_rescue_id?._id || item?.assigned_rescue_id;
+          const assignedRescueId =
+            item?.assigned_rescue_id?._id || item?.assigned_rescue_id;
           if (!userId) return true;
-          return !assignedRescueId || String(assignedRescueId) === String(userId);
+          return (
+            !assignedRescueId || String(assignedRescueId) === String(userId)
+          );
         });
 
         if (!cancelled) {
-          setActivities(scoped.sort((a, b) => {
-            const timeA = new Date(a?.updated_at || a?.created_at || 0).getTime();
-            const timeB = new Date(b?.updated_at || b?.created_at || 0).getTime();
-            return timeB - timeA;
-          }));
+          setActivities(
+            scoped.sort((a, b) => {
+              const timeA = new Date(
+                a?.updated_at || a?.created_at || 0
+              ).getTime();
+              const timeB = new Date(
+                b?.updated_at || b?.created_at || 0
+              ).getTime();
+              return timeB - timeA;
+            })
+          );
         }
       } catch (err) {
         if (!cancelled) setError(readApiMessage(err));
@@ -152,11 +171,15 @@ export default function ResponderActivityHistoryPage() {
     if (!authUser) {
       setError("Không thể xác định người dùng hiện tại");
       setLoading(false);
-      return () => { cancelled = true; };
+      return () => {
+        cancelled = true;
+      };
     }
 
     loadActivities();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [authUser, userId]);
 
   useEffect(() => {
@@ -167,11 +190,15 @@ export default function ResponderActivityHistoryPage() {
     if (!sosId) return;
     setCancelLoading(sosId);
     try {
-      await updateSosStatus(sosId, "CANCELLED", { reason: "Cancelled by responder" });
+      await updateSosStatus(sosId, "CANCELLED", {
+        reason: "Cancelled by responder",
+      });
       setActivities((prev) =>
         prev.map((item) =>
-          String(item._id) === String(sosId) ? { ...item, status: "CANCELLED" } : item,
-        ),
+          String(item._id) === String(sosId)
+            ? { ...item, status: "CANCELLED" }
+            : item
+        )
       );
     } catch (err) {
       console.error("Failed to cancel request:", err);
@@ -191,8 +218,12 @@ export default function ResponderActivityHistoryPage() {
   const stats = useMemo(() => {
     return {
       total: activities.length,
-      completed: activities.filter((x) => normalizeStatus(x?.status) === "RESOLVED").length,
-      cancelled: activities.filter((x) => normalizeStatus(x?.status) === "CANCELLED").length,
+      completed: activities.filter(
+        (x) => normalizeStatus(x?.status) === "RESOLVED"
+      ).length,
+      cancelled: activities.filter(
+        (x) => normalizeStatus(x?.status) === "CANCELLED"
+      ).length,
     };
   }, [activities]);
 
@@ -203,11 +234,11 @@ export default function ResponderActivityHistoryPage() {
   const endIndex = Math.min(startIndex + PAGE_SIZE, totalItems);
   const paginatedActivities = useMemo(
     () => filteredActivities.slice(startIndex, endIndex),
-    [filteredActivities, startIndex, endIndex],
+    [filteredActivities, startIndex, endIndex]
   );
   const pageNumbers = useMemo(
     () => Array.from({ length: totalPages }, (_, index) => index + 1),
-    [totalPages],
+    [totalPages]
   );
 
   return (
@@ -264,21 +295,29 @@ export default function ResponderActivityHistoryPage() {
           <section className="activity-history-filter">
             <button
               type="button"
-              className={`filter-btn ${filter === "RESOLVED" ? "is-active" : ""}`}
+              className={`filter-btn ${
+                filter === "RESOLVED" ? "is-active" : ""
+              }`}
               onClick={() => setFilter("RESOLVED")}
             >
               Hoàn thành
             </button>
             <button
               type="button"
-              className={`filter-btn ${filter === "CANCELLED" ? "is-active" : ""}`}
+              className={`filter-btn ${
+                filter === "CANCELLED" ? "is-active" : ""
+              }`}
               onClick={() => setFilter("CANCELLED")}
             >
               Đã hủy
             </button>
           </section>
 
-          {loading && <p className="activity-history-loading">Đang tải dữ liệu hoạt động...</p>}
+          {loading && (
+            <p className="activity-history-loading">
+              Đang tải dữ liệu hoạt động...
+            </p>
+          )}
           {error && <p className="activity-history-error">{error}</p>}
 
           <div className="activity-history-list">
@@ -290,18 +329,32 @@ export default function ResponderActivityHistoryPage() {
 
             {paginatedActivities.map((item) => {
               const status = getStatusDisplay(item?.status);
-              const incidentIcon = getIncidentTypeBadge(item?.incident_type_name);
+              const incidentIcon = getIncidentTypeBadge(
+                item?.incident_type_name
+              );
               const victim = item?.victim_id;
-              const victimName = typeof victim === "object" ? victim?.full_name : item?.victim_name || "Không xác định";
-              const victimPhone = typeof victim === "object" ? victim?.phone : item?.victim_phone || "—";
-              const createdAt = formatDateTime(item?.created_at || item?.createdAt);
-              const updatedAt = formatDateTime(item?.updated_at || item?.updatedAt);
+              const victimName =
+                typeof victim === "object"
+                  ? victim?.full_name
+                  : item?.victim_name || "Không xác định";
+              const victimPhone =
+                typeof victim === "object"
+                  ? victim?.phone
+                  : item?.victim_phone || "—";
+              const createdAt = formatDateTime(
+                item?.created_at || item?.createdAt
+              );
+              const updatedAt = formatDateTime(
+                item?.updated_at || item?.updatedAt
+              );
 
               return (
                 <article key={item._id} className="activity-history-card">
                   <div className="activity-card-top">
                     <div className="activity-card-left">
-                      <span className="activity-incident-icon">{incidentIcon}</span>
+                      <span className="activity-incident-icon">
+                        {incidentIcon}
+                      </span>
                       <div>
                         <h3>{victimName}</h3>
                         <p className="activity-meta">
@@ -309,31 +362,30 @@ export default function ResponderActivityHistoryPage() {
                         </p>
                       </div>
                     </div>
-                    <span className={`activity-status-badge ${status.className}`}>{status.label}</span>
+                    <span
+                      className={`activity-status-badge ${status.className}`}
+                    >
+                      {status.label}
+                    </span>
                   </div>
 
-                  <p className="activity-incident-type">Loại sự cố: {item?.incident_type_name || "Khác"}</p>
+                  <p className="activity-incident-type">
+                    Loại sự cố: {item?.incident_type_name || "Khác"}
+                  </p>
                   <p className="activity-address">
                     <MapPin size={13} /> {item?.address || "Chưa có địa chỉ"}
                   </p>
-                  <p className="activity-description">{item?.description || "Không có mô tả"}</p>
+                  <p className="activity-description">
+                    {item?.description || "Không có mô tả"}
+                  </p>
 
                   <div className="activity-card-footer">
                     <div className="activity-times">
                       <span>Tạo: {createdAt}</span>
-                      {updatedAt !== createdAt && <span>Cập nhật: {updatedAt}</span>}
+                      {updatedAt !== createdAt && (
+                        <span>Cập nhật: {updatedAt}</span>
+                      )}
                     </div>
-                    {normalizeStatus(item?.status) !== "CANCELLED" && (
-                      <button
-                        type="button"
-                        className="activity-cancel-btn"
-                        onClick={() => handleCancelRequest(item._id)}
-                        disabled={cancelLoading === item._id}
-                        title="Hủy yêu cầu này"
-                      >
-                        {cancelLoading === item._id ? "Hủy..." : <X size={14} />}
-                      </button>
-                    )}
                   </div>
                 </article>
               );
@@ -356,7 +408,9 @@ export default function ResponderActivityHistoryPage() {
                   <button
                     key={pageNumber}
                     type="button"
-                    className={`page-btn ${pageNumber === safePage ? "is-active" : ""}`}
+                    className={`page-btn ${
+                      pageNumber === safePage ? "is-active" : ""
+                    }`}
                     onClick={() => setCurrentPage(pageNumber)}
                   >
                     {pageNumber}
@@ -367,7 +421,9 @@ export default function ResponderActivityHistoryPage() {
               <button
                 type="button"
                 className="page-nav-btn"
-                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                }
                 disabled={safePage === totalPages}
               >
                 Sau
