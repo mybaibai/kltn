@@ -13,32 +13,37 @@ export default function ResponderSidebar({ active = "" }) {
       <nav className="sidebar-nav" aria-label="Điều hướng chính">
         <Link
           to="/responder"
-          className={`sidebar-item ${active === "home" ? "sidebar-item-active" : ""}`}
+          className={`sidebar-item ${
+            active === "home" ? "sidebar-item-active" : ""
+          }`}
         >
           <Home size={18} /> Trang chủ
         </Link>
 
         <Link
           to="/responder/team-info"
-          className={`sidebar-item ${active === "team" ? "sidebar-item-active" : ""}`}
+          className={`sidebar-item ${
+            active === "team" ? "sidebar-item-active" : ""
+          }`}
         >
           <User size={18} /> Thông tin cá nhân
         </Link>
 
         <Link
           to="/responder/history"
-          className={`sidebar-item ${active === "history" ? "sidebar-item-active" : ""}`}
+          className={`sidebar-item ${
+            active === "history" ? "sidebar-item-active" : ""
+          }`}
         >
           <Clock3 size={18} /> Lịch sử
         </Link>
       </nav>
 
       <div className="sidebar-footer">
-        <button type="button" className="sidebar-footer-btn">
-          <LifeBuoy size={16} /> Hỗ trợ
-        </button>
-
-        <button type="button" className="sidebar-footer-btn sidebar-footer-logout">
+        <button
+          type="button"
+          className="sidebar-footer-btn sidebar-footer-logout"
+        >
           <LogOut size={16} /> Đăng xuất
         </button>
       </div>
