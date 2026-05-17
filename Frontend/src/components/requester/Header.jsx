@@ -2,10 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import Logo from "@/assets/logo.svg";
-import {
-    getVictimProfile,
-    saveVictimProfile,
-  } from '@/services/auth/session';
+import { getVictimProfile, saveVictimProfile } from "@/services/auth/session";
 export default function Header({
   clearVictimProfile,
   logoutVictimFirebase,
@@ -19,11 +16,11 @@ export default function Header({
   const [user, setUser] = useState(() => getVictimProfile());
   const [showLogin, setShowLogin] = useState(() => {
     try {
-        return !getVictimProfile();
+      return !getVictimProfile();
     } catch {
-        return true;
+      return true;
     }
-    });
+  });
   const activeSosId = localStorage.getItem("active_sos_id");
   // click ngoài để đóng menu
   useEffect(() => {
@@ -51,7 +48,6 @@ export default function Header({
   return (
     <header className="w-full bg-white border-b border-gray-100 shadow-sm sticky top-0 z-40">
       <div className="mx-auto px-5 h-[56px] flex items-center justify-between">
-
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2">
           <img src={Logo} alt="SOSGo" className="h-8.5 object-contain" />
@@ -60,22 +56,17 @@ export default function Header({
         {/* Right */}
         <div className="flex items-center gap-2">
           {activeSosId && (
-              <button
-                onClick={() => navigate(`/tracking/${activeSosId}`)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 
+            <button
+              onClick={() => navigate(`/tracking/${activeSosId}`)}
+              className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 
                   border border-amber-200 rounded-xl text-amber-700 text-xs font-bold
                   hover:bg-amber-100 transition-colors"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                Đang cứu hộ
-              </button>
-            )}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              Đang cứu hộ
+            </button>
+          )}
           {/* Bell */}
-          <button className="relative w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors">
-            🔔
-            <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full" />
-          </button>
-
         </div>
       </div>
     </header>

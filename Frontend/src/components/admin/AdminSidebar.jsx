@@ -71,13 +71,7 @@ export default function AdminSidebar() {
         </button>
         */}
         <div className="flex flex-col gap-0.5">
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-[#525252] hover:bg-brand-gray-bg hover:text-[#525252]"
-          >
-            <HelpCircle className="size-4 shrink-0" aria-hidden />
-            Hỗ trợ
-          </button>
+          
           <button
             type="button"
             onClick={handleLogout}

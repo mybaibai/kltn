@@ -247,12 +247,7 @@ export default function ProfilePage() {
           </nav>
         </div>
         <div className="px-3 pb-5 flex flex-col gap-0.5">
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-500 cursor-pointer hover:text-gray-600 hover:bg-gray-50 transition">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/>
-            </svg>
-            Hỗ trợ
-          </div>
+
           <div
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-500 
               cursor-pointer hover:text-red-500 hover:bg-red-50 transition"

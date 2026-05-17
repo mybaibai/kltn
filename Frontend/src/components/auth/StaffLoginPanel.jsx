@@ -21,14 +21,22 @@ export default function StaffLoginPanel({ onSubmit, loading, errorMessage }) {
       <div className="staff-auth-shell">
         <section className="staff-auth-card">
           <div className="staff-brand">
-            <img className="staff-brand-logo" src={staffLogo} alt="Logo hệ thống cứu trợ" />
+            <img
+              className="staff-brand-logo"
+              src={staffLogo}
+              alt="Logo hệ thống cứu trợ"
+            />
           </div>
 
           <h2 className="staff-auth-title">Đăng nhập hệ thống</h2>
-          <p className="staff-auth-subtitle">Bảng điều khiển dành cho Quản trị viên và Đội cứu trợ.</p>
+          <p className="staff-auth-subtitle">
+            Bảng điều khiển dành cho Quản trị viên và Đội cứu trợ.
+          </p>
 
           <form onSubmit={handleSubmit} className="staff-auth-form">
-            <label className="staff-auth-label" htmlFor="staff-login-email">Email</label>
+            <label className="staff-auth-label" htmlFor="staff-login-email">
+              Email
+            </label>
             <div className="staff-auth-field">
               <Mail size={18} />
               <input
@@ -42,7 +50,9 @@ export default function StaffLoginPanel({ onSubmit, loading, errorMessage }) {
               />
             </div>
 
-            <label className="staff-auth-label" htmlFor="staff-login-password">Mật khẩu</label>
+            <label className="staff-auth-label" htmlFor="staff-login-password">
+              Mật khẩu
+            </label>
             <div className="staff-auth-field">
               <LockKeyhole size={18} />
               <input
@@ -74,15 +84,20 @@ export default function StaffLoginPanel({ onSubmit, loading, errorMessage }) {
                 />
                 Ghi nhớ mật khẩu
               </label>
-              <button className="staff-forgot-link" type="button">
-                Quên mật khẩu?
-              </button>
             </div>
 
-            {errorMessage ? <p className="staff-auth-error">{errorMessage}</p> : null}
+            {errorMessage ? (
+              <p className="staff-auth-error">{errorMessage}</p>
+            ) : null}
 
-            <button className="staff-auth-submit" type="submit" disabled={loading}>
-              {loading ? "Đang xử lý..." : (
+            <button
+              className="staff-auth-submit"
+              type="submit"
+              disabled={loading}
+            >
+              {loading ? (
+                "Đang xử lý..."
+              ) : (
                 <span className="staff-submit-inner">
                   Đăng nhập <ArrowRight size={20} />
                 </span>
@@ -92,14 +107,8 @@ export default function StaffLoginPanel({ onSubmit, loading, errorMessage }) {
 
           <div className="staff-auth-divider" />
           <p className="staff-auth-sos-link">
-            <Link to="/sos">
-              ← Trang SOS (nạn nhân)
-            </Link>
+            <Link to="/sos">← Trang SOS (nạn nhân)</Link>
           </p>
-          <div className="staff-auth-footer">
-            <div>Bạn gặp vấn đề khi truy cập?</div>
-            <button type="button">Liên hệ kỹ thuật hệ thống</button>
-          </div>
         </section>
       </div>
     </div>
