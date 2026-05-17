@@ -38,15 +38,6 @@ export default function ResponderSidebar({ active = "" }) {
           <Clock3 size={18} /> Lịch sử
         </Link>
       </nav>
-
-      <div className="sidebar-footer">
-        <button
-          type="button"
-          className="sidebar-footer-btn sidebar-footer-logout"
-        >
-          <LogOut size={16} /> Đăng xuất
-        </button>
-      </div>
     </aside>
   );
 }
