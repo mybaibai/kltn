@@ -5,14 +5,14 @@ const UserTable = ({ users = [], loading, onView, onToggleStatus }) => {
     <div className="bg-white rounded-xl border overflow-hidden">
       <table className="w-full text-sm">
         
-        <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+        <thead className="bg-gray-50 text-gray-500 text-sm uppercase">
           <tr>
             <th className="px-4 py-3 text-left">Họ tên & ID</th>
-            <th>Vai trò</th>
-            <th>Trạng thái</th>
-            <th>SĐT</th>
-            <th>Vị trí hiện tại</th>
-            <th>Hành động</th>
+            <th className="px-4 py-3 text-left">Vai trò</th>
+            <th className="px-4 py-3 text-left">Trạng thái</th>
+            <th className="px-4 py-3 text-left">SĐT</th>
+            <th className="px-4 py-3 text-left">Vị trí hiện tại</th>
+            <th className="px-4 py-3 text-left">Hành động</th>
           </tr>
         </thead>
 

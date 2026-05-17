@@ -9,10 +9,17 @@ const UserRow = ({ user = {}, onView, onToggleStatus }) => {
   const RoleIcon = role?.icon;
   const StatusIcon = status?.icon;
 
-  const roleKey = String(user?.role || "").trim().toLowerCase();
-  const canLockAccount = roleKey === "victim" || roleKey === "rescue";
+  // ✅ chỉ giữ 1 isActive
   const isActive =
     String(user?.status || "").toLowerCase() === "active";
+
+  // ✅ chỉ cho khóa Victim & Rescue
+  const roleKey = String(user?.role || "")
+    .trim()
+    .toLowerCase();
+
+  const canLockAccount =
+    roleKey === "victim" || roleKey === "rescue";
 
   return (
     <tr className="border-t hover:bg-gray-50">
@@ -22,95 +29,82 @@ const UserRow = ({ user = {}, onView, onToggleStatus }) => {
         <div className="flex items-center gap-3">
           <img
             src={getUserAvatarSrc(user)}
-            className="h-10 w-10 rounded-full object-cover"
+            className="h-11 w-11 rounded-full object-cover"
             alt=""
           />
-
-          <div>
-            <p className="font-medium">
-              {user?.full_name || user?.name || 'Chưa có tên'}
-            </p>
-
-            {/* EMAIL */}
-            <p className="text-xs text-gray-400">
-              {user?.auth?.email || 'Không có email'}
-            </p>
-
-            {/* UID */}
-            <p className="text-xs text-gray-400">
-              UID: {user?._id || user?.id || '--'}
-            </p>
-          </div>
+        <div>
+          <p className="font-semibold text-base">
+            {user?.full_name || user?.name || 'Chưa có tên'}
+          </p>
+          <p className="text-xs text-gray-400">
+            {user?.auth?.email || 'Không có email'}
+          </p>
+          <p className="text-xs text-gray-400">
+            UID: {user?._id || user?.id || '--'}
+          </p>
         </div>
-      </td>
+      </div>
+    </td>
 
       {/* ROLE */}
-      <td>
-        <div className={`flex w-fit items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${role?.className || ''}`}>
-          {RoleIcon ? <RoleIcon className="size-3 shrink-0" aria-hidden /> : null}
+      <td className="px-4 py-3">
+        <div className={`flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold ${role?.className || ''}`}>
+          {RoleIcon ? <RoleIcon className="size-4 shrink-0" aria-hidden /> : null}
           {user?.role || '--'}
         </div>
       </td>
 
       {/* STATUS */}
-      <td>
-        <div className={`flex w-fit items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${status?.className || ''}`}>
-          {StatusIcon ? <StatusIcon className="size-3 shrink-0" aria-hidden /> : null}
+      <td className="px-4 py-3">
+        <div className={`flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold ${status?.className || ''}`}>
+          {StatusIcon ? <StatusIcon className="size-4 shrink-0" aria-hidden /> : null}
           {user?.status || '--'}
         </div>
       </td>
 
       {/* PHONE */}
-      <td>
-        <span className="text-sm text-gray-600">
+      <td className="px-4 py-3">
+        <span className="text-sm font-medium text-gray-800">
           {user?.auth?.phone || '--'}
         </span>
       </td>
 
       {/* LOCATION */}
-      <td>
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <MapPin className="size-4 shrink-0 text-blue-500" aria-hidden />
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
+          <MapPin className="size-5 shrink-0 text-blue-500" aria-hidden />
           {user?.profile?.address || user?.location || 'Chưa rõ'}
         </div>
       </td>
 
       {/* ACTION */}
-      <td>
-        <div className="flex gap-3">
+      <td className="px-4 py-3">
+      <div className="flex gap-4">
+      <button
+        type="button"
+        className="inline-flex text-gray-400 hover:text-blue-600 transition-colors"
+        onClick={() => onView?.(user)}
+        title="Xem chi tiết"
+      >
+        <Info className="size-6" />
+      </button>
 
-          {/* XEM CHI TIẾT */}
-          <button
-            type="button"
-            className="inline-flex text-gray-500 hover:text-blue-600"
-            onClick={() => onView?.(user)}
-            title="Xem chi tiết"
-          >
-            <Info className="size-4" />
-          </button>
-
-          {/* KHÓA / MỞ KHÓA — chỉ Nạn nhân & Cứu hộ */}
-          {canLockAccount && (
-            <button
-            type="button"
-            className={`inline-flex ${
-              isActive
-                ? "text-gray-500 hover:text-red-500"
-                : "text-gray-500 hover:text-green-600"
-            }`} 
-            onClick={() => onToggleStatus?.(user)}
-            title={isActive ? "Khóa tài khoản" : "Mở khóa tài khoản"}
-          >
-            {isActive ? (
-              <Lock className="size-4" />
-            ) : (
-              <Unlock className="size-4" />
-              )}
-          </button>
-          )}
-
-        </div>
-      </td>
+      {canLockAccount && (
+      <button
+        type="button"
+        className={`inline-flex transition-colors ${
+          isActive
+            ? "text-gray-400 hover:text-red-500"
+            : "text-gray-400 hover:text-green-600"
+        }`}
+        onClick={() => onToggleStatus?.(user)}
+        title={isActive ? "Khóa tài khoản" : "Mở khóa tài khoản"}
+      >
+        {isActive ? <Lock className="size-6" /> : <Unlock className="size-6" />}
+      </button>
+    )}
+  </div>
+</td>
 
     </tr>
   );
