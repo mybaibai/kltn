@@ -97,21 +97,22 @@ const CreateUserDrawer = ({ open, onClose, onSubmit }) => {
 
       const payload = {
         full_name: form.full_name.trim(),
-        email: form.email.trim(),
+        email: form.email.trim().toLowerCase(),
         password: form.password,
         role: "Rescue",
-
-        // backend user schema
         profile: {
           address: form.address?.trim() || "",
         },
       };
 
-      await api.post("/users", payload);
+      const res = await api.post("/users", payload);
+      if (!res?.data?.success) {
+        throw new Error(res?.data?.message || "Tạo đội cứu trợ thất bại");
+      }
 
       toast.success("Tạo đội cứu trợ thành công");
 
-      onSubmit?.(payload);
+      onSubmit?.(res.data.data);
 
       // reset form
       setForm({
@@ -128,9 +129,11 @@ const CreateUserDrawer = ({ open, onClose, onSubmit }) => {
 
       const message =
         err?.response?.data?.message ||
+        err?.message ||
         "Tạo đội cứu trợ thất bại";
 
       toast.error(message);
+      return;
     } finally {
       setLoading(false);
     }

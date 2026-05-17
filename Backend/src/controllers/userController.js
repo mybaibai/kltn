@@ -3,10 +3,11 @@ import * as userService from '../services/userService.js';
 
 export const create = async (req, res) => {
   try {
-    const user = await userService.createUser(req.body);
+    const user = await userService.createStaffUser(req.body);
     res.status(201).json({ success: true, data: user });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    const status = err.statusCode || 500;
+    res.status(status).json({ success: false, message: err.message });
   }
 };
 
